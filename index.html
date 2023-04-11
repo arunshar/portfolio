@@ -41,12 +41,61 @@
             <td style="padding:20px;width:100%;vertical-align:middle">
               <heading>Selected Publications</heading>
               <p>
-                I am broadly interested in trajectory data mining in applications with real world problems. My research focuses on combining spatiotemporal data mining, time geography, query processing and computational geometry. Here is some of my work:
+                I am broadly interested in trajectory data mining in applications with real world societal problems. My research focuses on combining spatiotemporal data mining, time geography, and computational geometry. Here is some of my work:
               </p>
             </td>
           </tr>
         </tbody></table>
         <table style="width:100%;border:0px;border-spacing:0px;border-collapse:separate;margin-right:auto;margin-left:auto;"><tbody>
+
+          <tr onmouseout="nerfactor_stop()" onmouseover="nerfactor_start()">
+            <td style="padding:20px;width:25%;vertical-align:middle">
+            <img src='images/SIGSPATIAL.png' width="200" height="100">
+            </td>
+            <td style="padding:20px;width:75%;vertical-align:middle">
+              <a href="https://dl.acm.org/doi/abs/10.1145/3557915.3561033">
+              <papertitle>Towards a tighter bound on possible-rendezvous areas: preliminary results</papertitle>
+              </a>
+              <br>
+              <strong>Arun Sharma</strong>,
+              <a href="https://www-users.cse.umn.edu/~gupta423/index.html">Jayant Gupta</a>,
+              <a>Subhankar Ghosh</a>
+              <br>
+              <em>30th International Conference on Advances in Geographic Information Systems (SIGSPATIAL 2022)</em>
+              <br>
+<!--               <a href="https://people.csail.mit.edu/xiuming/projects/nerfactor/">project page</a>
+              /
+              <a href="https://arxiv.org/abs/2106.01970">arXiv</a>
+              /
+              <a href="https://www.youtube.com/watch?v=UUVSPJlwhPg">video</a> -->
+              <p></p>
+              <p>Given trajectories with gaps, we investigate methods to tighten spatial bounds on areas (e.g., nodes in a spatial network) where possible rendezvous activity could have occurred. The problem is important for reducing manual effort to post-process possible rendezvous areas using satellite imagery and has many societal applications to improve public safety, security, and health. The problem of rendezvous detection is challenging due to the difficulty of interpreting missing data within a trajectory gap and the very high cost of detecting gaps in such a large volume of location data. Most recent literature presents formal models, namely space-time prism, to track an object's rendezvous patterns within trajectory gaps on a spatial network. However, the bounds derived from the space-time prism are rather loose, resulting in unnecessarily extensive postprocessing manual effort. To address these limitations, we propose a Time Slicing-based Gap-Aware Rendezvous Detection (TGARD) algorithm to tighten the spatial bounds in spatial networks. We propose a Dual Convergence TGARD (DC-TGARD) algorithm to improve computational efficiency using a bi-directional pruning approach. Theoretical results show the proposed spatial bounds on the area of possible rendezvous are tighter than that from related work (space-time prism). Experimental results on synthetic and real-world spatial networks (e.g., road networks) show that the proposed DC-TGARD is more scalable than the TGARD algorithm.</p>
+            </td>
+
+
+        <tr onmouseout="nerfactor_stop()" onmouseover="nerfactor_start()">
+            <td style="padding:20px;width:25%;vertical-align:middle">
+            <img src='images/COSIT.png' width="200" height="100">
+            </td>
+            <td style="padding:20px;width:75%;vertical-align:middle">
+              <a href="https://drops.dagstuhl.de/opus/volltexte/2022/16911/">
+              <papertitle>Abnormal Trajectory-Gap Detection: A Summary</papertitle>
+              </a>
+              <br>
+              <strong>Arun Sharma</strong>,
+              <a href="https://www-users.cse.umn.edu/~gupta423/index.html">Jayant Gupta</a>,
+              <a href="https://www-users.cs.umn.edu/~shekhar/">Shashi Shekhar</a>
+              <br>
+              <em>15th International Conference on Spatial Information Theory (COSIT 2022)</em>
+              <br>
+<!--               <a href="https://people.csail.mit.edu/xiuming/projects/nerfactor/">project page</a>
+              /
+              <a href="https://arxiv.org/abs/2106.01970">arXiv</a>
+              /
+              <a href="https://www.youtube.com/watch?v=UUVSPJlwhPg">video</a> -->
+              <p></p>
+              <p>Given trajectories with gaps (i.e., missing data), we investigate algorithms to identify abnormal gaps for testing possible hypotheses of anomalous regions. Here, an abnormal gap within a trajectory is defined as an area where a given moving object did not report its location, but other moving objects did periodically. The problem is important due to its societal applications, such as improving maritime safety and regulatory enforcement for global security concerns such as illegal fishing, illegal oil transfer, and trans-shipments. The problem is challenging due to the difficulty of interpreting missing data within a trajectory gap, and the high computational cost of detecting gaps in such a large volume of location data proves computationally very expensive. The current literature assumes linear interpolation within gaps, which may not be able to detect abnormal gaps since objects within a given region may have traveled away from their shortest path. To overcome this limitation, we propose an abnormal gap detection (AGD) algorithm that leverages the concepts of a space-time prism model where we assume space-time interpolation. We then propose a refined memoized abnormal gap detection (Memo-AGD) algorithm that reduces comparison operations. We validated both algorithms using synthetic and real-world data. The results show that abnormal gaps detected by our algorithms give better estimates of abnormality than linear interpolation and can be used for further investigation from the human analysts.</p>
+            </td>
 
 
           <tr onmouseout="nerfactor_stop()" onmouseover="nerfactor_start()">
@@ -54,9 +103,9 @@
             <img src='images/Tist.png' width="200" height="100">
             </td>
             <td style="padding:20px;width:75%;vertical-align:middle">
-<!--               <a href="https://people.csail.mit.edu/xiuming/projects/nerfactor/"> -->
+              <a href="https://dl.acm.org/doi/full/10.1145/3467977">
               <papertitle>Analyzing Trajectory Gaps for Possible Rendezvous Regions</papertitle>
-<!--               </a> -->
+              </a>
               <br>
               <strong>Arun Sharma</strong>
               <a href="https://www-users.cs.umn.edu/~shekhar/">Shashi Shekhar</a>
@@ -69,7 +118,7 @@
               /
               <a href="https://www.youtube.com/watch?v=UUVSPJlwhPg">video</a> -->
               <p></p>
-              <p>Optimizing spatiotemporal approximation of rendezvous areas via proposed spatial and temporal pruning strategies.</p>
+              <p>Given trajectory data with gaps, we investigate methods to identify possible rendezvous regions. The problem has societal applications such as improving maritime safety and regulatory enforcement. The challenges come from two aspects. First, gaps in trajectory data make it difficult to identify regions where moving objects may have rendezvoused for nefarious reasons. Hence, traditional linear or shortest path interpolation methods may not be able to detect such activities, since objects in a rendezvous may have traveled away from their usual routes to meet. Second, user detecting a rendezvous regions involve a large number of gaps and associated trajectories, making the task computationally very expensive. In preliminary work, we proposed a more effective way of handling gaps and provided examples to illustrate potential rendezvous regions. In this article, we are providing detailed experiments with both synthetic and real-world data. Experiments on synthetic data show that the accuracy improved by 50 percent, which is substantial as compared to the baseline approach. In this article, we propose a refined algorithm Temporal Selection Search for finding a potential rendezvous region and finding an optimal temporal range to improve computational efficiency. We also incorporate two novel spatial filters: (i) a Static Ellipse Intersection Filter and (ii) a Dynamic Circle Intersection Spatial Filter. Both the baseline and proposed approaches account for every possible rendezvous pattern. We provide a theoretical evaluation of the algorithms correctness and completeness along with a time complexity analysis. Experimental results on synthetic and real-world maritime trajectory data show that the proposed approach substantially improves the area pruning effectiveness and computation time over the baseline technique. We also performed experiments based on accuracy and precision on synthetic dataset on both proposed and baseline techniques.</p>
             </td>
 <!-- bgcolor="#ffffd0" -->
           <tr onmouseout="mipnerf_stop()" onmouseover="mipnerf_start()">
@@ -97,7 +146,7 @@
 <!--               /
               <a href="https://www.youtube.com/watch?v=UUVSPJlwhPg">video</a> -->
               <p></p>
-              <p>Performing spatial approximation of rendezvous area based on physics based parameters. I've presented some of my work in <a href="https://geospatial.umd.edu/news/gis-day-umd">GIS Day</a> at <a href="https://www.umd.edu/">UMD</a>.</p>
+              <p>Given trajectory data with gaps, we investigate methods to identify possible rendezvous regions. Societal applications include improving maritime safety and regulations. The challenges come from two aspects. If trajectory data are not available around the rendezvous then either linear or shortest-path interpolation may fail to detect the possible rendezvous. Furthermore, the problem is computationally expensive due to the large number of gaps and associated trajectories. In this paper, we first use the plane sweep algorithm as a baseline. Then we propose a new filtering framework using the concept of a space-time grid. Experimental results and case study on real-world maritime trajectory data show that the proposed approach substantially improves the Area Pruning Efficiency over the baseline technique. I've presented some of my work in <a href="https://geospatial.umd.edu/news/gis-day-umd">GIS Day</a> at <a href="https://www.umd.edu/">UMD</a>.</p>
             </td>
           </tr> 
 

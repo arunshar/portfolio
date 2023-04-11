@@ -1,5 +1,2 @@
-Arun Sharma is a PhD candidate in Computer Science advised by Prof. Shashi Shekhar at University of Minnesota Twin Cities. 
-He works on spatiotemporal data mining for solving real world problems. He received a master in Computer Science from the 
-University at Buffalo, Buffalo, New York in 2018, where he was advised by Prof. Varun Chandola, and he received a Bachelors 
-and Masters in Computer Science from Gautam Buddha University in 2016.
+Arun Sharma is a Ph.D. candidate in the Department of Computer Science at the University of Minnesota, advised by Prof. Shashi Shekhar. His research interests span spatial data science, machine learning, uncertainty quantification, and geometric computing algorithms to solve previously unsolvable societal problems such as climate change, biodiversity, and others listed under the U.N. Sustainable Development Goals. He received his Master's in Computer Science from the State University of New York at Buffalo, New York, in 2018. During his P.h.D., he  published his research at prestigious computer science conferences and mentored many high school students.
 After graduation, Arun is looking forward to working in the areas of data mining and machine learning.

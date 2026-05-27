@@ -583,19 +583,15 @@ section[id] {
 }
 
 .project-group-heading {
-  padding: 2.2rem 0 0.4rem;
+  padding: 3.4rem 0 0.4rem;
   text-align: center;
-}
-
-.project-group-heading .section-label {
-  margin-bottom: 0.7rem;
 }
 
 .project-group-heading h3 {
   margin: 0;
   color: var(--text);
   font-family: "Cormorant Garamond", Georgia, serif;
-  font-size: 2.4rem;
+  font-size: 3.2rem;
   font-weight: 400;
 }
 
@@ -660,6 +656,25 @@ section[id] {
   display: flex;
   flex-direction: column;
   justify-content: center;
+}
+
+.timeline-section {
+  width: min(100%, 62rem);
+  margin: 0 auto 5.6rem;
+}
+
+.timeline-section:last-child {
+  margin-bottom: 0;
+}
+
+.timeline-section-title {
+  margin: 0 0 2.5rem;
+  color: var(--text);
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-size: 3rem;
+  font-weight: 400;
+  line-height: 1.05;
+  text-align: center;
 }
 
 .timeline {
@@ -981,6 +996,14 @@ section[id] {
     margin-bottom: 3rem;
   }
 
+  .timeline-section {
+    margin-bottom: 4.4rem;
+  }
+
+  .timeline-section-title {
+    font-size: 2.45rem;
+  }
+
   .timeline {
     gap: 3.4rem;
     padding-left: 4.2rem;
@@ -1015,6 +1038,11 @@ section[id] {
   .publication-card h3,
   .timeline h3 {
     font-size: 1.62rem;
+  }
+
+  .timeline-section-title,
+  .project-group-heading h3 {
+    font-size: 2.05rem;
   }
 
   .site-nav {

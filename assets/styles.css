@@ -491,6 +491,11 @@ section[id] {
   font-size: 0.95rem;
 }
 
+.resume-project-card .paper-authors {
+  max-width: 58rem;
+  line-height: 1.65;
+}
+
 .paper-venue {
   max-width: 52rem;
   margin-bottom: 1.4rem;
@@ -575,6 +580,23 @@ section[id] {
 
 .systems-list .paper-card {
   min-height: 16rem;
+}
+
+.project-group-heading {
+  padding: 2.2rem 0 0.4rem;
+  text-align: center;
+}
+
+.project-group-heading .section-label {
+  margin-bottom: 0.7rem;
+}
+
+.project-group-heading h3 {
+  margin: 0;
+  color: var(--text);
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-size: 2.4rem;
+  font-weight: 400;
 }
 
 .publication-list {
@@ -703,6 +725,32 @@ section[id] {
   max-width: 44rem;
   margin-bottom: 0;
   color: var(--muted);
+}
+
+.timeline-list {
+  display: grid;
+  gap: 0.7rem;
+  max-width: 48rem;
+  padding: 0;
+  margin: 0;
+  color: var(--muted);
+  list-style: none;
+}
+
+.timeline-list li {
+  position: relative;
+  padding-left: 1.05rem;
+}
+
+.timeline-list li::before {
+  position: absolute;
+  top: 0.72em;
+  left: 0;
+  width: 0.32rem;
+  height: 0.32rem;
+  content: "";
+  background: var(--accent);
+  border-radius: 50%;
 }
 
 .teaching-grid {

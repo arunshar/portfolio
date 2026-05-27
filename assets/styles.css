@@ -470,19 +470,20 @@ section[id] {
 }
 
 .paper-year {
-  margin-bottom: 0.95rem;
+  margin-bottom: 1rem;
   color: var(--accent);
-  font-size: 0.76rem;
-  font-weight: 500;
+  font-size: 0.88rem;
+  font-weight: 600;
+  line-height: 1.45;
   text-transform: uppercase;
 }
 
 .paper-card h3,
 .publication-card h3 {
-  max-width: 52rem;
-  margin-bottom: 0.65rem;
+  max-width: 62rem;
+  margin-bottom: 0.8rem;
   font-family: "Cormorant Garamond", Georgia, serif;
-  font-size: 2rem;
+  font-size: 2.22rem;
   font-weight: 400;
   line-height: 1.22;
 }
@@ -494,20 +495,20 @@ section[id] {
 
 .paper-authors {
   margin-bottom: 0.35rem;
-  color: var(--muted);
-  font-size: 0.95rem;
+  color: #b7b1ad;
+  font-size: 1.03rem;
+  line-height: 1.78;
 }
 
 .resume-project-card .paper-authors {
-  max-width: 58rem;
-  line-height: 1.65;
+  max-width: 60rem;
 }
 
 .paper-venue {
-  max-width: 52rem;
+  max-width: 56rem;
   margin-bottom: 1.4rem;
   color: var(--dim);
-  font-size: 0.95rem;
+  font-size: 1rem;
   font-style: italic;
 }
 
@@ -586,7 +587,7 @@ section[id] {
 }
 
 .systems-list .paper-card {
-  min-height: 16rem;
+  min-height: 17rem;
 }
 
 .project-group-heading {
@@ -1044,12 +1045,20 @@ section[id] {
   .paper-card h3,
   .publication-card h3,
   .timeline h3 {
-    font-size: 1.62rem;
+    font-size: 1.78rem;
   }
 
   .timeline-section-title,
   .project-group-heading h3 {
     font-size: 2.05rem;
+  }
+
+  .paper-year {
+    font-size: 0.78rem;
+  }
+
+  .paper-authors {
+    font-size: 0.98rem;
   }
 
   .site-nav {

@@ -64,6 +64,13 @@ h4 {
   pointer-events: none;
 }
 
+.icon-sprite {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
 .cursor,
 .cursor-dot {
   position: fixed;
@@ -496,7 +503,7 @@ section[id] {
 .contact-links {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.8rem 1.35rem;
+  gap: 0.75rem;
 }
 
 .paper-links a,
@@ -505,6 +512,65 @@ section[id] {
   font-size: 0.82rem;
   font-weight: 500;
   text-transform: uppercase;
+}
+
+.paper-links .project-link {
+  position: relative;
+  display: inline-flex;
+  min-height: 2.35rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  padding: 0.58rem 0.82rem;
+  overflow: hidden;
+  color: var(--text);
+  background: rgba(244, 241, 234, 0.055);
+  border: 1px solid rgba(244, 241, 234, 0.13);
+  border-radius: 6px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.paper-links .project-link:hover {
+  color: var(--text);
+  border-color: rgba(244, 241, 234, 0.28);
+  transform: translateY(-2px);
+}
+
+.paper-links .github-link {
+  background: rgba(244, 241, 234, 0.07);
+}
+
+.paper-links .hf-link {
+  color: #15110a;
+  background:
+    linear-gradient(135deg, rgba(255, 248, 220, 0.98), rgba(255, 196, 77, 0.98) 58%, rgba(245, 145, 44, 0.96));
+  border-color: rgba(255, 210, 86, 0.88);
+  box-shadow: 0 10px 28px rgba(255, 184, 54, 0.2);
+}
+
+.paper-links .hf-link:hover {
+  color: #15110a;
+  border-color: rgba(255, 228, 129, 0.98);
+  box-shadow: 0 14px 38px rgba(255, 184, 54, 0.3);
+}
+
+.project-link-icon {
+  flex: 0 0 auto;
+  width: 1rem;
+  height: 1rem;
+  fill: currentColor;
+}
+
+.hf-mark {
+  display: inline-grid;
+  width: 1.28rem;
+  height: 1.28rem;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.44);
+  border-radius: 50%;
+  font-size: 0.95rem;
+  line-height: 1;
 }
 
 .systems-list .paper-card {

@@ -1,1479 +1,367 @@
-<!DOCTYPE html>
-<!-- saved from url=(0032)https://www.cs.cmu.edu/~dpathak/ -->
+<!doctype html>
 <html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Arun Sharma | Spatial AI Research</title>
+    <meta
+      name="description"
+      content="Arun Sharma's spatial AI portfolio across physics-informed learning, knowledge-guided machine learning, diffusion models, remote sensing, 3D reconstruction, and geospatial intelligence."
+    />
+    <meta property="og:title" content="Arun Sharma | Spatial AI Research" />
+    <meta
+      property="og:description"
+      content="Research, publications, teaching, and applied spatial AI systems by Arun Sharma."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600&family=Outfit:wght@300;400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="assets/styles.css" />
+  </head>
+  <body>
+    <canvas id="ambient-canvas" aria-hidden="true"></canvas>
+    <div class="cursor" aria-hidden="true"></div>
+    <div class="cursor-dot" aria-hidden="true"></div>
 
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <!-- Google tag (gtag.js) -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-7XZLDYL4RM"></script>
-  <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag() { dataLayer.push(arguments); }
-    gtag('js', new Date());
+    <header class="site-header">
+      <a class="brand" href="#top" aria-label="Arun Sharma portfolio home">AS</a>
+      <nav class="site-nav" aria-label="Primary navigation">
+        <a href="#about">About</a>
+        <a href="#news">News</a>
+        <a href="#experience">Work</a>
+        <a href="#research">Systems</a>
+        <a href="#publications">Papers</a>
+        <a href="#teaching">Teaching</a>
+        <a href="#library">Library</a>
+        <a href="#contact">Contact</a>
+      </nav>
+    </header>
 
-    gtag('config', 'G-7XZLDYL4RM');
-  </script>
-  <meta name="generator" content="HTML Tidy for Linux/x86 (vers 11 February 2007), see www.w3.org">
-  <style type="text/css">
-    /* Design Modified from: Jon Barron and Saurabh Gupta. Thanks to Jeff Donahue for email scamble.*/
-    a {
-      color: #1772d0;
-      text-decoration: none;
-    }
+    <main id="top">
+      <section class="hero reveal" aria-labelledby="hero-title">
+        <p class="hero-kicker">Spatial AI Researcher</p>
+        <h1 id="hero-title">Arun Sharma</h1>
+        <p class="hero-copy">
+          Physics-informed AI for spatial problems where data are incomplete, conditions shift
+          across regions, and models must respect physical constraints.
+        </p>
+        <div class="hero-links" aria-label="Profile links">
+          <a href="https://arunshar.github.io/portfolio/data/Arun%20Sharma.pdf">CV</a>
+          <a href="https://scholar.google.com/citations?user=yb0e0FYAAAAJ&amp;hl=en">Google Scholar</a>
+          <a href="https://github.com/arunshar">GitHub</a>
+          <a href="https://www.linkedin.com/in/arun08sharma/">LinkedIn</a>
+        </div>
+        <a class="scroll-cue" href="#about" aria-label="Scroll to about section">
+          <span>Scroll</span>
+          <i aria-hidden="true"></i>
+        </a>
+      </section>
 
-    a:focus,
-    a:hover {
-      color: #f09228;
-      text-decoration: none;
-    }
-
-    body,
-    td,
-    th {
-      font-family: 'Titillium Web', Verdana, Helvetica, sans-serif;
-      font-size: 16px;
-      font-weight: 400
-    }
-
-    heading {
-      font-family: 'Titillium Web', Verdana, Helvetica, sans-serif;
-      font-size: 17px;
-      /* 19 */
-      font-weight: 600
-        /* 1000 */
-    }
-
-    hr {
-      border: 0;
-      height: 1px;
-      background-image: linear-gradient(to right, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.75), rgba(0, 0, 0, 0));
-    }
-
-    strong {
-      font-family: 'Titillium Web', Verdana, Helvetica, sans-serif;
-      font-size: 16px;
-      font-weight: 600
-        /* 800 */
-    }
-
-    strongred {
-      font-family: 'Titillium Web', Verdana, Helvetica, sans-serif;
-      color: red;
-      font-size: 16px
-    }
-
-    sectionheading {
-      font-family: 'Titillium Web', Verdana, Helvetica, sans-serif;
-      font-size: 22px;
-      font-weight: 600
-    }
-
-    pageheading {
-      font-family: 'Titillium Web', Verdana, Helvetica, sans-serif;
-      font-size: 38px;
-      font-weight: 400
-    }
-
-    .ImageBorder {
-      border-width: 1px;
-      border-color: Black;
-    }
-
-    span.highlight {
-      background-color: #ffffd0;
-    }
-  </style>
-  <link rel="shortcut icon" href="images/as_circle.png" type="image/vnd.microsoft.icon">
-  <script type="text/javascript" async="" src="./Arun Sharma_files/js"></script>
-  <script async="" src="./Arun Sharma_files/analytics.js"></script>
-  <script type="text/javascript" src="./Arun Sharma_files/hidebib.js"></script>
-  <title>Arun Sharma</title>
-  <meta name="description" content="Arun Sharma's Homepage">
-  <link href="./Arun Sharma_files/css" rel="stylesheet" type="text/css">
-  <!-- Start : Google Analytics Code -->
-  <script>
-    (function (i, s, o, g, r, a, m) {
-      i['GoogleAnalyticsObject'] = r; i[r] = i[r] || function () {
-        (i[r].q = i[r].q || []).push(arguments)
-      }, i[r].l = 1 * new Date(); a = s.createElement(o),
-        m = s.getElementsByTagName(o)[0]; a.async = 1; a.src = g; m.parentNode.insertBefore(a, m)
-    })(window, document, 'script', '//www.google-analytics.com/analytics.js', 'ga');
-    ga('create', 'UA-64069893-1', 'auto');
-    ga('send', 'pageview');
-  </script>
-  <!-- End : Google Analytics Code -->
-  <!-- Scramble Script by Jeff Donahue -->
-  <script src="./Arun Sharma_files/scramble.js"></script>
-  <script charset="utf-8" src="./Arun Sharma_files/button.856debeac157d9669cf51e73a08fbc93.js"></script>
-</head>
-
-<body data-new-gr-c-s-check-loaded="14.1172.0" data-gr-ext-installed="">
-  <table width="840" border="0" align="center" cellspacing="0" cellpadding="20">
-    <tbody>
-      <tr>
-        <td width="32%" valign="top"><a href="./Arun Sharma_files/Arun_Sharma.jpg" title="View Arun Sharma profile photo"><img
-              src="./Arun Sharma_files/Arun_Sharma.jpg" alt="Arun Sharma" width="100%" style="border-radius:15px"></a>
-          <p align="center">
-            <a href="data/Arun Sharma.pdf">CV</a> |
-            <a href="data/bio.txt" target="_blank" rel="noopener noreferrer">Bio</a> |
-            <a href="https://scholar.google.com/citations?user=yb0e0FYAAAAJ&hl=en">Google Scholar</a> <br>
-            <a href="https://www.linkedin.com/in/arun08sharma/" target="_blank" rel="noopener noreferrer">LinkedIn</a> |
-            <a href="https://github.com/arunshar">Github</a> |
-            <a href="https://x.com/arunshar08">Twitter</a> <br>
-          </p>
-          <p align="center" style="margin-top:-8px;"><iframe id="twitter-widget-0" scrolling="no" frameborder="0"
-              allowtransparency="true" allowfullscreen="true"
-              class="twitter-follow-button twitter-follow-button-rendered" title="Twitter Follow Button"
-              src="./Arun Sharma_files/follow_button.2f70fb173b9000da126c79afe2098f02.en.html"
-              style="position: static; visibility: visible; width: 156px; height: 20px;"
-              data-screen-name="arunshar08"></iframe>
-            <script async="" src="./Arun Sharma_files/widgets.js" charset="utf-8"></script>
-          </p>
-          <p></p>
-        </td>
-        <td width="68%" valign="top" align="justify">
-          <p align="center">
-            <pageheading>Arun Sharma</pageheading><br>
-            <b>email</b>:&nbsp;
-            <font id="email" style="display:inline;">
-              undamasrneu.u@hr
-              <a href="#" onclick="emailScramble.initAnimatedBubbleSort();return false;">
-                unscramble
-              </a>
-            </font>
-            <script>
-              emailScramble = new scrambledString(
-                document.getElementById('email'),
-                'emailScramble',
-                'undamasrneu.u@hr',
-                [16, 12, 15, 1, 11, 7, 5, 2, 4, 14, 3, 13, 10, 9, 6, 8]
-              );
-            </script>
-          </p>
-          <!-- <p>I am a Ph.D. candidate at <a href="https://twin-cities.umn.edu/">University of Minnesota, Twin Cities</a> in <a href="https://cse.umn.edu/cs" target="_blank">Computer Science</a> advised by <a href="https://www-users.cs.umn.edu/~shekhar/">Prof. Shashi Shekhar</a>. My thesis committee members are <a href="https://www-users.cse.umn.edu/~kumar001/">Prof. Vipin Kumar</a>, <a href="https://www-users.cse.umn.edu/~janardan/">Prof. Ravi Janardan</a>, and <a href="https://cla.umn.edu/about/directory/profile/yingsong">Prof. Ying Song</a>. My research areas span spatial data science, machine learning, uncertainty quantification, and geometric computing algorithms to solve previously unsolvable societal problems in areas such as biodiversity and climate change. Prior to joining UMN, I received my Master's in Computer Science from <a href="https://engineering.buffalo.edu/computer-science-engineering.html">University at Buffalo</a> in 2018 under the guidance of <a href="https://ubdsgroup.github.io/team/varun-chandola/">Prof. Varun Chandola</a>. <span style="color:red; font-weight:bold;">I am currently active in the job market.</span></p> -->
-          <p>I develop AI methods for spatial problems where data are incomplete, conditions shift across regions,
-            and models must respect physical constraints. My work combines physics-informed learning,
-            knowledge-guided machine learning, diffusion models, transformers, and process-based scientific models,
-            spanning applications in autonomous navigation, climate downscaling, sustainable agriculture, and
-            geospatial intelligence. I earned my Ph.D. in <a href="https://cse.umn.edu/cs" target="_blank" rel="noopener noreferrer">Computer
-              Science</a> from the <a href="https://twin-cities.umn.edu/">University of Minnesota, Twin Cities</a>,
-            advised by <a href="https://www-users.cs.umn.edu/~shekhar/">Prof. Shashi Shekhar</a> and
-            <a href="https://www-users.cse.umn.edu/~kumar001/">Prof. Vipin Kumar</a>. At
-            <a href="https://www.esri.com/en-us/home">Esri</a>, I shipped a maritime anomaly-detection pipeline on AWS
-            that improved classification accuracy from 55% to 73%. I hold the University of Minnesota Doctoral
-            Dissertation Fellowship, and my research has been published in AAAI, SIAM SDM, ACM TIST, ACM TSAS, and ACM
-            SIGSPATIAL.</p>
-          <!-- <p><span style="color:red; font-weight:bold;">I am currently on the job market, seeking academic and research opportunities.</span></p> -->
-          <p class="job-market-alert" style="text-align: center;">
-            <span class="icon">🎓</span> I am open to Job Market!
-          </p>
-
-          <style>
-            .job-market-alert {
-              font-weight: bold;
-              color: #2c3e50;
-              /* Dark grey color */
-              font-size: 1em;
-              padding: 5px 8px;
-              display: inline-flex;
-              align-items: center;
-              justify-content: center;
-              background-color: #ecf0f1;
-              /* Light grey background */
-              border: 1px solid #2c3e50;
-              border-radius: 5px;
-              box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
-              animation: bounce 2s infinite;
-              margin-top: 20px;
-              max-width: 300px;
-              /* Limit the width */
-              margin-left: auto;
-              /* Center horizontally */
-              margin-right: auto;
-              /* Center horizontally */
-            }
-
-            .job-market-alert .icon {
-              margin-right: 10px;
-            }
-          </style>
-        </td>
-      </tr>
-    </tbody>
-  </table>
-
-  <p align="center">
-    <a href="data/Research Statement.pdf">Research Statement</a> &nbsp;/&nbsp;
-    <a href="data/Teaching Statement.pdf">Teaching Statement</a> &nbsp;/&nbsp;
-    <a href="data/Diversity Statement.pdf">Diversity Statement</a> &nbsp;/&nbsp;
-    <a href="data/Thesis.pdf">Ph.D. Thesis</a>
-  </p>
-
-
-
-  <table width="840" align="center" border="0" cellspacing="0" cellpadding="20">
-    <tbody>
-      <tr>
-        <td>
-          <sectionheading>&nbsp;&nbsp;News</sectionheading>
-          <ul>
-            <li> [12/2025] One paper accepted in AAAI Workshop on AI to Accelerate Science and Engineering!</li>
-            <li> [11/2025] Two Oral Presentations in ACM SIGSPATIAL 2025 in Minneapolis!</li>
-            <li> [09/2025] Four papers accepted at ACM SIGSPATIAL 2025!</li>
-            <li> [08/2025] One paper accepted in SSTD 2025!</li>
-            <li> [07/2025] Successfully Defended my Ph.D. Dissertation!</li>
-            <li> [02/2025] Two papers accepted at AAAI bridge on Knowledge-guided ML Workshop 2025!</li>
-            <li> [12/2024] One paper accepted at SIAM Data Mining 2025!</li>
-            <li> [11/2024] Oral Presentation in ACM SIGSPATIAL 2024 in Atlanta, GA!</li>
-            <li> [10/2024] NSF Travel Award for SIGSPATIAL 2024!</li>
-            <li> [10/2024] One paper accepted at ACM Transactions on Spatial Algorithms and Systems!</li>
-            <li> [09/2024] Two papers accepted at ACM SIGSPATIAL 2024!</li>
-            <li> [08/2024] Invited Poster Presentation at Knowledge-Guided Machine Learning (KGML) Workshop 2024!</li>
-            <li> [06/2024] One paper is accepted at COSIT 2024!</li>
-            <li> [05/2024] Invited Lightening Talk and Poster Presentation in AI-CLIMATE annual meeting!</li>
-            <li> [12/2023] One paper accepted at SIAM Data Mining 2024!</li>
-            <li> [08/2023] Completed my internship at ESRI under Dr. Erik. G. Hoel!</li>
-            <li> [04/2023] Invited Presentation at MIDAS Future Leader Summit at Univesity of Michigan!</li>
-            <li> [03/2023] One paper accepted in GIScience 2023!</li>
-            <li> [11/2022] Oral Presentation in ACM SIGSPATIAL 2022 in Seattle, WA!</li>
-            <li> [10/2022] NSF Travel Award for SIGSPATIAL 2022!</li>
-            <li><a href="javascript:toggleblock(&#39;news&#39;)">---- show more ----</a></li>
-          </ul>
-          <ul id="news" style="display:none">
-            <li> [09/2022] Oral Presentation in COSIT 2022 in Kobe, Japan!</li>
-            <li> [08/2022] One paper accepted in ACM SIGSPATIAL 2022!</li>
-            <li> [05/2022] Received Doctoral Dissertation Fellowship 2022-2023!</li>
-            <li> [04/2022] One paper accepted in COSIT 2022!</li>
-            <li> [03/2022] One paper accepted in AGILE 2022!</li>
-            <li> [09/2021] Oral Presentation in GIScience 2021 (Online)!</li>
-            <li> [05/2021] One paper accepted at ACM Transactions in Intelligent System and Technology!</li>
-            <li> [10/2020] Invited Presentation in University of Maryland, College Park (Online)!</li>
-            <li> [06/2020] One paper accepted in GIScience 2021!</li>
-          </ul>
-        </td>
-      </tr>
-    </tbody>
-  </table>
-
-  <hr>
-
-
-  <div class="section_div" id="Teaching">
-    <table width="840" align="center" border="0" cellspacing="0" cellpadding="20">
-      <tbody>
-        <tr>
-          <td>
-            <sectionheading>Teaching</sectionheading>
-          </td>
-        </tr>
-        <tr>
-          <td>
-            <a href="https://www.spatial.cs.umn.edu/Courses/Spring24/8715/index.php">CSCI 8715: Spatial Data Science
-              Research</a> (Spring 2024)<br>
-            <a href="https://www.spatial.cs.umn.edu/Courses/Fall19/5715/index.php">CSCI 5715: Spatial Data Science</a>
-            (Fall 2019)<br>
-            <a href="https://www.spatial.cs.umn.edu/Courses/Spring19/5708/index.php">CSCI 5708: Database Systems</a>
-            (Spring 2019)<br>
-            <a href="https://www-users.cselabs.umn.edu/classes/Fall-2018/csci4041/index.php?page=syllabus">CSCI 4041:
-              Data Structures and Algorithms</a> (Fall 2018)<br>
-          </td>
-        </tr>
-        <tr>
-          <td></td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
-
-  <!-- <div class='section_div' id='Courses'>
-<h2>Courses</h2>
-<a href="https://phillipi.github.io/6.s898/">6.s898: Deep Learning</a> (Fall 2021)<br>
-<a href="http://6.869.csail.mit.edu/sp21">6.819/6.869: Advances in Computer Vision</a> (Spring 2021)<br>
-<a href="https://introml.odl.mit.edu/cat-soop/6.036">6.036: Introduction to Machine Learning</a> (Fall 2020)<br>
-<a href="https://phillipi.github.io/6.882/2020/">6.882: Embodied Intelligence</a> (Spring 2020)<br>
-
-</div>
-<br>
-<hr> -->
-
-  <hr>
-
-  <table width="840" align="center" border="0" cellspacing="0" cellpadding="20">
-    <tbody>
-      <tr>
-        <td>
-          <sectionheading>&nbsp;&nbsp;Publications </sectionheading>(representative papers are <span
-            class="highlight">highlighted</span>)<br>&nbsp;&nbsp;&nbsp;last update: Apr 2026
-        </td>
-      </tr>
-    </tbody>
-  </table>
-  <br>
-  <table width="840" align="center" border="0" cellspacing="0" cellpadding="15">
-
-    <tbody>
-
-      <tr bgcolor="#ffffd0">
-        <td width="100%" valign="top">
-          <p><a href="https://doi.org/10.1145/3764914.3770595" id="PIDIFF">
-              <heading>Towards Physics-informed Diffusion for Anomaly Detection in Trajectories: A Summary of Results
-              </heading>
-            </a><br>
-            <b>Arun Sharma</b>, Mingzhou Yang, Majid Farhadloo, Subhankar Ghosh, Bharat Jayaprakash and Shashi
-            Shekhar<br>
-            Proceedings of the 2nd ACM SIGSPATIAL International Workshop on Geospatial Anomaly Detection (GeoAnomalies
-            '25), pp. 11–24, 2025
-          </p>
-
-          <div class="paper" id="pidiff">
-            <a href="https://dl.acm.org/doi/10.1145/3764914.3770595">paper</a> |
-            <a href="javascript:toggleblock('pidiff_abs')">abstract</a> |
-            <a href="javascript:togglebib('pidiff')" class="togglebib">bibtex</a>
-
-            <p align="justify">
-              <i style="display: none;" id="pidiff_abs">
-                Given a dataset of moving object trajectories, a domain-specific study area, and a user-defined error
-                threshold, we aim to identify anomalous trajectories indicative of possible GPS spoofing (e.g.,
-                broadcasting fake signals). The problem is societally important to curb illegal activities such as
-                unauthorized fishing and illicit oil transfers in international waters. The problem is challenging due
-                to advances in AI-generated deep fakes (e.g., additive noise, fake trajectories) and the scarcity of
-                labeled samples for ground-truth verification. Current state-of-the-art methods ignore fine-scale
-                spatiotemporal dependencies and prior physical knowledge, resulting in lower accuracy. In this paper,
-                we propose a physics-informed anomaly detection framework based on an encoder-decoder architecture that
-                incorporates kinematic constraints to identify trajectories that violate physical laws. Experimental
-                results on maritime and urban domains demonstrate that the proposed approach yields higher solution
-                quality and lower estimation error for anomaly detection and trajectory reconstruction tasks,
-                respectively.
-              </i>
-            </p>
-
-            <pre xml:space="preserve" style="display:none;">
-  @inproceedings{10.1145/3764914.3770595,
-    author    = {Sharma, Arun and Yang, Mingzhou and Farhadloo, Majid and Ghosh, Subhankar and Jayaprakash, Bharat and Shekhar, Shashi},
-    title     = {Towards Physics-informed Diffusion for Anomaly Detection in Trajectories: A Summary of Results},
-    year      = {2025},
-    isbn      = {9798400722608},
-    publisher = {Association for Computing Machinery},
-    address   = {New York, NY, USA},
-    url       = {https://doi.org/10.1145/3764914.3770595},
-    doi       = {10.1145/3764914.3770595},
-    booktitle = {Proceedings of the 2nd ACM SIGSPATIAL International Workshop on Geospatial Anomaly Detection},
-    series    = {GeoAnomalies '25},
-    pages     = {11--24},
-    numpages  = {14},
-    keywords  = {Physics-informed Neural Network, Trajectory Reconstruction, Spatiotemporal Data Mining, Anomaly Detection}
-  }
-        </pre>
+      <section class="about section-pad" id="about" aria-labelledby="about-title">
+        <div class="about-grid">
+          <div class="about-visual-wrap reveal">
+            <img class="about-visual profile-photo" src="assets/arun-sharma.jpg" alt="Arun Sharma" />
+            <div class="about-frame" aria-hidden="true"></div>
           </div>
-        </td>
-      </tr>
+          <div class="about-content reveal">
+            <p class="section-label">About</p>
+            <h2 id="about-title">Building spatial systems that connect physics, geography, and learning.</h2>
+            <p>
+              I develop AI methods for spatial problems where data are incomplete, conditions
+              shift across regions, and models must respect physical constraints. My work combines
+              physics-informed learning, knowledge-guided machine learning, diffusion models,
+              transformers, and process-based scientific models.
+            </p>
+            <p>
+              I earned my Ph.D. in Computer Science from the University of Minnesota, Twin Cities,
+              advised by Prof. Shashi Shekhar and Prof. Vipin Kumar. At Esri, I shipped a maritime
+              anomaly-detection pipeline on AWS that improved classification accuracy from 55% to 73%.
+            </p>
+            <p>
+              I hold the University of Minnesota Doctoral Dissertation Fellowship, and my research
+              has been published in AAAI, SIAM SDM, ACM TIST, ACM TSAS, and ACM SIGSPATIAL.
+            </p>
+            <p class="status-pill">Open to research and applied scientist roles</p>
+            <div class="profile-actions">
+              <a href="https://arunshar.github.io/portfolio/data/Research%20Statement.pdf">Research Statement</a>
+              <a href="https://arunshar.github.io/portfolio/data/Teaching%20Statement.pdf">Teaching Statement</a>
+              <a href="https://arunshar.github.io/portfolio/data/Diversity%20Statement.pdf">Diversity Statement</a>
+              <a href="https://arunshar.github.io/portfolio/data/Thesis.pdf">Ph.D. Thesis</a>
+            </div>
+          </div>
+        </div>
+      </section>
 
-      <tr bgcolor="#ffffd0">
-        <td width="100%" valign="top">
+      <section class="news section-pad compact-section" id="news" aria-labelledby="news-title">
+        <div class="section-header reveal">
+          <p class="section-label">Updates</p>
+          <h2 id="news-title">News</h2>
+          <p>Research milestones, talks, awards, and publication updates from the academic portfolio.</p>
+        </div>
+        <ol class="news-list reveal" aria-label="Research news">
+          <li><span>[12/2025]</span> One paper accepted in AAAI Workshop on AI to Accelerate Science and Engineering.</li>
+          <li><span>[11/2025]</span> Two oral presentations in ACM SIGSPATIAL 2025 in Minneapolis.</li>
+          <li><span>[09/2025]</span> Four papers accepted at ACM SIGSPATIAL 2025.</li>
+          <li><span>[08/2025]</span> One paper accepted in SSTD 2025.</li>
+          <li><span>[07/2025]</span> Successfully defended my Ph.D. dissertation.</li>
+          <li><span>[02/2025]</span> Two papers accepted at AAAI Bridge on Knowledge-Guided ML Workshop 2025.</li>
+          <li><span>[12/2024]</span> One paper accepted at SIAM Data Mining 2025.</li>
+          <li><span>[11/2024]</span> Oral presentation in ACM SIGSPATIAL 2024 in Atlanta, GA.</li>
+          <li><span>[10/2024]</span> NSF Travel Award for SIGSPATIAL 2024.</li>
+          <li><span>[10/2024]</span> One paper accepted at ACM Transactions on Spatial Algorithms and Systems.</li>
+          <li><span>[09/2024]</span> Two papers accepted at ACM SIGSPATIAL 2024.</li>
+          <li><span>[08/2024]</span> Invited poster presentation at Knowledge-Guided Machine Learning Workshop 2024.</li>
+          <li><span>[06/2024]</span> One paper accepted at COSIT 2024.</li>
+          <li><span>[05/2024]</span> Invited lightning talk and poster presentation in the AI-CLIMATE annual meeting.</li>
+          <li><span>[12/2023]</span> One paper accepted at SIAM Data Mining 2024.</li>
+          <li><span>[08/2023]</span> Completed my internship at Esri under Dr. Erik G. Hoel.</li>
+          <li><span>[04/2023]</span> Invited presentation at MIDAS Future Leader Summit at University of Michigan.</li>
+          <li><span>[03/2023]</span> One paper accepted in GIScience 2023.</li>
+          <li><span>[11/2022]</span> Oral presentation in ACM SIGSPATIAL 2022 in Seattle, WA.</li>
+          <li><span>[10/2022]</span> NSF Travel Award for SIGSPATIAL 2022.</li>
+          <li><span>[09/2022]</span> Oral presentation in COSIT 2022 in Kobe, Japan.</li>
+          <li><span>[08/2022]</span> One paper accepted in ACM SIGSPATIAL 2022.</li>
+          <li><span>[05/2022]</span> Received Doctoral Dissertation Fellowship 2022-2023.</li>
+          <li><span>[04/2022]</span> One paper accepted in COSIT 2022.</li>
+          <li><span>[03/2022]</span> One paper accepted in AGILE 2022.</li>
+          <li><span>[09/2021]</span> Oral presentation in GIScience 2021 online.</li>
+          <li><span>[05/2021]</span> One paper accepted at ACM Transactions in Intelligent System and Technology.</li>
+          <li><span>[10/2020]</span> Invited presentation at University of Maryland, College Park online.</li>
+          <li><span>[06/2020]</span> One paper accepted in GIScience 2021.</li>
+        </ol>
+      </section>
+
+      <section class="experience section-pad" id="experience" aria-labelledby="experience-title">
+        <div class="section-header reveal">
+          <p class="section-label">The Path</p>
+          <h2 id="experience-title">Experience</h2>
+        </div>
+
+        <div class="timeline">
+          <article class="timeline-item reveal">
+            <span class="timeline-year">2025</span>
+            <span class="timeline-marker" aria-hidden="true"></span>
+            <div>
+              <h3>University of Minnesota, Twin Cities</h3>
+              <p class="role">Ph.D. in Computer Science</p>
+              <p>
+                Dissertation work in spatial AI, physics-informed learning, uncertainty-aware
+                spatial modeling, and geospatial intelligence.
+              </p>
+            </div>
+          </article>
+
+          <article class="timeline-item reveal">
+            <span class="timeline-year">Esri</span>
+            <span class="timeline-marker" aria-hidden="true"></span>
+            <div>
+              <h3>Maritime Anomaly Detection</h3>
+              <p class="role">Research internship with Dr. Erik G. Hoel</p>
+              <p>
+                Shipped an AWS pipeline for maritime anomaly detection and improved classification
+                accuracy from 55% to 73%.
+              </p>
+            </div>
+          </article>
+
+          <article class="timeline-item reveal">
+            <span class="timeline-year">DDF</span>
+            <span class="timeline-marker" aria-hidden="true"></span>
+            <div>
+              <h3>Doctoral Dissertation Fellowship</h3>
+              <p class="role">University of Minnesota</p>
+              <p>
+                Fellowship support for dissertation-stage research in spatial data science and
+                knowledge-guided machine learning.
+              </p>
+            </div>
+          </article>
+
+          <article class="timeline-item reveal">
+            <span class="timeline-year">2026</span>
+            <span class="timeline-marker" aria-hidden="true"></span>
+            <div>
+              <h3>Spatial AI Portfolio</h3>
+              <p class="role">Computer Vision / Remote Sensing / 3D / Generative AI</p>
+              <p>
+                Five runnable project repos focused on geospatial perception, Earth observation,
+                3D reconstruction, promptable segmentation, and maritime intelligence.
+              </p>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="research section-pad" id="research" aria-labelledby="research-title">
+        <div class="section-header reveal">
+          <p class="section-label">Applied Systems</p>
+          <h2 id="research-title">Research Systems</h2>
           <p>
-            <a href="https://doi.org/10.1145/3748636.3762749" id="GCDM">
-              <heading>Geo-lucid Conditional Diffusion Models for High Physical Fidelity Trajectory Generation</heading>
-            </a><br>
-            Mingzhou Yang, <b>Arun Sharma</b>, Majid Farhadloo, Bharat Jayaprakash and Shashi Shekhar<br>
-            Proceedings of the 33rd ACM International Conference on Advances in Geographic Information Systems
-            (SIGSPATIAL '25),
-            pp. 382–395, 2025
+            Project demos that translate the publication themes into runnable computer vision,
+            remote sensing, 3D, and generative AI systems.
           </p>
+        </div>
 
-          <div class="paper" id="gcdm">
-            <a href="https://dl.acm.org/doi/10.1145/3748636.3762749">paper</a> |
-            <a href="javascript:toggleblock('gcdm_abs')">abstract</a> |
-            <a href="javascript:togglebib('gcdm')" class="togglebib">bibtex</a>
+        <div class="papers-list systems-list">
+          <article class="paper-card reveal">
+            <p class="paper-year">3D Reconstruction</p>
+            <h3>Sat-Splat-Distort</h3>
+            <p class="paper-authors">Distortion-aware 3D Gaussian Splatting for satellite RPC, pushbroom, fisheye, and 360 cameras.</p>
+            <div class="paper-links" aria-label="Sat-Splat-Distort links">
+              <a href="https://github.com/arunshar/sat-splat-distort">GitHub</a>
+              <a href="https://huggingface.co/spaces/arun08sharma/sat-splat-distort">Space</a>
+            </div>
+          </article>
 
-            <p align="justify">
-              <i style="display: none;" id="gcdm_abs">
-                Given a set of historical vehicle trajectories and their descriptive attributes, the goal is to train a
-                generative model that produces synthetic trajectories with high physical fidelity. Here, physical
-                fidelity is
-                defined as fidelity to both geometric and dynamic properties of trajectories. The problem is important
-                since
-                trajectory generation can contribute to data augmentation for many traffic-related applications, such as
-                popular route discovery and traffic light control. The key challenge lies in achieving high physical
-                fidelity
-                under coarse geospatial attributes (e.g., origin-destination pairs) that lack fine-grained details.
-                Current
-                methods, which mostly focus on geometric properties, have limited utility in domain-specific scenarios
-                due to
-                their neglect of trajectory dynamics. To address these limitations, we propose GCDM, a novel Geo-Lucid
-                Conditional Diffusion Model framework that integrates road map attributes into the generative process
-                through
-                spatially hierarchical generation and map-informed latent variables. Experiments on real-world vehicle
-                trajectory datasets show that GCDM outperforms state-of-the-art methods in geo-distribution similarity
-                and
-                dynamics fidelity.
-              </i>
-            </p>
+          <article class="paper-card reveal">
+            <p class="paper-year">Generative Earth Observation</p>
+            <h3>PhysFlow-Earth</h3>
+            <p class="paper-authors">Physics-informed rectified flow for Sentinel-2 super-resolution and ERA5/CHIRPS climate downscaling.</p>
+            <div class="paper-links" aria-label="PhysFlow-Earth links">
+              <a href="https://github.com/arunshar/physflow-earth">GitHub</a>
+              <a href="https://huggingface.co/spaces/arun08sharma/physflow-earth">Space</a>
+            </div>
+          </article>
 
-            <pre xml:space="preserve" style="display:none;">
-@inproceedings{10.1145/3748636.3762749,
-  author    = {Yang, Mingzhou and Sharma, Arun and Farhadloo, Majid and Jayaprakash, Bharat and Shekhar, Shashi},
-  title     = {Geo-lucid Conditional Diffusion Models for High Physical Fidelity Trajectory Generation},
-  year      = {2025},
-  isbn      = {9798400720864},
-  publisher = {Association for Computing Machinery},
-  address   = {New York, NY, USA},
-  url       = {https://doi.org/10.1145/3748636.3762749},
-  doi       = {10.1145/3748636.3762749},
-  abstract  = {Given a set of historical vehicle trajectories and their descriptive attributes, the goal is to train a generative model that produces synthetic trajectories with high physical fidelity. Here, physical fidelity is defined as fidelity to both geometric and dynamic properties of trajectories. The problem is important since trajectory generation can contribute to data augmentation for many traffic-related applications, such as popular route discovery and traffic light control. The key challenge of this problem lies in achieving high physical fidelity under coarse geospatial attributes (e.g., origin-destination pairs) that lack fine-grained details. Current methods, which mostly focus on geometric properties, have limited utility in domain-specific scenarios due to their neglect of trajectory dynamics. To address these limitations, we propose GCDM, a novel Geo-Lucid Conditional Diffusion Model framework that integrates road map attributes into the generative process through spatially hierarchical generation and map-informed latent variables. Experiments on real-world vehicle trajectory datasets show that GCDM outperforms state-of-the-art methods in geo-distribution similarity and dynamics fidelity.},
-  booktitle = {Proceedings of the 33rd ACM International Conference on Advances in Geographic Information Systems},
-  pages     = {382--395},
-  numpages  = {14},
-  keywords  = {geo-lucid neural network, physical fidelity, trajectory generation, urban computing},
-  location  = {The Graduate Hotel Minneapolis, Minneapolis, MN, USA},
-  series    = {SIGSPATIAL '25}
-}
-      </pre>
+          <article class="paper-card reveal">
+            <p class="paper-year">Promptable 3D Segmentation</p>
+            <h3>GeoSAM-3D</h3>
+            <p class="paper-authors">Monocular-video scene segmentation with heat-method geodesic propagation over a 3D Gaussian graph.</p>
+            <div class="paper-links" aria-label="GeoSAM-3D links">
+              <a href="https://github.com/arunshar/geosam-3d">GitHub</a>
+              <a href="https://huggingface.co/spaces/arun08sharma/geosam-3d">Space</a>
+            </div>
+          </article>
+
+          <article class="paper-card reveal">
+            <p class="paper-year">Open-Vocabulary Maritime Search</p>
+            <h3>TrajPrompt</h3>
+            <p class="paper-authors">SAM 2, Prithvi-2, and TGARD for text-prompt search over AIS tracks and Sentinel-2 chips.</p>
+            <div class="paper-links" aria-label="TrajPrompt links">
+              <a href="https://github.com/arunshar/trajprompt">GitHub</a>
+              <a href="https://huggingface.co/spaces/arun08sharma/trajprompt">Space</a>
+            </div>
+          </article>
+
+          <article class="paper-card reveal">
+            <p class="paper-year">Multi-Modal Detection</p>
+            <h3>DarkVessel Stack</h3>
+            <p class="paper-authors">Sentinel-1 SAR, Sentinel-2, AIS, TGARD, and Pi-DPM anomaly reasoning for dark vessel detection.</p>
+            <div class="paper-links" aria-label="DarkVessel Stack links">
+              <a href="https://github.com/arunshar/darkvessel-stack">GitHub</a>
+              <a href="https://huggingface.co/spaces/arun08sharma/darkvessel-stack">Space</a>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="publications section-pad" id="publications" aria-labelledby="publications-title">
+        <div class="section-header reveal">
+          <p class="section-label">Representative Papers Highlighted</p>
+          <h2 id="publications-title">Publications</h2>
+          <p>
+            Imported from the academic portfolio. Last update: Apr 2026. Each entry keeps
+            the paper links, abstract, and bibtex where present.
+          </p>
+        </div>
+        <div id="publication-list" class="publication-list"></div>
+        <noscript>
+          <p class="noscript-note">Publication data is available in assets/publications.js.</p>
+        </noscript>
+      </section>
+
+      <section class="teaching section-pad compact-section" id="teaching" aria-labelledby="teaching-title">
+        <div class="section-header reveal">
+          <p class="section-label">Teaching</p>
+          <h2 id="teaching-title">Courses</h2>
+        </div>
+        <div class="teaching-grid reveal">
+          <a href="https://www.spatial.cs.umn.edu/Courses/Spring24/8715/index.php">
+            <span>Spring 2024</span>
+            CSCI 8715: Spatial Data Science Research
+          </a>
+          <a href="https://www.spatial.cs.umn.edu/Courses/Fall19/5715/index.php">
+            <span>Fall 2019</span>
+            CSCI 5715: Spatial Data Science
+          </a>
+          <a href="https://www.spatial.cs.umn.edu/Courses/Spring19/5708/index.php">
+            <span>Spring 2019</span>
+            CSCI 5708: Database Systems
+          </a>
+          <a href="https://www-users.cselabs.umn.edu/classes/Fall-2018/csci4041/index.php?page=syllabus">
+            <span>Fall 2018</span>
+            CSCI 4041: Data Structures and Algorithms
+          </a>
+        </div>
+      </section>
+
+      <section class="library section-pad" id="library" aria-labelledby="library-title">
+        <div class="section-header reveal">
+          <p class="section-label">Project Library</p>
+          <h2 id="library-title">Library</h2>
+        </div>
+
+        <div class="library-grid">
+          <div class="library-column reveal">
+            <h3>Documents</h3>
+            <ul>
+              <li><a href="https://arunshar.github.io/portfolio/data/Arun%20Sharma.pdf">CV</a></li>
+              <li><a href="https://arunshar.github.io/portfolio/data/bio.txt">Bio</a></li>
+              <li><a href="https://arunshar.github.io/portfolio/data/Research%20Statement.pdf">Research Statement</a></li>
+              <li><a href="https://arunshar.github.io/portfolio/data/Teaching%20Statement.pdf">Teaching Statement</a></li>
+              <li><a href="https://arunshar.github.io/portfolio/data/Diversity%20Statement.pdf">Diversity Statement</a></li>
+              <li><a href="https://arunshar.github.io/portfolio/data/Thesis.pdf">Ph.D. Thesis</a></li>
+            </ul>
           </div>
-        </td>
-      </tr>
 
-      <tr bgcolor="#ffffd0">
-        <td width="100%" valign="top">
-          <p><a href="https://dl.acm.org/doi/10.1145/3764915.3770717" id="PGGENFM">
-              <heading>Towards Physics-guided Generative Foundation Models</heading>
-            </a><br>
-            <b>Arun Sharma</b>, Majid Farhadloo, Mingzhou Yang, Bharat Jayaprakash, William Northrop, and Shashi
-            Shekhar<br>
-            The 1st ACM SIGSPATIAL International Workshop on Generative and Agentic AI for Multi-Modality Space-Time
-            Intelligence (GeoGenAgent '25), Minneapolis, MN, USA, 5 pages, 2025
-          </p>
-
-          <div class="paper" id="pggenfm">
-            <a href="https://dl.acm.org/doi/10.1145/3764915.3770717">paper</a> |
-            <a href="javascript:toggleblock('pggenfm_abs')">abstract</a> |
-            <a href="javascript:togglebib('pggenfm')" class="togglebib">bibtex</a>
-
-            <p align="justify">
-              <i style="display: none;" id="pggenfm_abs">
-                This work introduces physics-guided generative foundation models (PgGenFMs), a class of generative
-                models that systematically integrate broad and narrow physical knowledge into data, training, and
-                architecture design. The paper motivates PgGenFMs by outlining key limitations of purely data-driven
-                foundation models, including poor out-of-distribution behavior, violations of physical laws, and lack of
-                interpretability in scientific and engineering domains. It proposes a conceptual framework and taxonomy
-                that contrast PgGenFMs with conventional foundation models and physics-guided task-specific models, and
-                discusses how physical constraints can be embedded via loss terms, architectures, surrogate simulations,
-                and hybrid designs. The paper also highlights open problems around where and how to inject domain
-                knowledge, how to handle location dependence and bias in geospatial settings, and how to scale PgGenFMs
-                while preserving physical consistency and transparency.
-              </i>
-            </p>
-
-            <pre xml:space="preserve" style="display:none;">
-  @inproceedings{10.1145/3764915.3770717,
-    author    = {Sharma, Arun and Farhadloo, Majid and Yang, Mingzhou and Jayaprakash, Bharat and Northrop, William and Shekhar, Shashi},
-    title     = {Towards Physics-guided Generative Foundation Models},
-    year      = {2025},
-    publisher = {Association for Computing Machinery},
-    address   = {New York, NY, USA},
-    url       = {https://doi.org/10.1145/3764915.3770717},
-    doi       = {10.1145/3764915.3770717},
-    booktitle = {The 1st ACM SIGSPATIAL International Workshop on Generative and Agentic AI for Multi-Modality Space-Time Intelligence},
-    series    = {GeoGenAgent '25},
-    pages     = {1--5},
-    numpages  = {5},
-    keywords  = {Physics-guided Generative Foundation Models, Foundation Models, Physics-guided Machine Learning}
-  }
-        </pre>
+          <div class="library-column reveal">
+            <h3>Project repos</h3>
+            <ul>
+              <li><a href="https://github.com/arunshar/sat-splat-distort">Sat-Splat-Distort</a></li>
+              <li><a href="https://github.com/arunshar/physflow-earth">PhysFlow-Earth</a></li>
+              <li><a href="https://github.com/arunshar/geosam-3d">GeoSAM-3D</a></li>
+              <li><a href="https://github.com/arunshar/trajprompt">TrajPrompt</a></li>
+              <li><a href="https://github.com/arunshar/darkvessel-stack">DarkVessel Stack</a></li>
+            </ul>
           </div>
-        </td>
-      </tr>
 
-      <tr bgcolor="#ffffd0">
-        <td width="100%" valign="top">
-          <p><a href="https://doi.org/10.1145/3764921.3770153" id="SMHYBRID">
-              <heading>Towards Surrogate Models with Hybrid Spatial Neural Networks: A Summary of Results</heading>
-            </a><br>
-            Shengya Zhang, <b>Arun Sharma</b>, Majid Farhadloo, Mingzhou Yang, Ruolei Zeng,
-            Subhankar Ghosh, Yao Zhang, Mu Hong, Licheng Liu, David Mulla and Shashi Shekhar<br>
-            Proceedings of the 8th ACM SIGSPATIAL International Workshop on Geospatial Simulation (GeoSIM '25),
-            pp. 57–69, 2025
-          </p>
-
-          <div class="paper" id="smhybrid">
-            <a href="https://doi.org/10.1145/3764921.3770153">paper</a> |
-            <a href="javascript:toggleblock('smhybrid_abs')">abstract</a> |
-            <a href="javascript:togglebib('smhybrid')" class="togglebib">bibtex</a>
-
-            <p align="justify">
-              <i style="display: none;" id="smhybrid_abs">
-                The goal is to develop an efficient and accurate surrogate model for Daycent, a widely used but
-                computationally expensive ecosystem model. This problem is important due to its societal applications
-                in sustainable agriculture. Challenges include balancing the trade-off between prediction time and
-                solution quality (e.g., accuracy), as well as the need to capture spatial relationships both within
-                and across sites, while also accounting for varied crop management practices that introduce irregular
-                and non-stationary patterns, reducing predictability. Related work on surrogate models with traditional
-                feed-forward artificial neural networks (SM-ANN) has shown that these models have limited accuracy and
-                often fail to capture spatial dependencies. To address these limitations, we explore novel Surrogate
-                Models with Hybrid Spatial Neural Networks (SM-Hybrid) capable of explicitly modeling spatial
-                autocorrelation and tele-connections. Experimental results show that the proposed SM-Hybrid is more
-                accurate than SM-ANN and is twice as fast as the Daycent model.
-              </i>
-            </p>
-
-            <pre xml:space="preserve" style="display:none;">
-  @inproceedings{10.1145/3764921.3770153,
-    author    = {Zhang, Shengya and Sharma, Arun and Farhadloo, Majid and Yang, Mingzhou and Zeng, Ruolei and Ghosh, Subhankar and Zhang, Yao and Hong, Mu and Liu, Licheng and Mulla, David and Shekhar, Shashi},
-    title     = {Towards Surrogate Models with Hybrid Spatial Neural Networks: A Summary of Results},
-    year      = {2025},
-    isbn      = {9798400721847},
-    publisher = {Association for Computing Machinery},
-    address   = {New York, NY, USA},
-    url       = {https://doi.org/10.1145/3764921.3770153},
-    doi       = {10.1145/3764921.3770153},
-    booktitle = {Proceedings of the 8th ACM SIGSPATIAL International Workshop on Geospatial Simulation},
-    series    = {GeoSIM '25},
-    pages     = {57--69},
-    numpages  = {13},
-    keywords  = {surrogate modeling, spatial neural network, spatial autocorrelation, spatial teleconnection, sustainable agriculture, daycent model},
-    location  = {The Graduate Hotel Minneapolis, Minneapolis, MN, USA}
-  }
-        </pre>
+          <div class="library-column reveal">
+            <h3>Code and profiles</h3>
+            <ul>
+              <li><a href="https://github.com/arunshar">GitHub</a></li>
+              <li><a href="https://huggingface.co/arun08sharma">Hugging Face</a></li>
+              <li><a href="https://scholar.google.com/citations?user=yb0e0FYAAAAJ&amp;hl=en">Google Scholar</a></li>
+              <li><a href="https://www.linkedin.com/in/arun08sharma/">LinkedIn</a></li>
+              <li><a href="https://x.com/arunshar08">Twitter / X</a></li>
+              <li><a href="README.md">Repository overview</a></li>
+            </ul>
           </div>
-        </td>
-      </tr>
+        </div>
+      </section>
 
-      <tr bgcolor="#ffffd0">
-        <td width="100%" valign="top">
-          <p><a href="https://ai-2-ase.github.io/papers/CameraReadys%203-41/38/CameraReady/SVA_KGML_109.pdf" id="FTBSCKGML">
-              <heading>Towards Fine-Tuning-Based Site Calibration for Knowledge-Guided Machine Learning</heading>
-            </a><br>
-            Ruolei Zeng, <b>Arun Sharma</b>, Shuai An, Mingzhou Yang, Shengya Zhang, Licheng Liu, David Mulla, and Shashi Shekhar<br>
-            5th Annual AAAI Workshop on AI to Accelerate Science and Engineering (AI2ASE)
-          </p>
-
-          <div class="paper" id="ftbsc_kgml">
-            <a href="https://ai-2-ase.github.io/papers/CameraReadys%203-41/38/CameraReady/SVA_KGML_109.pdf">paper</a> |
-            <a href="https://arxiv.org/abs/2512.16013">arXiv</a> |
-            <a href="javascript:toggleblock('ftbsc_kgml_abs')">abstract</a> |
-            <a href="javascript:togglebib('ftbsc_kgml')" class="togglebib">bibtex</a>
-
-            <p align="justify">
-              <i style="display: none;" id="ftbsc_kgml_abs">
-                Accurate and cost-effective quantification of the agroecosystem carbon cycle at decision-relevant scales is essential for climate mitigation and sustainable agriculture. However, both transfer learning and the exploitation of spatial variability in this field are challenging, as they involve heterogeneous data and complex cross-scale dependencies. Conventional approaches often rely on location-independent parameterizations and independent training, underutilizing transfer learning and spatial heterogeneity in the inputs, and limiting their applicability in regions with substantial variability. We propose FTBSC-KGML (Fine-Tuning-Based Site Calibration-Knowledge-Guided Machine Learning), a pretraining- and fine-tuning-based, spatial-variability-aware, and knowledge-guided machine learning framework that augments KGML-ag with a pretraining-fine-tuning process and site-specific parameters. Using a pretraining-fine-tuning process with remote-sensing GPP, climate, and soil covariates collected across multiple midwestern sites, FTBSC-KGML estimates land emissions while leveraging transfer learning and spatial heterogeneity. A key component is a spatial-heterogeneity-aware transfer-learning scheme, which is a globally pretrained model that is fine-tuned at each state or site to learn place-aware representations, thereby improving local accuracy under limited data without sacrificing interpretability. Empirically, FTBSC-KGML achieves lower validation error and greater consistency in explanatory power than a purely global model, thereby better capturing spatial variability across states. This work extends the prior SDSA-KGML framework.
-              </i>
-            </p>
-
-            <pre xml:space="preserve" style="display:none;">
-@misc{zeng2025towards,
-  title={Towards Fine-Tuning-Based Site Calibration for Knowledge-Guided Machine Learning: A Summary of Results},
-  author={Zeng, Ruolei and Sharma, Arun and An, Shuai and Yang, Mingzhou and Zhang, Shengya and Liu, Licheng and Mulla, David and Shekhar, Shashi},
-  year={2025},
-  eprint={2512.16013},
-  archivePrefix={arXiv},
-  primaryClass={cs.LG},
-  url={https://arxiv.org/abs/2512.16013},
-  doi={10.48550/arXiv.2512.16013}
-}
-        </pre>
+      <section class="contact" id="contact" aria-labelledby="contact-title">
+        <div class="contact-inner reveal">
+          <p class="section-label">Connect</p>
+          <h2 id="contact-title">Spatial AI, built from first principles.</h2>
+          <p class="contact-copy">Email: arunshar at umn dot edu</p>
+          <div class="contact-links">
+            <a href="https://github.com/arunshar">GitHub</a>
+            <a href="https://scholar.google.com/citations?user=yb0e0FYAAAAJ&amp;hl=en">Scholar</a>
+            <a href="https://www.linkedin.com/in/arun08sharma/">LinkedIn</a>
+            <a href="https://huggingface.co/arun08sharma">Hugging Face</a>
           </div>
-        </td>
-      </tr>
-
-      <tr bgcolor="#ffffd0">
-        <td width="100%" valign="top">
-          <p><a href="https://doi.org/10.1145/3748777.3748790" id="SUPERCOL">
-              <heading>Discovering Super-Colocation Patterns: A Summary of Results</heading>
-            </a><br>
-            Shuai An, Shesha Sai Kumar Reddy Sadu, <b>Arun Sharma</b>, Majid Farhadloo and Shashi Shekhar<br>
-            Proceedings of the 19th International Symposium on Spatial and Temporal Data (SSTD '25), pp. 34–38, 2025
-          </p>
-
-          <div class="paper" id="supercol">
-            <a href="https://dl.acm.org/doi/pdf/10.1145/3748777.3748790">paper</a> |
-            <a href="javascript:toggleblock('supercol_abs')">abstract</a> |
-            <a href="javascript:togglebib('supercol')" class="togglebib">bibtex</a>
-
-            <p align="justify">
-              <i style="display: none;" id="supercol_abs">
-                Given a collection of Boolean spatial features, the Super-Colocation Pattern Discovery process identifies subsets of features that are not only frequently located together but also have dense interactions. For example, the presence of multiple immune cells around cancer cells is more interesting to oncologists than simple colocation between immune and cancer cells. This problem is important due to its multiple societal applications, including oncology, economic analysis, and sports analytics. The problem is challenging due to
-                the need to model interaction density among a subset of Boolean spatial features. Related work on colocation pattern mining is limited due to a lack of conceptual, logical, and physical models that accurately represent interaction density. Traditional interest measures (e.g., Participation Index) largely focus on the mere presence of another spatial feature type and overlook the number or density of neighboring instances. To address these limitations, we propose a novel interest measure, termed Super-Colocation Density, which utilizes a matrix or tensor along with a utility-based index to quantify the interaction density among subsets of spatial features. We also introduce novel Super-Colocation Mining algorithms and evaluate the proposed methods through both theoretical analysis and experiments with real and synthetic data.
-              </i>
-            </p>
-
-            <pre xml:space="preserve" style="display:none;">
-  @inproceedings{10.1145/3748777.3748790,
-    author    = {An, Shuai and Sadu, Shesha Sai Kumar Reddy and Sharma, Arun and Farhadloo, Majid and Shekhar, Shashi},
-    title     = {Discovering Super-Colocation Patterns: A Summary of Results},
-    year      = {2025},
-    publisher = {Association for Computing Machinery},
-    address   = {New York, NY, USA},
-    url       = {https://doi.org/10.1145/3748777.3748790},
-    doi       = {10.1145/3748777.3748790},
-    booktitle = {Proceedings of the 19th International Symposium on Spatial and Temporal Data},
-    series    = {SSTD '25},
-    pages     = {34--38},
-    numpages  = {5},
-    keywords  = {Super-Colocation, Density Matrix, Density Index, Utility}
-  }
-        </pre>
-          </div>
-        </td>
-      </tr>
-
-
-      <tr bgcolor="#ffffd0">
-        <td width="100%" valign="top">
-          <p><a href="https://doi.org/10.1145/3681772.3698215" id="MBOR">
-              <heading>Towards Pareto-optimality with Multi-level Bi-objective Routing: A Summary of Results</heading>
-            </a><br> Mingzhou Yang, Ruolei Zeng, <b>Arun Sharma</b>, Shunichi Sawamura, William F. Northrop and Shashi Shekhar
-            <br> Proceedings of the 17th ACM SIGSPATIAL International Workshop on Computational Transportation Science GenAI and Smart Mobility Session (IWCTS'24), pp. 36–45, 2025
-          </p>
-          <div class="paper" id="mbor">
-            <a href="https://dl.acm.org/doi/10.1145/3681772.3698215">paper</a> |
-            <a href="javascript:toggleblock('mbor_abs')">abstract</a> |
-            <a href="javascript:togglebib('mbor')" class="togglebib">bibtex</a>
-
-            <p align="justify">
-              <i style="display: none;" id="mbor_abs">
-                Given an origin, a destination, and a directed graph in which each edge is associated with a pair of
-                non-negative costs, the bi-objective routing problem aims to find the set of all Pareto-optimal paths.
-                This problem is societally important due to several applications, such as route finding that considers
-                both vehicle travel time and energy consumption. The problem is challenging due to the potentially large
-                number of candidate Pareto-optimal paths to be enumerated during the search, making existing
-                compute-on-demand methods inefficient due to their high time complexity. One way forward is the
-                introduction of precomputation algorithms. However, the large size of the Pareto-optimal set makes it
-                infeasible to precompute and store all-pair solutions. In addition, generalizing traditional
-                single-objective hierarchical algorithms to bi-objective cases is non-trivial because of the
-                non-comparability of candidate paths and the need to accommodate multiple Pareto-optimal paths for each
-                node pair. To overcome these limitations, we propose Multi-Level Bi-Objective Routing (MBOR) algorithms
-                using three novel ideas: boundary multigraph representation, Pareto frontier encoding, and
-                two-dimensional cost-interval-based pruning. Computational experiments using real road network data
-                demonstrate that the proposed methods significantly outperform baseline methods in terms of online
-                runtime and precomputation time.
-              </i>
-            </p>
-
-            <pre xml:space="preserve" style="display:none;">
-  @inproceedings{10.1145/3681772.3698215,
-    author    = {Yang, Mingzhou and Zeng, Ruolei and Sharma, Arun and Sawamura, Shunichi and Northrop, William F. and Shekhar, Shashi},
-    title     = {Towards Pareto-optimality with Multi-level Bi-objective Routing: A Summary of Results},
-    year      = {2025},
-    isbn      = {9798400711510},
-    publisher = {Association for Computing Machinery},
-    address   = {New York, NY, USA},
-    url       = {https://doi.org/10.1145/3681772.3698215},
-    doi       = {10.1145/3681772.3698215},
-    booktitle = {Proceedings of the 17th ACM SIGSPATIAL International Workshop on Computational Transportation Science GenAI and Smart Mobility Session},
-    series    = {IWCTS'24},
-    pages     = {36--45},
-    numpages  = {10},
-    keywords  = {Bi-objective routing, Pareto optimality, Spatial algorithms, Spatial query processing},
-    location  = {Atlanta, GA, USA}
-  }
-        </pre>
-          </div>
-        </td>
-      </tr>
-
-      <tr bgcolor="#ffffd0">
-        <td width="100%" valign="top">
-          <p><a href="https://doi.org/10.1145/3678717.3691304" id="KICDPM">
-              <heading>Towards Kriging-informed Conditional Diffusion for Regional Sea-Level Data Downscaling: A Summary
-                of Results</heading>
-            </a><br>
-            Subhankar Ghosh, <b>Arun Sharma</b>, Jayant Gupta, Aneesh Subramanian, Shashi Shekhar<br>
-            Proceedings of the 32nd ACM International Conference on Advances in Geographic Information Systems
-            (SIGSPATIAL '24), pp. 372–383, 2024
-          </p>
-
-          <div class="paper" id="kicdpm">
-            <a href="https://dl.acm.org/doi/pdf/10.1145/3678717.3691304">paper</a> |
-            <a href="javascript:toggleblock('kicdpm_abs')">abstract</a> |
-            <a href="javascript:togglebib('kicdpm')" class="togglebib">bibtex</a>
-
-            <p align="justify">
-              <i style="display: none;" id="kicdpm_abs">
-                Given coarser-resolution projections from global climate models or satellite data, the downscaling
-                problem
-                aims to estimate finer-resolution regional climate data, capturing fine-scale spatial patterns and
-                variability. Downscaling is any method to derive high-resolution data from low-resolution variables,
-                often
-                to provide more detailed and local predictions and analyses. This problem is societally crucial for
-                effective
-                adaptation, mitigation, and resilience against significant risks from climate change. The challenge
-                arises
-                from spatial heterogeneity and the need to recover finer-scale features while ensuring model
-                generalization.
-                Most downscaling methods fail to capture the spatial dependencies at finer scales and underperform on
-                real-world climate datasets, such as sea-level rise. We propose a novel Kriging-informed Conditional
-                Diffusion
-                Probabilistic Model (Ki-CDPM) to capture spatial variability while preserving fine-scale features.
-                Experimental results on climate data show that our proposed method is more accurate than
-                state-of-the-art
-                downscaling techniques.
-              </i>
-            </p>
-
-            <pre xml:space="preserve" style="display:none;">
-@inproceedings{10.1145/3678717.3691304,
-  author    = {Ghosh, Subhankar and Sharma, Arun and Gupta, Jayant and Subramanian, Aneesh and Shekhar, Shashi},
-  title     = {Towards Kriging-informed Conditional Diffusion for Regional Sea-Level Data Downscaling: A Summary of Results},
-  year      = {2024},
-  isbn      = {9798400711077},
-  publisher = {Association for Computing Machinery},
-  address   = {New York, NY, USA},
-  url       = {https://doi.org/10.1145/3678717.3691304},
-  doi       = {10.1145/3678717.3691304},
-  booktitle = {Proceedings of the 32nd ACM International Conference on Advances in Geographic Information Systems},
-  pages     = {372--383},
-  numpages  = {12},
-  keywords  = {Climate Science, Diffusion Models, Downscaling, Generative AI, GeoAI, Geostatistics, Kriging, Remote Sensing},
-  location  = {Atlanta, GA, USA},
-  series    = {SIGSPATIAL '24}
-}
-      </pre>
-          </div>
-        </td>
-      </tr>
-
-
-      <tr bgcolor="#ffffd0">
-        <td width="100%" valign="top">
-          <p><a href="https://dl.acm.org/doi/pdf/10.1145/3673235" id="INTEXPL">
-              <heading>Physics-based Abnormal Trajectory Gap Detection</heading>
-            </a><br>
-            <b>Arun Sharma</b>, Subhankar Ghosh and Shashi Shekhar<br>
-            ACM Transactions on Intelligent Systems and Technology 15 (5), 1-31
-          </p>
-
-          <div class="paper" id="intexpl">
-            <a href="https://dl.acm.org/doi/pdf/10.1145/3673235">paper</a> |
-            <a href="javascript:toggleblock(&#39;intexpl_abs&#39;)">abstract</a> |
-            <a href="javascript:togglebib(&#39;intexpl&#39;)" class="togglebib">bibtex</a>
-
-            <p align="justify"> <i style="display: none;" id="intexpl_abs">Given trajectories with gaps (i.e., missing
-                data), we investigate algorithms to identify abnormal gaps in trajectories which occur when a given
-                moving object did not report its location, but other moving objects in the same geographic region
-                periodically did. The problem is important due to its societal applications, such as improving maritime
-                safety and regulatory enforcement for global security concerns such as illegal fishing, illegal oil
-                transfers, and trans-shipments. The problem is challenging due to the difficulty of bounding the
-                possible locations of the moving object during a trajectory gap, and the very high computational cost of
-                detecting gaps in such a large volume of location data. The current literature on anomalous trajectory
-                detection assumes linear interpolation within gaps, which may not be able to detect abnormal gaps since
-                objects within a given region may have traveled away from their shortest path. In preliminary work, we
-                introduced an abnormal gap measure that uses a classical space-time prism model to bound an object's
-                possible movement during the trajectory gap and provided a scalable memoized gap detection algorithm
-                (Memo-AGD). In this paper, we propose a Space Time-Aware Gap Detection (STAGD) approach to leverage
-                space-time indexing and merging of trajectory gaps. We also incorporate a Dynamic Region Merge-based
-                (DRM) approach to efficiently compute gap abnormality scores. We provide theoretical proofs that both
-                algorithms are correct and complete and also provide analysis of asymptotic time complexity.
-                Experimental results on synthetic and real-world maritime trajectory data show that the proposed
-                approach substantially improves computation time over the baseline technique.</i></p>
-
-            <pre xml:space="preserve" style="display:none;">
-      @article{sharma2024physics,
-    title={Physics-based abnormal trajectory gap detection},
-    author={Sharma, Arun and Ghosh, Subhankar and Shekhar, Shashi},
-    journal={ACM Transactions on Intelligent Systems and Technology},
-    volume={15},
-    number={5},
-    pages={1--31},
-    year={2024},
-    publisher={ACM New York, NY, USA}
-}
-    </pre>
-          </div>
-        </td>
-      </tr>
-
-      <tr>
-        <!--   <td width="33%" valign="top" align="center"><a href="https://extreme-parkour.github.io/">
-  <video autoplay="" loop="" muted="" src="images/parkour.mp4" alt="sym" style="padding-top:0px;padding-bottom:0px;border-radius:15px;border:1px solid black" width="90%"></video>
-  </a></td> -->
-        <td width="100%" valign="top">
-          <p><a href="https://epubs.siam.org/doi/abs/10.1137/1.9781611978032.71" id="EXTREME-PARKOUR">
-              <heading>Towards Spatially-Lucid AI Classification in Non-Euclidean Space: An Application for MxIF
-                Oncology Data</heading>
-            </a><br>
-            Majid Farhadloo, <b>Arun Sharma</b>, Jayant Gupta, Alexey Leontovich, Svetomir N Markovic, and Shashi
-            Shekhar<br>
-            SIAM Data Mining Conference (SDM) 2024
-          </p>
-
-          <div class="paper" id="extreme-parkour">
-            <a href="https://epubs.siam.org/doi/pdf/10.1137/1.9781611978032.71/">paper</a> |
-            <a href="javascript:toggleblock(&#39;extreme-parkour-abs&#39;)">abstract</a> |
-            <a href="javascript:togglebib(&#39;extreme-parkour&#39;)" class="togglebib">bibtex</a>
-            <!--     <a href="https://arxiv.org/abs/2309.14341">arXiv</a> |
-    <a href="https://github.com/chengxuxin/extreme-parkour">code</a> -->
-
-            <p align="justify"> <i style="display: none;" id="extreme-parkour-abs">Given multi-category point sets from
-                different place-types, our goal is to develop a spatially-lucid classifier that can distinguish between
-                two classes based on the arrangements of their points. This problem is important for many applications,
-                such as oncology, for analyzing immune-tumor relationships and designing new immunotherapies. It is
-                challenging due to spatial variability and interpretability needs. Previously proposed techniques
-                require dense training data or have limited ability to handle significant spatial variability within a
-                single place-type. Most importantly, these deep neural network (DNN) approaches are not designed to work
-                in non-Euclidean space, particularly point sets. Existing non-Euclidean DNN methods are limited to
-                one-size-fitsall approaches. We explore a spatial ensemble framework that explicitly uses different
-                training strategies, including weighted-distance learning rate and spatial domain adaptation, on various
-                place-types for spatially-lucid classification. Experimental results on real-world datasets (e.g., MxIF
-                oncology data) show that the proposed framework provides higher prediction accuracy than baseline
-                methods..</i></p>
-
-            <pre xml:space="preserve" style="display:none;">@inproceedings{farhadloo2024towards,
-      title={Towards Spatially-Lucid AI Classification in Non-Euclidean Space: An Application for MxIF Oncology Data},
-      author={Farhadloo, Majid and Sharma, Arun and Gupta, Jayant and Leontovich, Alexey and Markovic, Svetomir N and Shekhar, Shashi},
-      booktitle={Proceedings of the 2024 SIAM International Conference on Data Mining (SDM)},
-      pages={616--624},
-      year={2024},
-      organization={SIAM}
-    }
-</pre>
-          </div>
-        </td>
-      </tr>
-
-      <tr>
-        <!--   <td width="33%" valign="top" align="center"><a href="https://diffusion-classifier.github.io/">
-  <img src="./Arun Sharma_files/diffusion_classifier.jpg" alt="sym" width="90%" style="padding-top:0px;padding-bottom:0px;border-radius:15px;border:1px solid black">
-    </a></td> -->
-
-        <td width="100%" valign="top">
-          <p><a href="https://dl.acm.org/doi/10.1145/3679201" id="DIFFCLS">
-              <heading>Spatial computing opportunities in biomedical decision support: The atlas-ehr vision</heading>
-            </a><br>
-            Majid Farhadloo, <b>Arun Sharma</b>, Shashi Shekhar, and Svetomir N Markovic<br>
-            ACM Transactions on Spatial Algorithms and Systems 10, no. 3 (2024): 1-36.
-          </p>
-
-          <div class="paper" id="diffcls">
-            <a href="https://dl.acm.org/doi/10.1145/3679201">summary</a> |
-            <a href="javascript:toggleblock(&#39;diffcls_abs&#39;)">abstract</a> |
-            <a href="javascript:togglebib(&#39;diffcls&#39;)" class="togglebib">bibtex</a>
-
-            <p align="justify"> <i style="display: none;" id="diffcls_abs">We consider the problem of reducing the time
-                needed by healthcare professionals to understand patient medical history via the next generation of
-                biomedical decision support. This problem is societally important because it has the potential to
-                improve healthcare quality and patient outcomes. However, navigating electronic health records is
-                challenging due to the high patient-doctor ratios, potentially long medical histories, the urgency of
-                treatment for some medical conditions, and patient variability. The current electronic health record
-                systems provides only a longitudinal view of patient medical history, which is time-consuming to browse,
-                and doctors often need to engage nurses, residents, and others for initial analysis. To overcome this
-                limitation, we envision an alternative spatial representation of patients' histories (e.g., electronic
-                health records (EHRs)) and other biomedical data in the form of Atlas-EHR. Just like Google Maps allows
-                a global, national, regional, and local view, the Atlas-EHR may start with an overview of the patient's
-                anatomy and history before drilling down to spatially anatomical sub-systems, their individual
-                components, or sub-components. Atlas-EHR presents a compelling opportunity for spatial computing since
-                healthcare is almost a fifth of the US economy. However, the traditional spatial computing designed for
-                geographic use cases (e.g., navigation, land-surveys, mapping) faces many hurdles in the biomedical
-                domain. This paper presents a number of open research questions under this theme in five broad areas of
-                spatial computing.</i></p>
-
-            <pre xml:space="preserve" style="display:none;">@article{10.1145/3679201,
-            author = {Farhadloo, Majid and Sharma, Arun and Shekhar, Shashi and Markovic, Svetomir},
-            title = {Spatial Computing Opportunities in Biomedical Decision Support: The Atlas-EHR Vision},
-            year = {2024},
-            issue_date = {September 2024},
-            publisher = {Association for Computing Machinery},
-            address = {New York, NY, USA},
-            volume = {10},
-            number = {3},
-            issn = {2374-0353},
-            url = {https://doi.org/10.1145/3679201},
-            doi = {10.1145/3679201},
-            month = sep,
-            articleno = {21},
-            numpages = {36},
-            keywords = {Atlas-EHR, biomedical decision support, inner space, spatial computing, vision}
-            }
-</pre>
-          </div>
-        </td>
-      </tr>
-
-      <tr>
-        <!-- <td width="33%" valign="top" align="center"><a href="https://slot-tta.github.io/">
-<video autoplay="" loop="" muted="" src="images/slot_tta_poster.mp4" alt="sym" width="90%" style="padding-top:0px;padding-bottom:0px;border-radius:15px;border:0px solid black"></video>
-</a></td> -->
-        <td width="100%" valign="top">
-          <p><a href="https://drops.dagstuhl.de/entities/document/10.4230/LIPIcs.COSIT.2024.25" id="STATCOL">
-              <heading>Towards Statistically Significant Taxonomy Aware Co-Location Pattern Detection</heading>
-            </a><br>
-            Subhankar Ghosh, <b>Arun Sharma</b>, Jayant Gupta, Shashi Shekhar<br>
-            COSIT 2024
-          </p>
-
-          <div class="paper" id="statcol">
-            <a
-              href="https://drops.dagstuhl.de/storage/00lipics/lipics-vol315-cosit2024/LIPIcs.COSIT.2024.25/LIPIcs.COSIT.2024.25.pdf">paper</a>
-            |
-            <a href="javascript:toggleblock(&#39;statcol_abs&#39;)">abstract</a> |
-            <a href="javascript:togglebib(&#39;statcol&#39;)" class="togglebib">bibtex</a>
-
-            <p align="justify"> <i style="display: none;" id="statcol_abs">Given a collection of Boolean spatial feature
-                types, their instances, a neighborhood relation (e.g., proximity), and a hierarchical taxonomy of the
-                feature types, the goal is to find the subsets of feature types or their parents whose spatial
-                interaction is statistically significant. This problem is for taxonomy-reliant applications such as
-                ecology (e.g., finding new symbiotic relationships across the food chain), spatial pathology (e.g.,
-                immunotherapy for cancer), retail, etc. The problem is computationally challenging due to the
-                exponential number of candidate co-location patterns generated by the taxonomy. Most approaches for
-                co-location pattern detection overlook the hierarchical relationships among spatial features, and the
-                statistical significance of the detected patterns is not always considered, leading to potential false
-                discoveries. This paper introduces two methods for incorporating taxonomies and assessing the
-                statistical significance of co-location patterns. The baseline approach iteratively checks the
-                significance of co-locations between leaf nodes or their ancestors in the taxonomy. Using the
-                Benjamini-Hochberg procedure, an advanced approach is proposed to control the false discovery rate. This
-                approach effectively reduces the risk of false discoveries while maintaining the power to detect true
-                co-location patterns. Experimental evaluation and case study results show the effectiveness of the
-                approach..</i></p>
-
-
-            <pre xml:space="preserve" style="display:none;">@InProceedings{ghosh_et_al:LIPIcs.COSIT.2024.25,
-      author =  {Ghosh, Subhankar and Sharma, Arun and Gupta, Jayant and Shekhar, Shashi},
-      title = {{Towards Statistically Significant Taxonomy Aware Co-Location Pattern Detection}},
-      booktitle = {16th International Conference on Spatial Information Theory (COSIT 2024)},
-      pages = {25:1--25:11},
-      series =  {Leibniz International Proceedings in Informatics (LIPIcs)},
-      ISBN =  {978-3-95977-330-0},
-      ISSN =  {1868-8969},
-      year =  {2024},
-      volume =  {315},
-      editor =  {Adams, Benjamin and Griffin, Amy L. and Scheider, Simon and McKenzie, Grant},
-      publisher = {Schloss Dagstuhl -- Leibniz-Zentrum f{\"u}r Informatik},
-      address = {Dagstuhl, Germany},
-      URL =   {https://drops.dagstuhl.de/entities/document/10.4230/LIPIcs.COSIT.2024.25},
-      URN =   {urn:nbn:de:0030-drops-208404},
-      doi =   {10.4230/LIPIcs.COSIT.2024.25},
-      annote =  {Keywords: Co-location patterns, spatial data mining, taxonomy, hierarchy, statistical significance, false discovery rate, family-wise error rate} 
-    }
-      </pre>
-
-          </div>
-        </td>
-      </tr>
-
-      <tr>
-        <!-- <td width="33%" valign="top" align="center"><a href="https://slot-tta.github.io/">
-<video autoplay="" loop="" muted="" src="images/slot_tta_poster.mp4" alt="sym" width="90%" style="padding-top:0px;padding-bottom:0px;border-radius:15px;border:0px solid black"></video>
-</a></td> -->
-        <td width="100%" valign="top">
-          <p><a href="https://drops.dagstuhl.de/entities/document/10.4230/LIPIcs.GIScience.2023.3" id="FDRCOL">
-              <heading>Reducing False Discoveries in Statistically-Significant Regional-Colocation Mining: A Summary of
-                Results</heading>
-            </a><br>
-            Subhankar Ghosh, Jayant Gupta, <b>Arun Sharma</b>, Shuai An, Shashi Shekhar<br>
-            GIScience 2023
-          </p>
-
-          <div class="paper" id="fdrcol">
-            <a
-              href="https://drops.dagstuhl.de/storage/00lipics/lipics-vol277-giscience2023/LIPIcs.GIScience.2023.3/LIPIcs.GIScience.2023.3.pdf">paper</a>
-            |
-            <a href="javascript:toggleblock(&#39;fdrcol_abs&#39;)">abstract</a> |
-            <a href="javascript:togglebib(&#39;fdrcol&#39;)" class="togglebib">bibtex</a>
-
-            <p align="justify"> <i style="display: none;" id="fdrcol_abs">Given a set S of spatial feature types, its
-                feature instances, a study area, and a neighbor relationship, the goal is to find pairs &lt;region
-                  (r_{g}), a subset C of S&gt; such that C is a statistically significant regional-colocation pattern in
-                  r_{g}. This problem is important for applications in various domains including ecology, economics, and
-                  sociology. The problem is computationally challenging due to the exponential number of regional
-                  colocation patterns and candidate regions. Previously, we proposed a miner [Subhankar et. al, 2022]
-                  that finds statistically significant regional colocation patterns. However, the numerous simultaneous
-                  statistical inferences raise the risk of false discoveries (also known as the multiple comparisons
-                  problem) and carry a high computational cost. We propose a novel algorithm, namely, multiple
-                  comparisons regional colocation miner (MultComp-RCM) which uses a Bonferroni correction. Theoretical
-                  analysis, experimental evaluation, and case study results show that the proposed method reduces both
-                  the false discovery rate and computational cost.</i></p>
-
-
-            <pre xml:space="preserve" style="display:none;">@inproceedings{ghosh2023reducing,
-      title={Reducing False Discoveries in Statistically-Significant Regional-Colocation Mining: A Summary of Results},
-      author={Ghosh, Subhankar and Gupta, Jayant and Sharma, Arun and An, Shuai and Shekhar, Shashi},
-      booktitle={12th International Conference on Geographic Information Science (GIScience 2023)},
-      year={2023},
-      organization={Schloss-Dagstuhl-Leibniz Zentrum f{\"u}r Informatik}
-    }
-    </pre>
-
-          </div>
-        </td>
-      </tr>
-
-      <tr bgcolor="#ffffd0">
-        <!--   <td width="33%" valign="top" align="center"><a href="https://sear-rl.github.io/">
-    <img src="./Arun Sharma_files/sear.png" alt="sym" width="90%" style="padding-top:0px;padding-bottom:0px;border-radius:15px;border:0px solid black">
-    </a></td> -->
-        <td width="100%" valign="top">
-          <p><a href="https://dl.acm.org/doi/abs/10.1145/3557915.3561033" id="SEAR">
-              <heading>Towards a tighter bound on possible-rendezvous areas: preliminary results</heading>
-            </a><br>
-            <b>Arun Sharma</b>, Jayant Gupta, Subhankar Ghosh<br>
-            International Conference on Advances in Geographic Information Systems (ACM SIGSPATIAL 2022)
-            &nbsp;<b>(Oral)</b><br>
-          </p>
-
-          <div class="paper" id="sear">
-            <a href="https://dl.acm.org/doi/pdf/10.1145/3557915.3561033">paper</a> |
-            <a href="javascript:toggleblock(&#39;sear_abs&#39;)">abstract</a> |
-            <a href="javascript:togglebib(&#39;sear&#39;)" class="togglebib">bibtex</a>
-
-            <p align="justify"> <i style="display: none;" id="sear_abs">Given trajectories with gaps, we investigate
-                methods to tighten spatial bounds on areas (e.g., nodes in a spatial network) where possible rendezvous
-                activity could have occurred. The problem is important for reducing manual effort to post-process
-                possible rendezvous areas using satellite imagery and has many societal applications to improve public
-                safety, security, and health. The problem of rendezvous detection is challenging due to the difficulty
-                of interpreting missing data within a trajectory gap and the very high cost of detecting gaps in such a
-                large volume of location data. Most recent literature presents formal models, namely space-time prism,
-                to track an object's rendezvous patterns within trajectory gaps on a spatial network. However, the
-                bounds derived from the space-time prism are rather loose, resulting in unnecessarily extensive
-                postprocessing manual effort. To address these limitations, we propose a Time Slicing-based Gap-Aware
-                Rendezvous Detection (TGARD) algorithm to tighten the spatial bounds in spatial networks. We propose a
-                Dual Convergence TGARD (DC-TGARD) algorithm to improve computational efficiency using a bi-directional
-                pruning approach. Theoretical results show the proposed spatial bounds on the area of possible
-                rendezvous are tighter than that from related work (space-time prism). Experimental results on synthetic
-                and real-world spatial networks (e.g., road networks) show that the proposed DC-TGARD is more scalable
-                than the TGARD algorithm.</i></p>
-
-            <pre xml:space="preserve" style="display:none;">@inproceedings{sharma2022towards,
-      title={Towards a tighter bound on possible-rendezvous areas: preliminary results},
-      author={Sharma, Arun and Gupta, Jayant and Ghosh, Subhankar},
-      booktitle={Proceedings of the 30th International Conference on Advances in Geographic Information Systems},
-      pages={1--11},
-      year={2022}
-    }
-    </pre>
-          </div>
-        </td>
-      </tr>
-
-      <tr bgcolor="#ffffd0">
-        <!--   <td width="33%" valign="top" align="center"><a href="https://leap-hand.github.io/">
-  <video autoplay="" loop="" muted="" src="images/leap_sim2real.mp4" alt="sym" width="90%" style="padding-top:0px;padding-bottom:0px;border-radius:15px;border:1px solid black"></video>
-  </a></td> -->
-        <td width="100%" valign="top">
-          <p><a href="https://dl.acm.org/doi/full/10.1145/3467977" id="LEAP">
-              <heading>Analyzing trajectory gaps to find possible rendezvous region</heading>
-            </a><br>
-            <b>Arun Sharma</b> and Shashi Shekhar<br>
-            ACM TIST 2023
-          </p>
-
-          <div class="paper" id="leap">
-            <a href="https://dl.acm.org/doi/pdf/10.1145/3467977">paper</a> |
-            <a href="javascript:toggleblock(&#39;leap_abs&#39;)">abstract</a> |
-            <a href="javascript:togglebib(&#39;leap&#39;)" class="togglebib">bibtex</a>
-
-            <p align="justify"> <i style="display: none;" id="leap_abs">Given trajectory data with gaps, we investigate
-                methods to identify possible rendezvous regions. The problem has societal applications such as improving
-                maritime safety and regulatory enforcement. The challenges come from two aspects. First, gaps in
-                trajectory data make it difficult to identify regions where moving objects may have rendezvoused for
-                nefarious reasons. Hence, traditional linear or shortest path interpolation methods may not be able to
-                detect such activities, since objects in a rendezvous may have traveled away from their usual routes to
-                meet. Second, user detecting a rendezvous regions involve a large number of gaps and associated
-                trajectories, making the task computationally very expensive. In preliminary work, we proposed a more
-                effective way of handling gaps and provided examples to illustrate potential rendezvous regions. In this
-                article, we are providing detailed experiments with both synthetic and real-world data. Experiments on
-                synthetic data show that the accuracy improved by 50 percent, which is substantial as compared to the
-                baseline approach. In this article, we propose a refined algorithm Temporal Selection Search for finding
-                a potential rendezvous region and finding an optimal temporal range to improve computational efficiency.
-                We also incorporate two novel spatial filters: (i) a Static Ellipse Intersection Filter and (ii) a
-                Dynamic Circle Intersection Spatial Filter. Both the baseline and proposed approaches account for every
-                possible rendezvous pattern. We provide a theoretical evaluation of the algorithms correctness and
-                completeness along with a time complexity analysis. Experimental results on synthetic and real-world
-                maritime trajectory data show that the proposed approach substantially improves the area pruning
-                effectiveness and computation time over the baseline technique. We also performed experiments based on
-                accuracy and precision on synthetic dataset on both proposed and baseline techniques.</i></p>
-
-            <pre xml:space="preserve" style="display:none;">@article{sharma2022analyzing,
-      title={Analyzing trajectory gaps to find possible rendezvous region},
-      author={Sharma, Arun and Shekhar, Shashi},
-      journal={ACM Transactions on Intelligent Systems and Technology (TIST)},
-      volume={13},
-      number={3},
-      pages={1--23},
-      year={2022},
-      publisher={ACM New York, NY}
-    }
-</pre>
-          </div>
-        </td>
-      </tr>
-
-      <tr>
-        <!--   <td width="33%" valign="top" align="center"><a href="https://human-world-model.github.io/">
-  <video autoplay="" loop="" muted="" src="images/swim.mp4" alt="sym" width="90%" style="padding-top:0px;padding-bottom:0px;border-radius:15px;border:1px solid black"></video>
-  </a></td> -->
-        <td width="100%" valign="top">
-          <p><a href="https://dl.acm.org/doi/abs/10.1145/3557915.3561034" id="SWIM">
-              <heading>Mining taxonomy-aware colocations: a summary of results</heading>
-            </a><br>
-            Jayant Gupta and <b>Arun Sharma</b><br>
-            ACM SIGSPATIAL 2022 <br>
-          </p>
-
-          <div class="paper" id="swim">
-            <a href="https://dl.acm.org/doi/pdf/10.1145/3557915.3561034">paper</a> |
-            <a href="javascript:toggleblock(&#39;swim_abs&#39;)">abstract</a> |
-            <a href="javascript:togglebib(&#39;swim&#39;)" class="togglebib">bibtex</a>
-
-            <p align="justify"> <i style="display: none;" id="swim_abs">Given a collection of Boolean spatial
-                feature-types, their instances, a neighborhood relation (e.g., proximity), and a hierarchical taxonomy
-                on the feature-types, taxonomy-aware colocation pattern discovery finds the subsets of feature-types or
-                their parents frequently located together. Taxonomy-aware colocations are important due to their use in
-                taxonomy-reliant societal applications in ecology (e.g., finding new symbiotic relationships across
-                food-chain), spatial pathology (e.g., immunotherapy for cancer), etc. Due to the taxonomy, the number of
-                candidate patterns increases considerably (i.e., exponential in the number of colocated instances, where
-                a subset of instances have a parent-child relation). Existing algorithms for mining general colocations
-                are not designed to use taxonomy and will incur redundant computations across the hierarchy. We propose
-                a taxonomy-aware colocation miner (TCM) algorithm which uses a user-defined taxonomy to find
-                taxonomy-aware colocation patterns. We also propose TCM-Prune algorithm that prunes duplicate
-                colocations instances having a parent-child relation. Experiments with synthetic and real data sets show
-                that TCM and TCM-Prune can find colocation patterns missed by the traditional approach (i.e., the ones
-                which do not take hierarchy into account), and TCM-Prune can remove duplicate colocation instances.</i>
-            </p>
-
-            <pre xml:space="preserve" style="display:none;">@inproceedings{gupta2022mining,
-      title={Mining taxonomy-aware colocations: a summary of results},
-      author={Gupta, Jayant and Sharma, Arun},
-      booktitle={Proceedings of the 30th International Conference on Advances in Geographic Information Systems},
-      pages={1--11},
-      year={2022}
-    }
-</pre>
-
-          </div>
-        </td>
-      </tr>
-
-      <tr bgcolor="#ffffd0">
-        <!--   <td width="33%" valign="top" align="center"><a href="https://robo-affordances.github.io/">
-  <video autoplay="" loop="" muted="" src="images/vrb.mp4" alt="sym" width="90%" style="padding-top:0px;padding-bottom:0px;border-radius:15px;border:1px solid black"></video>
-  </a></td> -->
-        <td width="100%" valign="top">
-          <p><a href="https://drops.dagstuhl.de/entities/document/10.4230/LIPIcs.COSIT.2022.26" id="VRB">
-              <heading>Abnormal Trajectory-Gap Detection: A Summary (Short Paper)</heading>
-            </a><br>
-            <b>Arun Sharma</b>, Jayant Gupta, Shashi Shekhar<br>
-            COSIT 2022 &nbsp;<b>(Oral)</b>
-          </p>
-
-          <div class="paper" id="vrb">
-            <a
-              href="https://drops.dagstuhl.de/storage/00lipics/lipics-vol240-cosit2022/LIPIcs.COSIT.2022.26/LIPIcs.COSIT.2022.26.pdf">paper</a>
-            |
-            <a href="javascript:toggleblock(&#39;vrb_abs&#39;)">abstract</a> |
-            <a href="javascript:togglebib(&#39;vrb&#39;)" class="togglebib">bibtex</a>
-
-            <p align="justify"> <i style="display: none;" id="vrb_abs">Given trajectories with gaps (ie, missing data),
-                we investigate algorithms to identify abnormal gaps for testing possible hypotheses of anomalous
-                regions. Here, an abnormal gap within a trajectory is defined as an area where a given moving object did
-                not report its location, but other moving objects did periodically. The problem is important due to its
-                societal applications, such as improving maritime safety and regulatory enforcement for global security
-                concerns such as illegal fishing, illegal oil transfer, and trans-shipments. The problem is challenging
-                due to the difficulty of interpreting missing data within a trajectory gap, and the high computational
-                cost of detecting gaps in such a large volume of location data proves computationally very expensive.
-                The current literature assumes linear interpolation within gaps, which may not be able to detect
-                abnormal gaps since objects within a given region may have traveled away from their shortest path. To
-                overcome this limitation, we propose an abnormal gap detection (AGD) algorithm that leverages the
-                concepts of a space-time prism model where we assume space-time interpolation. We then propose a refined
-                memoized abnormal gap detection (Memo-AGD) algorithm that reduces comparison operations. We validated
-                both algorithms using synthetic and real-world data. The results show that abnormal gaps detected by our
-                algorithms give better estimates of abnormality than linear interpolation and can be used for further
-                investigation from the human analysts.</i></p>
-
-            <pre xml:space="preserve" style="display:none;">@inproceedings{sharma2022abnormal,
-    title={Abnormal Trajectory-Gap Detection: A Summary (Short Paper)},
-    author={Sharma, Arun and Gupta, Jayant and Shekhar, Shashi},
-    booktitle={15th International Conference on Spatial Information Theory (COSIT 2022)},
-    year={2022},
-    organization={Schloss Dagstuhl-Leibniz-Zentrum f{\"u}r Informatik}
-  }
-</pre>
-          </div>
-        </td>
-      </tr>
-
-
-      <tr>
-        <!--   <td width="33%" valign="top" align="center"><a href="https://linzhiqiu.github.io/papers/cross_modal/">
-  <img alt="sym" width="90%" style="padding-top:0px;padding-bottom:0px;border-radius:15px;border:1px solid black" src="./Arun Sharma_files/cross_modal_cvpr_2023.png">
-  </a></td> -->
-        <td width="100%" valign="top">
-          <p><a href="https://dl.acm.org/doi/abs/10.1145/3557989.3566158" id="CROSSMODAL_2023">
-              <heading>Towards geographically robust statistically significant regional colocation pattern detection
-              </heading>
-            </a><br>
-            Subhankar Ghosh, Jayant Gupta, <b>Arun Sharma</b>, Shuai An, and Shashi Shekhar<br>
-            ACM GeoSim 2022<br>
-          </p>
-
-          <div class="paper" id="crossmodal_2023">
-            <a href="https://dl.acm.org/doi/pdf/10.1145/3557989.3566158">paper</a> |
-            <a href="javascript:toggleblock(&#39;crossmodal_2023_abs&#39;)">abstract</a> |
-            <a href="javascript:togglebib(&#39;crossmodal_2023&#39;)" class="togglebib">bibtex</a>
-
-            <p align="justify"> <i style="display: none;" id="crossmodal_2023_abs">Given a set S of spatial
-                feature-types, its feature-instances, a study area, and a neighbor relationship, the goal is to find
-                pairs &lt;region (rg), a subset C of S&gt; such that C is a statistically significant regional colocation
-                  pattern in region rg. For example Caribou Coffee and Starbucks are significantly co-located in
-                  Minneapolis but not in Dallas at present. This problem has applications in a wide variety of domains
-                  including ecology, economics, and sociology. The problem is computationally challenging due to the
-                  exponential number of regional colocation patterns and candidate regions. The current literature on
-                  regional colocation pattern detection has not addressed statistical significance which can result in
-                  spurious (chance) pattern instances. In this paper, we propose a novel technique for mining
-                  statistically significant regional colocation patterns. Our approach determines regions based on
-                  geographically defined boundaries (e.g., counties) unlike previous works which employed clustering, or
-                  regular polygons to enumerate candidate regions. To reduce spurious patterns, we perform a statistical
-                  significance test by modeling the observed data points with multiple Monte Carlo simulations within
-                  the corresponding regions. Using Safegraph POI dataset, this paper provides a case study on retail
-                  establishments in Minnesota for validation of proposed ideas. The paper also provides a detailed
-                  interpretation of discovered patterns using game theory and regional economics..</i></p>
-
-            <pre xml:space="preserve" style="display:none;">@inproceedings{ghosh2022towards,
-      title={Towards geographically robust statistically significant regional colocation pattern detection},
-      author={Ghosh, Subhankar and Gupta, Jayant and Sharma, Arun and An, Shuai and Shekhar, Shashi},
-      booktitle={Proceedings of the 5th ACM SIGSPATIAL International Workshop on GeoSpatial Simulation},
-      pages={11--20},
-      year={2022}
-    }
-</pre>
-          </div>
-        </td>
-      </tr>
-
-      <tr bgcolor="#ffffd0">
-        <!-- <td width="33%" valign="top" align="center"><a href="https://robot-skills.github.io/">
- <video autoplay="" loop="" muted="" src="images/legmanip.mp4" alt="sym" width="90%" style="padding-top:0px;padding-bottom:0px;border-radius:15px;border:1px solid black"></video>
- </a></td> -->
-        <td width="100%" valign="top">
-          <p><a href="https://doi.org/10.4337/9781789903942.00029" id="LEGMANIP">
-              <heading>Book Chapter: Spatiotemporal Data Mining</heading>
-            </a><br>
-            <b>Arun Sharma</b>, Zhe Jiang, and Shashi Shekhar<br>
-            Handbook of Spatial Analysis in the Social Sciences &nbsp;<br>
-          </p>
-
-
-          <div class="paper" id="legmanip">
-            <a href="https://doi.org/10.4337/9781789903942.00029">paper</a> |
-            <a href="javascript:toggleblock(&#39;legmanip_abs&#39;)">abstract</a> |
-            <a href="javascript:togglebib(&#39;legmanip&#39;)" class="togglebib">bibtex</a>
-
-            <p align="justify"> <i style="display: none;" id="legmanip_abs">Spatiotemporal data mining aims to discover
-                interesting, useful but non-trivial patterns in big spatial and spatiotemporal data. They are used in
-                various application domains such as public safety, ecology, epidemiology, earth science etc. This
-                problem is challenging because of the high societal cost of spurious patterns and exorbitant
-                computational cost. Recent surveys of spatiotemporal data mining need update due to rapid growth. In
-                addition, they did not adequately survey parallel techniques for spatiotemporal data mining. This paper
-                provides a more up-to-date survey of spatiotemporal data mining methods. Furthermore, it has a detailed
-                survey of parallel formulations of spatiotemporal data mining.</i></p>
-
-            <pre xml:space="preserve" style="display:none;">@incollection{sharma2022spatiotemporal,
-      title={Spatiotemporal data mining},
-      author={Sharma, Arun and Jiang, Zhe and Shekhar, Shashi},
-      booktitle={Handbook of Spatial Analysis in the Social Sciences},
-      pages={352--368},
-      year={2022},
-      publisher={Edward Elgar Publishing}
-    }
-</pre>
-          </div>
-        </td>
-      </tr>
-
-      <tr bgcolor="#ffffd0">
-        <!--   <td width="33%" valign="top" align="center"><a href="https://robo-explorer.github.io/">
-  <video autoplay="" loop="" muted="" src="images/alan.mp4" alt="sym" width="90%" style="padding-top:0px;padding-bottom:0px;border-radius:15px;border:1px solid black"></video>
-  </a></td> -->
-        <td width="100%" valign="top">
-          <p><a href="https://agile-giss.copernicus.org/articles/3/14/2022/" id="ALAN">
-              <heading>Understanding Covid-19 Effects on Mobility: A Community-Engaged Approach</heading>
-            </a><br>
-            <b>Arun Sharma</b>, Majid Farhadloo, Yan Li, Jayant Gupta, Aditya Kulkarni, Shashi Shekhar<br>
-            AGILE: GIScience 2022 <br>
-          </p>
-
-          <div class="paper" id="alan">
-            <a href="https://agile-giss.copernicus.org/articles/3/14/2022/agile-giss-3-14-2022.pdf">paper</a> |
-            <a href="javascript:toggleblock(&#39;alan_abs&#39;)">abstract</a> |
-            <a href="javascript:togglebib(&#39;alan&#39;)" class="togglebib">bibtex</a>
-
-            <p align="justify"> <i style="display: none;" id="alan_abs">Given aggregated mobile device data, the goal is
-                to understand the impact of COVID-19 policy interventions on mobility. This problem is vital due to
-                important societal use cases, such as safely reopening the economy. Challenges include understanding and
-                interpreting questions of interest to policymakers, cross-jurisdictional variability in choice and time
-                of interventions, the large data volume, and unknown sampling bias. The related work has explored the
-                COVID-19 impact on travel distance, time spent at home, and the number of visitors at different points
-                of interest. However, many policymakers are interested in long-duration visits to high-risk business
-                categories and understanding the spatial selection bias to interpret summary reports. We provide an
-                Entity Relationship diagram, system architecture, and implementation to support queries on long-duration
-                visits in addition to fine resolution device count maps to understand spatial bias. We closely
-                collaborated with policymakers to derive the system requirements and evaluate the system components, the
-                summary reports, and visualizations.</i></p>
-
-            <pre xml:space="preserve" style="display:none;">@article{sharma2022understanding,
-      title={Understanding covid-19 effects on mobility: A community-engaged approach},
-      author={Sharma, Arun and Farhadloo, Majid and Li, Yan and Gupta, Jayant and Kulkarni, Aditya and Shekhar, Shashi},
-      journal={AGILE: GIScience Series},
-      volume={3},
-      pages={14},
-      year={2022},
-      publisher={Copernicus Publications G{\"o}ttingen, Germany}
-    }
-</pre>
-          </div>
-        </td>
-      </tr>
-
-      <tr bgcolor="#ffffd0">
-        <!-- <td width="33%" valign="center" align="center"><a href="https://tarun005.github.io/FLAVR/"><img src="./Arun Sharma_files/flavr.gif" alt="sym" width="90%" style="padding-top:0px;padding-bottom:0px;border-radius:15px;"></a></td> -->
-        <td width="100%" valign="top">
-          <p><a href="https://drops.dagstuhl.de/entities/document/10.4230/LIPIcs.GIScience.2021.I.13" id="FLAVR">
-              <!-- <img src="images/new.png" alt="[NEW]" width="6%" style="border-style: none"> -->
-              <heading>Analyzing trajectory gaps for possible rendezvous: A summary of results</heading>
-            </a><br>
-            <b>Arun Sharma</b>, Xun Tang, Jayant Gupta, Majid Farhadloo, Shashi Shekhar<br>
-            GIScience 2021 &nbsp;<b>(Oral)</b><br>
-          </p>
-
-          <div class="paper" id="flavr">
-            <a
-              href="https://drops.dagstuhl.de/storage/00lipics/lipics-vol177-giscience2021/LIPIcs.GIScience.2021.I.13/LIPIcs.GIScience.2021.I.13.pdf">paper</a>
-            |
-            <a href="javascript:toggleblock(&#39;flavr_abs&#39;)">abstract</a> |
-            <a href="javascript:togglebib(&#39;flavr&#39;)" class="togglebib">bibtex</a>
-
-            <p align="justify"> <i id="flavr_abs" style="display: none;">Given trajectory data with gaps, we investigate
-                methods to identify possible rendezvous regions. Societal applications include improving maritime safety
-                and regulations. The challenges come from two aspects. If trajectory data are not available around the
-                rendezvous then either linear or shortest-path interpolation may fail to detect the possible rendezvous.
-                Furthermore, the problem is computationally expensive due to the large number of gaps and associated
-                trajectories. In this paper, we first use the plane sweep algorithm as a baseline. Then we propose a new
-                filtering framework using the concept of a space-time grid. Experimental results and case study on
-                real-world maritime trajectory data show that the proposed approach substantially improves the Area
-                Pruning Efficiency over the baseline technique.</i></p>
-
-            <pre xml:space="preserve" style="display: none;">@inproceedings{sharma2020analyzing,
-      title={Analyzing trajectory gaps for possible rendezvous: A summary of results},
-      author={Sharma, Arun and Tang, Xun and Gupta, Jayant and Farhadloo, Majid and Shekhar, Shashi},
-      booktitle={11th International Conference on Geographic Information Science (GIScience 2021)-Part I},
-      year={2020},
-      organization={Schloss Dagstuhl-Leibniz-Zentrum f{\"u}r Informatik}
-    }
-</pre>
-          </div>
-        </td>
-      </tr>
-
-      <tr bgcolor="#ffffd0">
-        <!--   <td width="33%" valign="top" align="center"><a href="https://vision-locomotion.github.io/">
-  <video autoplay="" loop="" muted="" src="images/vision-loco.mp4" alt="sym" style="padding-top:0px;padding-bottom:0px;border-radius:15px;border:1px solid black" width="90%"></video>
-  </a></td> -->
-        <td width="100%" valign="top">
-          <p><a href="https://dl.acm.org/doi/abs/10.1145/3282834.3282835" id="VISION-LOCO">
-              <heading>WebGlobe - A cloud-based geospatial analysis framework for interacting with climate data
-              </heading>
-            </a><br>
-            <b>Arun Sharma</b>, Syed Mohammed Arshad Zaidi, Varun Chandola, Melissa R Allen, and Budhendra L Bhaduri<br>
-            ACM BIGSPATIAL 2018 <br>
-          </p>
-
-          <div class="paper" id="vision-loco">
-            <a href="https://dl.acm.org/doi/pdf/10.1145/3282834.3282835">paper</a> |
-            <a href="javascript:toggleblock(&#39;vision-loco-abs&#39;)">abstract</a> |
-            <a href="javascript:togglebib(&#39;vision-loco&#39;)" class="togglebib">bibtex</a>
-
-            <p align="justify"> <i style="display: none;" id="vision-loco-abs">While climate models have evolved over
-                time to produce high fidelity and high resolution climate forecasts, visualization and analysis of the
-                output of the model simulations has been limited, typically constrained to single dimensional charts for
-                visualization and basic aggregate statistics for analytics. Same is true for the large troves of
-                observational data available from meteorological stations all over the world. For richer understanding
-                of climate and the impact of climate change, one needs computational tools that allow researchers,
-                policymakers, and general public, to interact with the climate data. In this paper, we describe,
-                webGlobe, a browser based GIS framework for interacting with climate data, and other datasets available
-                in similar format. webGlobe is a unique resource that allows unprecedented access to climate data
-                through a browser. The framework also allows for deploying machine learning based analytical
-                applications on the climate data without putting computational burden on the client. Instead, webGlobe
-                uses a client-server framework, where the server, deployed on a cloud infrastructure, allows for dynamic
-                allocation of resources for running compute-intensive applications. The capabilities of the framework
-                will be discussed in context of a use case: identifying extreme events from real and simulated climate
-                data using a Gaussian process based change detection algorithm.</i></p>
-
-            <pre xml:space="preserve" style="display:none;">@inproceedings{sharma2018webgiobe,
-      title={WebGIobe-A cloud-based geospatial analysis framework for interacting with climate data},
-      author={Sharma, Arun and Zaidi, Syed Mohammed Arshad and Chandola, Varun and Allen, Melissa R and Bhaduri, Budhendra L},
-      booktitle={Proceedings of the 7th ACM SIGSPATIAL International Workshop on Analytics for Big Geospatial Data},
-      pages={42--46},
-      year={2018}
-    }
-</pre>
-          </div>
-        </td>
-      </tr>
-    </tbody>
-  </table>
-
-  <!--
-<table width="100%" align="center" border="0" cellspacing="0" cellpadding="10">
-  <tr><td><sectionheading>&nbsp;&nbsp;Teaching</sectionheading></td></tr>
-</table>
-<table width="100%" align="top" border="0" cellpadding="20">
-  <tr>
-    <td width="32%"><img src="images/cs189.jpg" alt="pacman" width="100%" style="border-radius:15px"></td>
-    <td width="68%" valign="top">
-      <p>
-        <a href="http://www-inst.eecs.berkeley.edu/~cs189/fa15/"><heading>CS189/289: Introduction to Machine Learning - Fall '15 (GSI) </heading></a><br>
-        <strong>Instructor</strong>: Prof. Alexei A. Efros and Dr. Isabelle Guyon<br>
-      </p>
-      <p>
-        <a href="http://www-inst.eecs.berkeley.edu/~cs280/sp16"><heading>CS280: Computer Vision - Spring '16 (GSI)</heading></a><br>
-        <strong>Instructor</strong>: Prof. Trevor Darrell and Prof. Alexei A. Efros<br>
-      </p>
-    </td>
-  </tr>
-</table> -->
-
-  <!-- <hr/>
-
-<table width="100%" align="center" border="0" cellpadding="10">
-  <tr><td>
-    <sectionheading>&nbsp;&nbsp;Selected Awards</sectionheading>
-    <ul>
-    <li> Google Faculty Research Award (2020)</li>
-    <li> Facebook Graduate Fellowship (2018-2020)</li>
-    <li> Nvidia Graduate Fellowship (2017-2018)</li>
-    <li> Snapchat Inc. Graduate Fellowship (2017)</li>
-    <li> Gold Medal in Computer Science at IIT Kanpur (2014)</li>
-    <li> Best Undergraduate Thesis Award at IIT Kanpur (2014)</li>
-    </ul>
-  </td></tr>
-</table> -->
-
-  <hr>
-
-  <table width="100%" align="center" border="0" cellspacing="0" cellpadding="2">
-    <tbody>
-      <tr>
-        <td><br>
-          <p align="right">
-            <font size="1.5">
-              Modified version of template from <a href="http://www.cs.berkeley.edu/~barron/">here</a>
-            </font>
-          </p>
-        </td>
-      </tr>
-    </tbody>
-  </table>
-
-  <script xml:space="preserve" language="JavaScript">
-    hideallbibs();
-  </script>
-
-
-
-  <iframe scrolling="no" frameborder="0" allowtransparency="true"
-    src="./Arun Sharma_files/widget_iframe.2f70fb173b9000da126c79afe2098f02.html" title="Twitter settings iframe"
-    style="display: none;"></iframe><iframe id="rufous-sandbox" scrolling="no" frameborder="0" allowtransparency="true"
-    allowfullscreen="true"
-    style="position: absolute; visibility: hidden; display: none; width: 0px; height: 0px; padding: 0px; border: none;"
-    title="Twitter analytics iframe" src="./Arun Sharma_files/saved_resource.html"></iframe>
-</body>
-
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <p>Arun Sharma | Spatial AI Research Portfolio</p>
+    </footer>
+
+    <script src="assets/publications.js"></script>
+    <script src="assets/main.js"></script>
+  </body>
 </html>

@@ -23,7 +23,7 @@
       href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600&family=Outfit:wght@300;400;500;600&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="assets/styles.css" />
+    <link rel="stylesheet" href="assets/styles.css?v=20260527-2" />
   </head>
   <body>
     <svg class="icon-sprite" aria-hidden="true">
@@ -117,7 +117,6 @@
       <section class="news section-pad compact-section" id="news" aria-labelledby="news-title">
         <div class="section-header reveal">
           <h2 id="news-title">News</h2>
-          <p>Research milestones, talks, awards, and publication updates from the academic portfolio.</p>
         </div>
         <ol class="news-list reveal" aria-label="Research news">
           <li><span>[12/2025]</span> One paper accepted in AAAI Workshop on AI to Accelerate Science and Engineering.</li>
@@ -179,7 +178,7 @@
               <span class="timeline-marker" aria-hidden="true"></span>
               <div>
                 <h3>State University of New York at Buffalo</h3>
-                <p class="role">M.S. in Computer Science, 2014 - 2018</p>
+                <p class="role">M.S. in Computer Science, 2016 - 2018</p>
                 <p>
                   Graduate training in computer science before joining the University of Minnesota
                   spatial computing and spatial data science research group.
@@ -252,18 +251,21 @@
 
       <section class="research section-pad" id="research" aria-labelledby="research-title">
         <div class="section-header reveal">
-          <h2 id="research-title">Selected Projects</h2>
-          <p>
-            Runnable GitHub and Hugging Face demos come first, followed by additional CV-selected
-            research projects.
-          </p>
+          <h2 id="research-title">Selected Research Systems and Projects</h2>
         </div>
 
         <div class="papers-list systems-list">
           <article class="paper-card reveal">
             <p class="paper-year">Satellite Geometry Extension</p>
-            <h3>Sat-Splat-Distort</h3>
-            <p class="paper-authors">A geometry-focused demo for distortion-aware Gaussian Splatting with satellite RPC, pushbroom, fisheye, and 360 cameras.</p>
+            <h3><a href="https://github.com/arunshar/sat-splat-distort" target="_blank" rel="noopener noreferrer">Distortion-Aware Gaussian Splatting under Satellite and Non-Pinhole Camera Geometry</a></h3>
+            <p class="paper-authors">
+              A geometry-aware 3D reconstruction system for settings where standard pinhole camera
+              assumptions break down. The project implements analytic camera Jacobians and
+              distortion grids for satellite RPC, pushbroom, fisheye, and equirectangular cameras,
+              then exposes a CPU-safe Hugging Face demo for inspecting how projection error affects
+              Gaussian Splatting. The goal is to make novel-view synthesis more faithful to the
+              actual sensor geometry rather than hiding distortion in preprocessing.
+            </p>
             <div class="paper-links" aria-label="Sat-Splat-Distort links">
               <a class="project-link github-link" href="https://github.com/arunshar/sat-splat-distort">
                 <svg class="project-link-icon" aria-hidden="true"><use href="#icon-github"></use></svg>
@@ -278,8 +280,15 @@
 
           <article class="paper-card reveal">
             <p class="paper-year">Generative Earth Observation</p>
-            <h3>PhysFlow-Earth</h3>
-            <p class="paper-authors">Physics-informed rectified flow for Sentinel-2 super-resolution and ERA5/CHIRPS climate downscaling, connected to the CV work on fine-grained climate risk maps.</p>
+            <h3><a href="https://github.com/arunshar/physflow-earth" target="_blank" rel="noopener noreferrer">Physics-Constrained Rectified Flow for Earth Observation Super-Resolution and Climate Downscaling</a></h3>
+            <p class="paper-authors">
+              A conditional generative model for downscaling Sentinel-2 imagery, precipitation, and
+              climate fields without losing physical consistency. The system combines a
+              flow-matching velocity objective with residual penalties for conservation behavior,
+              wind-field divergence, and spectral index consistency such as NDVI, NDWI, and SAVI.
+              The demo includes AOI selection, variable controls, coarse-to-fine visualization, and
+              a physics-violation dashboard so the output can be evaluated beyond visual sharpness.
+            </p>
             <div class="paper-links" aria-label="PhysFlow-Earth links">
               <a class="project-link github-link" href="https://github.com/arunshar/physflow-earth">
                 <svg class="project-link-icon" aria-hidden="true"><use href="#icon-github"></use></svg>
@@ -294,8 +303,15 @@
 
           <article class="paper-card reveal">
             <p class="paper-year">Scene Understanding Extension</p>
-            <h3>GeoSAM-3D</h3>
-            <p class="paper-authors">A monocular-video demo for promptable scene segmentation with geodesic propagation over a 3D Gaussian graph.</p>
+            <h3><a href="https://github.com/arunshar/geosam-3d" target="_blank" rel="noopener noreferrer">Geodesic Prompt Propagation for Open-Vocabulary 3D Scene Segmentation</a></h3>
+            <p class="paper-authors">
+              A promptable 3D scene segmentation pipeline that starts from monocular video rather
+              than assuming pre-built meshes or RGB-D scans. GeoSAM-3D reconstructs a Gaussian
+              scene with monocular depth priors, lifts SAM-style masks into per-Gaussian feature
+              embeddings, and propagates labels through a learned-feature plus heat-method
+              geodesic kernel. The emphasis is on respecting scene topology, occlusions, and
+              concavities when transferring 2D prompts into 3D.
+            </p>
             <div class="paper-links" aria-label="GeoSAM-3D links">
               <a class="project-link github-link" href="https://github.com/arunshar/geosam-3d">
                 <svg class="project-link-icon" aria-hidden="true"><use href="#icon-github"></use></svg>
@@ -310,8 +326,15 @@
 
           <article class="paper-card reveal">
             <p class="paper-year">Open-Vocabulary Maritime Search</p>
-            <h3>TrajPrompt</h3>
-            <p class="paper-authors">SAM 2, Prithvi-2, and TGARD for text-prompt search over AIS tracks and Sentinel-2 chips, extending the CV trajectory-gap and possible-rendezvous work.</p>
+            <h3><a href="https://github.com/arunshar/trajprompt" target="_blank" rel="noopener noreferrer">Language-Guided Trajectory Search over AIS Tracks and Satellite Imagery</a></h3>
+            <p class="paper-authors">
+              A retrieval and reasoning interface for maritime analysts who want to search vessel
+              behavior with natural-language prompts. The system aligns AIS trajectory features
+              with text through a trajectory-CLIP encoder, connects the retrieval step to TGARD
+              rendezvous reasoning, and pairs the selected tracks with Sentinel-2 chips and
+              segmentation masks. It is meant to bridge open-vocabulary search, trajectory gap
+              analysis, and visual inspection in one auditable workflow.
+            </p>
             <div class="paper-links" aria-label="TrajPrompt links">
               <a class="project-link github-link" href="https://github.com/arunshar/trajprompt">
                 <svg class="project-link-icon" aria-hidden="true"><use href="#icon-github"></use></svg>
@@ -326,8 +349,15 @@
 
           <article class="paper-card reveal">
             <p class="paper-year">Multi-Modal Detection</p>
-            <h3>DarkVessel Stack</h3>
-            <p class="paper-authors">Sentinel-1 SAR, Sentinel-2, AIS, TGARD, and Pi-DPM anomaly reasoning for dark vessel detection, aligned with the Esri maritime anomaly pipeline and GPS spoofing research.</p>
+            <h3><a href="https://github.com/arunshar/darkvessel-stack" target="_blank" rel="noopener noreferrer">Multi-Modal Dark Vessel Detection with AIS, SAR, Optical Imagery, and Trajectory Reasoning</a></h3>
+            <p class="paper-authors">
+              An end-to-end maritime domain awareness stack for cases where AIS is missing,
+              spoofed, jammed, or inconsistent with what satellite sensors observe. The project
+              fuses Sentinel-1 SAR, Sentinel-2 optical imagery, AIS streams, and trajectory
+              reasoning modules derived from TGARD and Pi-DPM. It frames dark vessel detection as
+              a multi-modal decision problem that combines object detection, segmentation, change
+              detection, anomaly reasoning, and an analyst-facing explanation trace.
+            </p>
             <div class="paper-links" aria-label="DarkVessel Stack links">
               <a class="project-link github-link" href="https://github.com/arunshar/darkvessel-stack">
                 <svg class="project-link-icon" aria-hidden="true"><use href="#icon-github"></use></svg>
@@ -342,8 +372,15 @@
 
           <article class="paper-card reveal">
             <p class="paper-year">AV Ride-Hail Microservice</p>
-            <h3>Pin Service</h3>
-            <p class="paper-authors">Production-grade gRPC microservice for autonomous-vehicle pickup and drop-off pin selection. H3 candidate generation, HD-map hard constraints, gradient-boosted scoring, congestion control, OpenTelemetry, and Prometheus.</p>
+            <h3><a href="https://github.com/arunshar/pin-service" target="_blank" rel="noopener noreferrer">Map-Constrained Pickup and Drop-Off Pin Selection for Autonomous Ride-Hail Systems</a></h3>
+            <p class="paper-authors">
+              A production-style microservice for choosing safe pickup and drop-off pins under
+              road-network, curb, HD-map, and congestion constraints. The service generates H3
+              candidates around a request, filters them with map feasibility rules, scores them
+              with gradient-boosted models, and exposes the decision path through gRPC,
+              OpenTelemetry, and Prometheus metrics. The project demonstrates how spatial
+              reasoning moves from a model output into a reliable operational service.
+            </p>
             <div class="paper-links" aria-label="Pin Service links">
               <a class="project-link github-link" href="https://github.com/arunshar/pin-service">
                 <svg class="project-link-icon" aria-hidden="true"><use href="#icon-github"></use></svg>
@@ -358,8 +395,15 @@
 
           <article class="paper-card reveal">
             <p class="paper-year">Physics-Informed RL</p>
-            <h3>Pi-GRPO</h3>
-            <p class="paper-authors">Group Relative Policy Optimization for trajectory generation and reasoning under a hybrid kinematic-bicycle and Pi-DPM reward, with shared PPO, DPO, and GRPO trainers.</p>
+            <h3><a href="https://github.com/arunshar/pi-grpo" target="_blank" rel="noopener noreferrer">Physics-Informed Group Relative Policy Optimization for Trajectory Reasoning</a></h3>
+            <p class="paper-authors">
+              A reinforcement-learning stack for training trajectory generation and reasoning
+              policies while making hard physical violations costly. Pi-GRPO combines GRPO,
+              PPO, and DPO trainers with a hybrid reward that includes kinematic-bicycle
+              feasibility, jerk and curvature envelopes, and Pi-DPM reconstruction likelihood.
+              The implementation emphasizes reward decomposition, rollout efficiency, preference
+              data curation, and guardrails against reward hacking in spatial policy learning.
+            </p>
             <div class="paper-links" aria-label="Pi-GRPO links">
               <a class="project-link github-link" href="https://github.com/arunshar/pi-grpo">
                 <svg class="project-link-icon" aria-hidden="true"><use href="#icon-github"></use></svg>
@@ -374,8 +418,15 @@
 
           <article class="paper-card reveal">
             <p class="paper-year">Spatiotemporal Multi-Agent</p>
-            <h3>GeoTrace-Agent</h3>
-            <p class="paper-authors">Multi-agent reasoning over AIS, OSM, Copernicus, and Sentinel sources with Hägerstrand space-time prisms, MCP tools, and JSON-RPC A2A messaging for trajectory gap and rendezvous detection.</p>
+            <h3><a href="https://github.com/arunshar/geotrace-agent" target="_blank" rel="noopener noreferrer">Auditable Multi-Agent Spatiotemporal Reasoning for Trajectory Gaps and Rendezvous Detection</a></h3>
+            <p class="paper-authors">
+              A multi-agent spatial reasoning system for decomposing natural-language questions
+              into deterministic geospatial tools. GeoTrace-Agent routes work across AIS feeds,
+              OSM road networks, Copernicus weather, Sentinel imagery, space-time prisms,
+              STAGD gap detection, TGARD rendezvous search, and kinematic feasibility checks. The
+              system is designed around typed plans, traceable tool calls, semantic caching,
+              human review queues, and physically constrained outputs.
+            </p>
             <div class="paper-links" aria-label="GeoTrace-Agent links">
               <a class="project-link github-link" href="https://github.com/arunshar/geotrace-agent">
                 <svg class="project-link-icon" aria-hidden="true"><use href="#icon-github"></use></svg>
@@ -390,8 +441,15 @@
 
           <article class="paper-card reveal">
             <p class="paper-year">Distortion-Aware Geospatial Correction</p>
-            <h3>MapFix-Spatial</h3>
-            <p class="paper-authors">Interactive distortion-aware correction of geospatial coordinates with a deterministic fallback engine, optional GPT analysis backend, and clean projection rendering.</p>
+            <h3><a href="https://github.com/arunshar/mapfix-spatial" target="_blank" rel="noopener noreferrer">Distortion-Aware Geospatial Coordinate Correction with Deterministic and LLM-Assisted Analysis</a></h3>
+            <p class="paper-authors">
+              An interactive correction tool for diagnosing and repairing distorted geospatial
+              coordinates before downstream mapping or spatial analysis. The project combines a
+              deterministic fallback engine with optional language-model analysis, clean projection
+              rendering, and explicit reasoning about likely coordinate, datum, projection, and
+              measurement-error issues. It is framed as a practical bridge between geospatial data
+              cleaning and explainable spatial quality control.
+            </p>
             <div class="paper-links" aria-label="MapFix-Spatial links">
               <a class="project-link github-link" href="https://github.com/arunshar/mapfix-spatial">
                 <svg class="project-link-icon" aria-hidden="true"><use href="#icon-github"></use></svg>
@@ -405,17 +463,18 @@
           </article>
 
           <div class="project-group-heading reveal">
-            <h3>Other Projects</h3>
+            <h3>Additional CV Research Projects</h3>
           </div>
 
           <article class="paper-card resume-project-card reveal">
             <p class="paper-year">01 / Trajectory Generation</p>
-            <h3>Geo-lucid Conditional Diffusion Model</h3>
+            <h3><a href="https://doi.org/10.1145/3748636.3762749" target="_blank" rel="noopener noreferrer">Geo-lucid Conditional Diffusion Models for High Physical Fidelity Trajectory Generation</a></h3>
             <p class="paper-authors">
               Generated realistic synthetic vehicle trajectories for autonomous driving simulation
               and traffic prediction by co-designing GCDM, a two-stage cascaded diffusion model
               that injects attributed road-network priors through map-informed latent variables,
-              spatial cross-attention, and physics-based trajectory decomposition. It produced
+              spatial cross-attention, and a physics-based trajectory decomposition. The work
+              targets trajectory generation that preserves both geometry and dynamics, producing
               stronger geo-distribution similarity and velocity, acceleration, and jerk fidelity
               than DiffTraj, Sashimi, DiffWave, and EETG on Porto and Harbin taxi data.
             </p>
@@ -423,63 +482,67 @@
 
           <article class="paper-card resume-project-card reveal">
             <p class="paper-year">02 / EV Routing</p>
-            <h3>Multi-Level Bi-Objective Routing</h3>
+            <h3><a href="https://doi.org/10.1145/3681772.3698215" target="_blank" rel="noopener noreferrer">Multi-Level Bi-Objective Routing for Pareto-Optimal Energy and Travel-Time Planning</a></h3>
             <p class="paper-authors">
               Enabled real-time energy-vs-travel-time route planning for electric vehicles by
               co-designing MBOR with a boundary multigraph, Multi-level Encoded Pareto Frontier
-              View, 2D cost-interval pruning, and multi-edge pruning. The method retrieves complete
-              Pareto-optimal path sets over fragmented road networks and achieved more than 10x
-              online-runtime improvement on real-world road network data.
+              View, 2D cost-interval pruning, and multi-edge pruning. The method retrieves
+              complete Pareto-optimal path sets over fragmented road networks and achieved more
+              than 10x online-runtime improvement on real-world road network data, making
+              multi-objective EV route planning feasible in interactive settings.
             </p>
           </article>
 
           <article class="paper-card resume-project-card reveal">
             <p class="paper-year">03 / Maritime Safety</p>
-            <h3>STAGD, TGARD, and DC-TGARD</h3>
+            <h3><a href="https://dl.acm.org/doi/pdf/10.1145/3673235" target="_blank" rel="noopener noreferrer">Physics-Based Trajectory Gap Detection and Possible Rendezvous Search</a></h3>
             <p class="paper-authors">
               Reduced manual investigation areas for illegal maritime activity such as fishing,
               oil transfers, and trans-shipments by up to 80% through a multi-year research
               program on Space-Time Aware Gap Detection. The work combines comparison-less
               temporal indexing, R*-tree spatial indexing, maximal-union merge over space-time
-              prism geo-ellipses, ellipse symmetry, bi-directional pruning, and early stopping on
-              AIS data with roughly 500K ships.
+              prism geo-ellipses, ellipse symmetry, bi-directional pruning, and early stopping.
+              The STAGD, TGARD, and DC-TGARD line connects missing AIS reports to physically
+              plausible search regions at the scale of roughly 500K ships.
             </p>
           </article>
 
           <article class="paper-card resume-project-card reveal">
             <p class="paper-year">04 / Sustainable Agriculture</p>
-            <h3>SM-Hybrid Surrogate Models</h3>
+            <h3><a href="https://doi.org/10.1145/3764921.3770153" target="_blank" rel="noopener noreferrer">Hybrid Spatial Neural Surrogate Models for Sustainable Agriculture Simulation</a></h3>
             <p class="paper-authors">
               Accelerated expensive ecosystem simulations for sustainable agriculture with
               SM-Hybrid, a surrogate model for Daycent that models spatial autocorrelation and
-              long-range tele-connections using hybrid spatial neural networks. It predicted land
-              emissions and crop yield across Iowa, Illinois, and Indiana about 2x faster than
-              Daycent while improving accuracy over SM-ANN baselines.
+              long-range tele-connections using hybrid spatial neural networks. It predicts land
+              emissions, ecosystem fluxes, and crop yield across Iowa, Illinois, and Indiana
+              about 2x faster than Daycent while improving accuracy over SM-ANN baselines, which
+              supports faster scenario evaluation for climate-smart agriculture.
             </p>
           </article>
 
           <article class="paper-card resume-project-card reveal">
             <p class="paper-year">05 / Biomedical Spatial Computing</p>
-            <h3>Spatially-Lucid Oncology Classification</h3>
+            <h3><a href="https://epubs.siam.org/doi/abs/10.1137/1.9781611978032.71" target="_blank" rel="noopener noreferrer">Spatially-Lucid AI Classification for Non-Euclidean MxIF Oncology Data</a></h3>
             <p class="paper-authors">
               Supported precision immunotherapy by developing domain-adapted spatially-lucid
               neural networks for multi-category point set classification in non-Euclidean space.
               The work uses spatial ensemble learning, place-calibration parameters, weighted
               distance learning rates, spatial domain adaptation, spatial mix-up masking, and
-              spatial contrastive predictive coding on MxIF oncology data.
+              spatial contrastive predictive coding on MxIF oncology data to represent
+              immune-tumor relationships in the tumor microenvironment.
             </p>
           </article>
 
           <article class="paper-card resume-project-card reveal">
             <p class="paper-year">06 / Community-Engaged GIScience</p>
-            <h3>COVID-19 Mobility Analysis</h3>
+            <h3><a href="https://agile-giss.copernicus.org/articles/3/14/2022/" target="_blank" rel="noopener noreferrer">Community-Engaged Mobility Analysis for COVID-19 Policy Response</a></h3>
             <p class="paper-authors">
               Built an entity-relationship model, system architecture, and implementation for
               analyzing aggregated mobile device data during COVID-19 policy interventions. The
               project delivered county-level analytics on long-duration visits to high-risk
               business categories and fine-resolution device count maps to epidemiologists,
               analysts, and policymakers in collaboration with the Minnesota Department of
-              Management and Budget.
+              Management and Budget, including outputs used in policy-facing mobility analysis.
             </p>
           </article>
 
@@ -489,10 +552,6 @@
       <section class="publications section-pad" id="publications" aria-labelledby="publications-title">
         <div class="section-header reveal">
           <h2 id="publications-title">Publications</h2>
-          <p>
-            Imported from the academic portfolio. Last update: Apr 2026. Each entry keeps
-            the paper links, abstract, and bibtex where present.
-          </p>
         </div>
         <div id="publication-list" class="publication-list"></div>
         <noscript>
@@ -590,6 +649,6 @@
     </footer>
 
     <script src="assets/publications.js"></script>
-    <script src="assets/main.js"></script>
+    <script src="assets/main.js?v=20260527-2"></script>
   </body>
 </html>

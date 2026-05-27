@@ -34,7 +34,12 @@ function renderPublications() {
 
   list.innerHTML = publications
     .map((publication) => {
-      const links = (publication.links || [])
+      const supplementalLinks = (publication.links || []).filter((link) => {
+        const label = String(link.label || "").toLowerCase();
+        if (label === "paper" || label === "arxiv") return false;
+        return link.href !== publication.titleUrl;
+      });
+      const links = supplementalLinks
         .map(
           (link) =>
             `<a href="${escapeHtml(link.href)}">${escapeHtml(link.label)}</a>`,

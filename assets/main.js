@@ -95,7 +95,7 @@ function installCursor() {
 
   document.querySelectorAll("a").forEach((link) => {
     link.addEventListener("mouseenter", () => {
-      cursor.style.transform = "scale(1.22)";
+      cursor.style.transform = "scale(1.9)";
     });
     link.addEventListener("mouseleave", () => {
       cursor.style.transform = "scale(1)";

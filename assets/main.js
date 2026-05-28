@@ -95,7 +95,7 @@ function installCursor() {
 
   document.querySelectorAll("a").forEach((link) => {
     link.addEventListener("mouseenter", () => {
-      cursor.style.transform = "scale(1.9)";
+      cursor.style.transform = "scale(1.22)";
     });
     link.addEventListener("mouseleave", () => {
       cursor.style.transform = "scale(1)";
@@ -200,7 +200,7 @@ function drawAmbient(canvas, particles, time) {
   ctx.save();
   ctx.translate(centerX, centerY);
   ctx.rotate(time * 0.000025 + pointer.x * 0.03);
-  ctx.strokeStyle = "rgba(255, 204, 51, 0.052)";
+  ctx.strokeStyle = "rgba(214, 150, 116, 0.055)";
   ctx.lineWidth = 1;
   for (let i = 0; i < 7; i += 1) {
     ctx.beginPath();
@@ -217,7 +217,7 @@ function drawAmbient(canvas, particles, time) {
   });
 
   projected.forEach((particle, index) => {
-    ctx.fillStyle = index % 5 === 0 ? "rgba(131, 169, 191, 0.5)" : "rgba(255, 204, 51, 0.42)";
+    ctx.fillStyle = index % 5 === 0 ? "rgba(143, 199, 176, 0.55)" : "rgba(214, 150, 116, 0.48)";
     ctx.beginPath();
     ctx.arc(particle.x, particle.y, particle.r * particle.z, 0, Math.PI * 2);
     ctx.fill();
@@ -246,7 +246,7 @@ function drawAboutVisual(canvas, time = 0) {
   ctx.clearRect(0, 0, width, height);
 
   const cell = Math.max(18, width / 16);
-  const palette = ["#140c0f", "#270914", "#3d0b18", "#47320d", "#10232c"];
+  const palette = ["#1b2a33", "#183f37", "#28333c", "#5a4439", "#13252b"];
   for (let y = 0; y < height + cell; y += cell) {
     for (let x = 0; x < width + cell; x += cell) {
       const signal = Math.sin(x * 0.045 + time * 0.0005) + Math.cos(y * 0.055 - time * 0.00035);
@@ -280,7 +280,7 @@ function drawAboutVisual(canvas, time = 0) {
   ];
 
   ctx.lineWidth = 2;
-  ctx.strokeStyle = "#ffcc33";
+  ctx.strokeStyle = "#d69674";
   ctx.beginPath();
   path.forEach(([px, py], index) => {
     const x = px * width;
@@ -293,7 +293,7 @@ function drawAboutVisual(canvas, time = 0) {
   path.forEach(([px, py], index) => {
     const x = px * width;
     const y = py * height + Math.sin(time * 0.001 + index) * 4;
-    ctx.fillStyle = index === path.length - 1 ? "#83a9bf" : "#fff8ea";
+    ctx.fillStyle = index === path.length - 1 ? "#8fc7b0" : "#f4f1ea";
     ctx.beginPath();
     ctx.arc(x, y, index === path.length - 1 ? 5 : 3.5, 0, Math.PI * 2);
     ctx.fill();

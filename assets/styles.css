@@ -568,17 +568,6 @@ section[id] {
   box-shadow: 0 14px 38px rgba(255, 184, 54, 0.3);
 }
 
-.paper-links .pdf-link {
-  color: var(--text);
-  background: rgba(117, 197, 255, 0.11);
-  border-color: rgba(117, 197, 255, 0.32);
-}
-
-.paper-links .pdf-link:hover {
-  border-color: rgba(117, 197, 255, 0.58);
-  box-shadow: 0 12px 30px rgba(117, 197, 255, 0.16);
-}
-
 .project-link-icon {
   flex: 0 0 auto;
   width: 1rem;

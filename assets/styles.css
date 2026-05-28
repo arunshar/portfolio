@@ -1,17 +1,20 @@
 :root {
   color-scheme: dark;
-  --bg: #08080b;
-  --panel: rgba(18, 17, 22, 0.68);
-  --panel-solid: #121116;
-  --text: #f4f1ea;
-  --muted: #a19c98;
-  --dim: #67615f;
-  --line: rgba(214, 150, 116, 0.18);
-  --line-strong: rgba(214, 150, 116, 0.36);
-  --accent: #d69674;
-  --accent-alt: #8fc7b0;
-  --cool: #9cb7d9;
-  --shadow: 0 24px 70px rgba(0, 0, 0, 0.32);
+  --bg: #050405;
+  --bg-soft: #0d090b;
+  --panel: rgba(19, 12, 14, 0.72);
+  --panel-solid: #140c0f;
+  --text: #fff8ea;
+  --muted: #b7aa97;
+  --dim: #7d7267;
+  --line: rgba(255, 204, 51, 0.17);
+  --line-strong: rgba(255, 204, 51, 0.38);
+  --accent: #ffcc33;
+  --accent-deep: #7a0019;
+  --accent-warm: #b11f3a;
+  --accent-alt: #f2a900;
+  --cool: #83a9bf;
+  --shadow: 0 26px 82px rgba(0, 0, 0, 0.42);
 }
 
 * {
@@ -27,10 +30,13 @@ body {
   min-width: 320px;
   margin: 0;
   color: var(--text);
-  background: linear-gradient(180deg, #08080b 0%, #101014 42%, #08080b 100%);
-  font-family: Outfit, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  font-weight: 300;
-  line-height: 1.7;
+  background:
+    linear-gradient(125deg, rgba(122, 0, 25, 0.2), transparent 26%),
+    linear-gradient(235deg, rgba(255, 204, 51, 0.08), transparent 24%),
+    linear-gradient(180deg, #050405 0%, #10080b 42%, #050405 100%);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-weight: 400;
+  line-height: 1.68;
   letter-spacing: 0;
   overflow-x: hidden;
 }
@@ -125,14 +131,24 @@ h4 {
   gap: 2rem;
   padding: 1.35rem clamp(1.25rem, 5vw, 4rem);
   color: var(--text);
-  background: linear-gradient(180deg, rgba(8, 8, 11, 0.86), rgba(8, 8, 11, 0));
+  background:
+    linear-gradient(180deg, rgba(5, 4, 5, 0.92), rgba(5, 4, 5, 0.46) 68%, rgba(5, 4, 5, 0));
+  border-bottom: 1px solid rgba(255, 204, 51, 0.07);
+  backdrop-filter: blur(18px);
 }
 
 .brand {
-  font-family: "Cormorant Garamond", Georgia, serif;
-  font-size: 1.4rem;
+  display: inline-grid;
+  width: 2.35rem;
+  height: 2.35rem;
+  place-items: center;
+  color: var(--accent);
+  background: rgba(122, 0, 25, 0.38);
+  border: 1px solid rgba(255, 204, 51, 0.28);
+  border-radius: 50%;
+  font-size: 0.86rem;
   line-height: 1;
-  font-weight: 500;
+  font-weight: 800;
 }
 
 .site-nav {
@@ -142,7 +158,7 @@ h4 {
   gap: clamp(0.7rem, 1.8vw, 1.8rem);
   color: var(--muted);
   font-size: 0.82rem;
-  font-weight: 400;
+  font-weight: 600;
   text-transform: uppercase;
 }
 
@@ -185,6 +201,25 @@ section[id] {
   scroll-margin-top: 7rem;
 }
 
+main > section[id] {
+  transition:
+    opacity 720ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 720ms cubic-bezier(0.22, 1, 0.36, 1),
+    filter 720ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+main > section[id].scroll-focus {
+  opacity: 0.62;
+  transform: translateY(1.4rem) scale(0.986);
+  filter: saturate(0.72);
+}
+
+main > section[id].section-in-focus {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  filter: saturate(1.05);
+}
+
 .hero {
   position: relative;
   display: flex;
@@ -194,6 +229,18 @@ section[id] {
   justify-content: center;
   flex-direction: column;
   text-align: center;
+}
+
+.hero::before {
+  position: absolute;
+  inset: 14% 9% auto;
+  height: 42%;
+  content: "";
+  background:
+    linear-gradient(90deg, transparent, rgba(255, 204, 51, 0.07) 44%, transparent 72%),
+    linear-gradient(180deg, rgba(122, 0, 25, 0.11), transparent 82%);
+  opacity: 0.72;
+  pointer-events: none;
 }
 
 .hero-kicker,
@@ -211,17 +258,17 @@ section[id] {
 .section-header h2,
 .about-content h2,
 .contact-inner h2 {
-  font-family: "Cormorant Garamond", Georgia, serif;
-  font-weight: 300;
-  line-height: 0.98;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-weight: 800;
+  line-height: 0.96;
   letter-spacing: 0;
 }
 
 .hero h1 {
   max-width: 68rem;
   margin-bottom: 1.4rem;
-  font-size: 7.8rem;
-  background: linear-gradient(135deg, var(--text), var(--accent) 58%, var(--accent-alt));
+  font-size: 7.4rem;
+  background: linear-gradient(135deg, #fff8ea, var(--accent) 55%, #9f1d35);
   background-clip: text;
   -webkit-background-clip: text;
   color: transparent;
@@ -244,7 +291,7 @@ section[id] {
 .hero-links a {
   color: var(--muted);
   font-size: 0.8rem;
-  font-weight: 500;
+  font-weight: 700;
   text-transform: uppercase;
 }
 
@@ -319,7 +366,7 @@ section[id] {
   display: block;
   width: 100%;
   aspect-ratio: 1;
-  background: #121116;
+  background: var(--panel-solid);
   border-radius: 3px;
   box-shadow: var(--shadow);
 }
@@ -327,7 +374,7 @@ section[id] {
 .profile-photo {
   object-fit: cover;
   object-position: center top;
-  filter: grayscale(22%) contrast(1.05);
+  filter: grayscale(12%) contrast(1.07) sepia(8%);
 }
 
 .about-frame {
@@ -357,7 +404,7 @@ section[id] {
   width: fit-content;
   padding: 0.5rem 0.75rem;
   color: var(--text) !important;
-  background: rgba(214, 150, 116, 0.1);
+  background: rgba(122, 0, 25, 0.32);
   border: 1px solid var(--line-strong);
   border-radius: 4px;
   font-size: 0.9rem !important;
@@ -373,7 +420,7 @@ section[id] {
 .profile-actions a {
   color: var(--muted);
   font-size: 0.82rem;
-  font-weight: 500;
+  font-weight: 700;
   text-transform: uppercase;
 }
 
@@ -385,7 +432,7 @@ section[id] {
 
 .section-header h2 {
   margin-bottom: 1rem;
-  font-size: 4.7rem;
+  font-size: 4.25rem;
 }
 
 .section-header p:not(.section-label) {
@@ -396,7 +443,9 @@ section[id] {
 }
 
 .research {
-  background: linear-gradient(180deg, transparent, rgba(143, 199, 176, 0.04), transparent);
+  background:
+    linear-gradient(180deg, transparent, rgba(255, 204, 51, 0.035), transparent),
+    linear-gradient(90deg, rgba(122, 0, 25, 0.1), transparent 34%, rgba(131, 169, 191, 0.035));
 }
 
 .news-list {
@@ -411,7 +460,7 @@ section[id] {
 
 .news-list li {
   color: var(--muted);
-  border-top: 1px solid rgba(244, 241, 234, 0.08);
+  border-top: 1px solid rgba(255, 248, 234, 0.08);
   padding-top: 0.72rem;
   line-height: 1.5;
 }
@@ -433,9 +482,11 @@ section[id] {
   position: relative;
   overflow: hidden;
   padding: clamp(1.5rem, 4vw, 2.6rem);
-  background: var(--panel);
+  background:
+    linear-gradient(145deg, rgba(24, 14, 17, 0.86), rgba(10, 8, 9, 0.74)),
+    var(--panel);
   border: 1px solid var(--line);
-  border-radius: 4px;
+  border-radius: 8px;
   box-shadow: 0 16px 44px rgba(0, 0, 0, 0.16);
   backdrop-filter: blur(16px);
   transition:
@@ -459,9 +510,11 @@ section[id] {
 
 .paper-card:hover,
 .publication-card:hover {
-  background: rgba(22, 20, 25, 0.82);
+  background:
+    linear-gradient(145deg, rgba(35, 15, 21, 0.92), rgba(12, 9, 10, 0.84)),
+    rgba(22, 20, 25, 0.82);
   border-color: var(--line-strong);
-  transform: translateY(-3px);
+  transform: translateY(-4px);
 }
 
 .paper-card:hover::before,
@@ -482,20 +535,20 @@ section[id] {
 .publication-card h3 {
   max-width: 62rem;
   margin-bottom: 0.8rem;
-  font-family: "Cormorant Garamond", Georgia, serif;
-  font-size: 2.22rem;
-  font-weight: 400;
-  line-height: 1.22;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.2;
 }
 
 .paper-card h3 a,
 .publication-card h3 a {
-  border-bottom: 1px solid rgba(214, 150, 116, 0.28);
+  border-bottom: 1px solid rgba(255, 204, 51, 0.28);
 }
 
 .paper-authors {
   margin-bottom: 0.35rem;
-  color: #b7b1ad;
+  color: #c5b9a7;
   font-size: 1.03rem;
   line-height: 1.78;
 }
@@ -523,7 +576,7 @@ section[id] {
 .contact-links a {
   color: var(--muted);
   font-size: 0.82rem;
-  font-weight: 500;
+  font-weight: 700;
   text-transform: uppercase;
 }
 
@@ -537,8 +590,8 @@ section[id] {
   padding: 0.58rem 0.82rem;
   overflow: hidden;
   color: var(--text);
-  background: rgba(244, 241, 234, 0.055);
-  border: 1px solid rgba(244, 241, 234, 0.13);
+  background: rgba(255, 248, 234, 0.055);
+  border: 1px solid rgba(255, 248, 234, 0.13);
   border-radius: 6px;
   line-height: 1;
   white-space: nowrap;
@@ -546,26 +599,26 @@ section[id] {
 
 .paper-links .project-link:hover {
   color: var(--text);
-  border-color: rgba(244, 241, 234, 0.28);
+  border-color: rgba(255, 204, 51, 0.34);
   transform: translateY(-2px);
 }
 
 .paper-links .github-link {
-  background: rgba(244, 241, 234, 0.07);
+  background: rgba(255, 248, 234, 0.07);
 }
 
 .paper-links .hf-link {
-  color: #15110a;
+  color: #16060a;
   background:
-    linear-gradient(135deg, rgba(255, 248, 220, 0.98), rgba(255, 196, 77, 0.98) 58%, rgba(245, 145, 44, 0.96));
-  border-color: rgba(255, 210, 86, 0.88);
-  box-shadow: 0 10px 28px rgba(255, 184, 54, 0.2);
+    linear-gradient(135deg, rgba(255, 248, 220, 0.98), rgba(255, 204, 51, 0.98) 56%, rgba(177, 31, 58, 0.92));
+  border-color: rgba(255, 210, 86, 0.9);
+  box-shadow: 0 10px 28px rgba(255, 204, 51, 0.16);
 }
 
 .paper-links .hf-link:hover {
-  color: #15110a;
+  color: #16060a;
   border-color: rgba(255, 228, 129, 0.98);
-  box-shadow: 0 14px 38px rgba(255, 184, 54, 0.3);
+  box-shadow: 0 14px 38px rgba(255, 204, 51, 0.26);
 }
 
 .project-link-icon {
@@ -598,9 +651,9 @@ section[id] {
 .project-group-heading h3 {
   margin: 0;
   color: var(--text);
-  font-family: "Cormorant Garamond", Georgia, serif;
-  font-size: 3.2rem;
-  font-weight: 400;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 2.6rem;
+  font-weight: 800;
 }
 
 .publication-list {
@@ -611,8 +664,8 @@ section[id] {
 }
 
 .publication-card.representative {
-  border-color: rgba(214, 150, 116, 0.32);
-  background: rgba(27, 23, 24, 0.78);
+  border-color: rgba(255, 204, 51, 0.32);
+  background: rgba(27, 13, 17, 0.82);
 }
 
 .publication-card.representative .paper-year::after {
@@ -623,7 +676,7 @@ section[id] {
 
 .paper-detail {
   margin-top: 0.9rem;
-  border-top: 1px solid rgba(244, 241, 234, 0.08);
+  border-top: 1px solid rgba(255, 248, 234, 0.08);
   padding-top: 0.8rem;
 }
 
@@ -647,7 +700,7 @@ section[id] {
   padding: 1rem;
   color: #ded8cf;
   background: rgba(0, 0, 0, 0.28);
-  border: 1px solid rgba(244, 241, 234, 0.08);
+  border: 1px solid rgba(255, 248, 234, 0.08);
   border-radius: 4px;
   font-size: 0.78rem;
   line-height: 1.55;
@@ -678,9 +731,9 @@ section[id] {
 .timeline-section-title {
   margin: 0 0 2.5rem;
   color: var(--text);
-  font-family: "Cormorant Garamond", Georgia, serif;
-  font-size: 3rem;
-  font-weight: 400;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 2.6rem;
+  font-weight: 800;
   line-height: 1.05;
   text-align: center;
 }
@@ -731,9 +784,9 @@ section[id] {
 
 .timeline h3 {
   margin-bottom: 0.35rem;
-  font-family: "Cormorant Garamond", Georgia, serif;
-  font-size: 2.05rem;
-  font-weight: 400;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 1.72rem;
+  font-weight: 700;
   line-height: 1.18;
 }
 
@@ -792,9 +845,10 @@ section[id] {
   min-height: 9rem;
   padding: 1.3rem;
   color: var(--text);
-  background: rgba(18, 17, 22, 0.72);
-  font-family: "Cormorant Garamond", Georgia, serif;
-  font-size: 1.45rem;
+  background: rgba(20, 12, 15, 0.78);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 1.22rem;
+  font-weight: 700;
   line-height: 1.2;
 }
 
@@ -802,9 +856,9 @@ section[id] {
   display: block;
   margin-bottom: 0.7rem;
   color: var(--accent);
-  font-family: Outfit, ui-sans-serif, system-ui, sans-serif;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
   font-size: 0.78rem;
-  font-weight: 500;
+  font-weight: 700;
   text-transform: uppercase;
 }
 
@@ -824,9 +878,9 @@ section[id] {
 .library-column h3 {
   margin-bottom: 1.3rem;
   color: var(--accent);
-  font-family: "Cormorant Garamond", Georgia, serif;
-  font-size: 1.55rem;
-  font-weight: 400;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 1.2rem;
+  font-weight: 800;
 }
 
 .library-column ul {
@@ -913,6 +967,12 @@ section[id] {
     opacity: 1;
     transform: none;
   }
+
+  main > section[id].scroll-focus {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
 }
 
 @media (max-width: 980px) {
@@ -954,8 +1014,8 @@ section[id] {
     flex-direction: column;
     gap: 1rem;
     padding: 1rem 1.25rem;
-    background: rgba(8, 8, 11, 0.9);
-    border-bottom: 1px solid rgba(244, 241, 234, 0.06);
+    background: rgba(5, 4, 5, 0.92);
+    border-bottom: 1px solid rgba(255, 204, 51, 0.08);
     backdrop-filter: blur(14px);
   }
 

@@ -126,6 +126,52 @@ function installReveal() {
   revealItems.forEach((item) => observer.observe(item));
 }
 
+function installSectionFocus() {
+  const sections = Array.from(document.querySelectorAll("main > section[id]"));
+  if (!sections.length) return;
+
+  sections.forEach((section) => section.classList.add("scroll-focus"));
+
+  if (reduceMotion || !("IntersectionObserver" in window)) {
+    sections.forEach((section) => section.classList.add("section-in-focus"));
+    return;
+  }
+
+  const visibility = new Map(sections.map((section) => [section, 0]));
+  let rafId = 0;
+
+  function updateFocus() {
+    rafId = 0;
+    let active = sections[0];
+    let bestRatio = -1;
+
+    sections.forEach((section) => {
+      const ratio = visibility.get(section) || 0;
+      if (ratio > bestRatio) {
+        active = section;
+        bestRatio = ratio;
+      }
+    });
+
+    sections.forEach((section) => {
+      section.classList.toggle("section-in-focus", section === active && bestRatio > 0.04);
+    });
+  }
+
+  const observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => visibility.set(entry.target, entry.intersectionRatio));
+      if (!rafId) rafId = requestAnimationFrame(updateFocus);
+    },
+    {
+      rootMargin: "-18% 0px -30% 0px",
+      threshold: [0, 0.12, 0.25, 0.4, 0.55, 0.7, 0.85, 1],
+    },
+  );
+
+  sections.forEach((section) => observer.observe(section));
+}
+
 function createParticles(count) {
   return Array.from({ length: count }, (_, index) => {
     const layer = index % 3;
@@ -154,7 +200,7 @@ function drawAmbient(canvas, particles, time) {
   ctx.save();
   ctx.translate(centerX, centerY);
   ctx.rotate(time * 0.000025 + pointer.x * 0.03);
-  ctx.strokeStyle = "rgba(214, 150, 116, 0.055)";
+  ctx.strokeStyle = "rgba(255, 204, 51, 0.052)";
   ctx.lineWidth = 1;
   for (let i = 0; i < 7; i += 1) {
     ctx.beginPath();
@@ -171,13 +217,13 @@ function drawAmbient(canvas, particles, time) {
   });
 
   projected.forEach((particle, index) => {
-    ctx.fillStyle = index % 5 === 0 ? "rgba(143, 199, 176, 0.55)" : "rgba(214, 150, 116, 0.48)";
+    ctx.fillStyle = index % 5 === 0 ? "rgba(131, 169, 191, 0.5)" : "rgba(255, 204, 51, 0.42)";
     ctx.beginPath();
     ctx.arc(particle.x, particle.y, particle.r * particle.z, 0, Math.PI * 2);
     ctx.fill();
   });
 
-  ctx.strokeStyle = "rgba(244, 241, 234, 0.045)";
+  ctx.strokeStyle = "rgba(255, 248, 234, 0.04)";
   projected.forEach((particle, index) => {
     for (let next = index + 1; next < Math.min(index + 9, projected.length); next += 1) {
       const other = projected[next];
@@ -200,7 +246,7 @@ function drawAboutVisual(canvas, time = 0) {
   ctx.clearRect(0, 0, width, height);
 
   const cell = Math.max(18, width / 16);
-  const palette = ["#1b2a33", "#183f37", "#28333c", "#5a4439", "#13252b"];
+  const palette = ["#140c0f", "#270914", "#3d0b18", "#47320d", "#10232c"];
   for (let y = 0; y < height + cell; y += cell) {
     for (let x = 0; x < width + cell; x += cell) {
       const signal = Math.sin(x * 0.045 + time * 0.0005) + Math.cos(y * 0.055 - time * 0.00035);
@@ -212,7 +258,7 @@ function drawAboutVisual(canvas, time = 0) {
   }
   ctx.globalAlpha = 1;
 
-  ctx.strokeStyle = "rgba(244, 241, 234, 0.18)";
+  ctx.strokeStyle = "rgba(255, 248, 234, 0.18)";
   ctx.lineWidth = 1;
   for (let y = height * 0.12; y < height * 0.9; y += height * 0.09) {
     ctx.beginPath();
@@ -234,7 +280,7 @@ function drawAboutVisual(canvas, time = 0) {
   ];
 
   ctx.lineWidth = 2;
-  ctx.strokeStyle = "#d69674";
+  ctx.strokeStyle = "#ffcc33";
   ctx.beginPath();
   path.forEach(([px, py], index) => {
     const x = px * width;
@@ -247,7 +293,7 @@ function drawAboutVisual(canvas, time = 0) {
   path.forEach(([px, py], index) => {
     const x = px * width;
     const y = py * height + Math.sin(time * 0.001 + index) * 4;
-    ctx.fillStyle = index === path.length - 1 ? "#8fc7b0" : "#f4f1ea";
+    ctx.fillStyle = index === path.length - 1 ? "#83a9bf" : "#fff8ea";
     ctx.beginPath();
     ctx.arc(x, y, index === path.length - 1 ? 5 : 3.5, 0, Math.PI * 2);
     ctx.fill();
@@ -279,4 +325,5 @@ function installCanvases() {
 renderPublications();
 installCursor();
 installReveal();
+installSectionFocus();
 installCanvases();

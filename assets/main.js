@@ -4,6 +4,17 @@
 (function () {
   "use strict";
 
+  var ICON_GH =
+    '<svg class="ico" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">' +
+    '<path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59' +
+    '.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23' +
+    '-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87' +
+    '.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82' +
+    '-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82A7.65 7.65 0 0 1 8 3.86c.68 0 ' +
+    '1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27' +
+    '.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 ' +
+    '2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>';
+
   function escapeHtml(value) {
     return String(value == null ? "" : value)
       .replace(/&/g, "&amp;")
@@ -20,36 +31,43 @@
 
     list.innerHTML = pubs
       .map(function (p) {
-        var supplemental = (p.links || []).filter(function (link) {
-          var label = String(link.label || "").toLowerCase();
-          if (label === "paper" || label === "arxiv") return false;
-          return link.href !== p.titleUrl;
-        });
-        var links = supplemental
-          .map(function (link) {
-            return '<a href="' + escapeHtml(link.href) + '">' + escapeHtml(link.label) + "</a>";
-          })
-          .join("");
         var title = p.titleUrl
           ? '<a href="' + escapeHtml(p.titleUrl) + '">' + escapeHtml(p.title) + "</a>"
           : escapeHtml(p.title);
+        var authors = escapeHtml(p.authors || "").replace(
+          "Arun Sharma", "<strong>Arun Sharma</strong>");
+        var chips = (p.links || []).map(function (link) {
+          var label = String(link.label || "").toLowerCase();
+          var href = escapeHtml(link.href);
+          if (label === "code" || label === "github") {
+            return '<a class="ico-link" href="' + href + '" target="_blank" rel="noopener" ' +
+              'title="Code on GitHub" aria-label="Code on GitHub">' + ICON_GH + "</a>";
+          }
+          if (label === "paper" || label === "pdf") {
+            return '<a href="' + href + '">PDF</a>';
+          }
+          if (label === "arxiv") {
+            return '<a href="' + href + '">arXiv</a>';
+          }
+          return '<a href="' + href + '">' + escapeHtml(link.label) + "</a>";
+        });
+        var linkRow = chips.length
+          ? '<p class="pub-links">' + chips.join(" &middot; ") + "</p>"
+          : "";
+        var venue = p.venue ? '<p class="pub-venue">' + escapeHtml(p.venue) + "</p>" : "";
         var abstract = p.abstract
-          ? '<details class="paper-detail"><summary>Abstract</summary><p>' +
+          ? '<details class="pub-fold"><summary>Abstract</summary><p>' +
             escapeHtml(p.abstract) + "</p></details>"
           : "";
         var bibtex = p.bibtex
-          ? '<details class="paper-detail"><summary>BibTeX</summary><pre>' +
+          ? '<details class="pub-fold"><summary>BibTeX</summary><pre>' +
             escapeHtml(p.bibtex) + "</pre></details>"
           : "";
-        var classes = p.representative ? "publication-card representative" : "publication-card";
         return (
-          '<article class="' + classes + '" id="pub-' + escapeHtml(p.id) + '">' +
-          '<p class="paper-year">' + escapeHtml(p.year || "Publication") + "</p>" +
+          '<article class="pub-entry" id="pub-' + escapeHtml(p.id) + '">' +
           "<h3>" + title + "</h3>" +
-          '<p class="paper-authors">' + escapeHtml(p.authors) + "</p>" +
-          '<p class="paper-venue">' + escapeHtml(p.venue) + "</p>" +
-          (links ? '<div class="paper-links">' + links + "</div>" : "") +
-          abstract + bibtex +
+          '<p class="pub-authors">' + authors + "</p>" +
+          venue + linkRow + abstract + bibtex +
           "</article>"
         );
       })

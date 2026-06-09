@@ -16,7 +16,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css?family=Titillium+Web:300,300italic,400,400italic,600,600italic" rel="stylesheet" />
-    <link rel="stylesheet" href="assets/academic.css?v=20260608c" />
+    <link rel="stylesheet" href="assets/academic.css?v=20260608d" />
   </head>
   <body class="home">
     <div class="wrap">
@@ -194,75 +194,9 @@
       </section>
 
       <section id="publications">
-        <h2>Selected Publications</h2>
-        <div class="pub-highlights">
-          <article class="pub-entry">
-            <h3><a href="https://doi.org/10.1145/3748636.3762749">Geo-lucid Conditional Diffusion Models for High Physical Fidelity Trajectory Generation</a></h3>
-            <p class="pub-meta">Generative Modeling / Trajectory Forecasting / Urban AI</p>
-            <p class="pub-blurb">
-              GCDM, a two-stage cascaded diffusion model that injects attributed
-              road-network priors through map-informed latent variables, spatial
-              cross-attention, and a physics-based trajectory decomposition; stronger
-              geo-distribution similarity and velocity, acceleration, and jerk fidelity
-              than DiffTraj, Sashimi, DiffWave, and EETG on Porto and Harbin taxi data.
-            </p>
-          </article>
-          <article class="pub-entry">
-            <h3><a href="https://doi.org/10.1145/3681772.3698215">Multi-Level Bi-Objective Routing for Pareto-Optimal Energy and Travel-Time Planning</a></h3>
-            <p class="pub-meta">Graph Algorithms / Route Optimization / Electric Vehicles</p>
-            <p class="pub-blurb">
-              MBOR with a boundary multigraph, Multi-level Encoded Pareto Frontier View,
-              2D cost-interval pruning, and multi-edge pruning; retrieves complete
-              Pareto-optimal path sets over fragmented road networks with more than 10x
-              online-runtime improvement on real-world road data.
-            </p>
-          </article>
-          <article class="pub-entry">
-            <h3><a href="https://dl.acm.org/doi/pdf/10.1145/3673235">Physics-Based Trajectory Gap Detection and Possible Rendezvous Search</a></h3>
-            <p class="pub-meta">Trajectory Mining / Maritime Safety / Anomaly Detection</p>
-            <p class="pub-blurb">
-              Space-Time Aware Gap Detection that reduces manual investigation areas for
-              illegal maritime activity by up to 80%, combining comparison-less temporal
-              indexing, R*-tree spatial indexing, maximal-union merge over space-time
-              prism geo-ellipses, bi-directional pruning, and early stopping. The STAGD,
-              TGARD, and DC-TGARD line scales to roughly 500K ships.
-            </p>
-          </article>
-          <article class="pub-entry">
-            <h3><a href="https://doi.org/10.1145/3764921.3770153">Hybrid Spatial Neural Surrogate Models for Sustainable Agriculture Simulation</a></h3>
-            <p class="pub-meta">Surrogate Modeling / Spatial ML / Sustainable Agriculture</p>
-            <p class="pub-blurb">
-              SM-Hybrid, a surrogate for Daycent that models spatial autocorrelation and
-              long-range tele-connections with hybrid spatial neural networks; predicts
-              land emissions, ecosystem fluxes, and crop yield across Iowa, Illinois, and
-              Indiana about 2x faster than Daycent while improving on SM-ANN baselines.
-            </p>
-          </article>
-          <article class="pub-entry">
-            <h3><a href="https://epubs.siam.org/doi/abs/10.1137/1.9781611978032.71">Spatially-Lucid AI Classification for Non-Euclidean MxIF Oncology Data</a></h3>
-            <p class="pub-meta">Biomedical AI / Spatial Deep Learning / Domain Adaptation</p>
-            <p class="pub-blurb">
-              Domain-adapted spatially-lucid neural networks for multi-category point-set
-              classification in non-Euclidean space, using spatial ensemble learning,
-              place-calibration, weighted distance learning rates, spatial domain
-              adaptation, mix-up masking, and contrastive predictive coding on MxIF
-              oncology data.
-            </p>
-          </article>
-          <article class="pub-entry">
-            <h3><a href="https://agile-giss.copernicus.org/articles/3/14/2022/">Community-Engaged Mobility Analysis for COVID-19 Policy Response</a></h3>
-            <p class="pub-meta">GIScience / Mobility Analytics / Public Policy</p>
-            <p class="pub-blurb">
-              An entity-relationship model, system architecture, and implementation for
-              analyzing aggregated mobile-device data during COVID-19 policy
-              interventions, delivering county-level analytics and fine-resolution device
-              maps with the Minnesota Department of Management and Budget.
-            </p>
-          </article>
-        </div>
-
-        <h3 class="subhead">Full list</h3>
-        <div id="publication-list" class="publication-list"></div>
+        <h2>Publications</h2>
+        <p class="section-note">Complete list, also on <a href="https://scholar.google.com/citations?user=yb0e0FYAAAAJ&amp;hl=en">Google Scholar</a>. Click a title to open the paper.</p>
+        <div id="publication-list" class="pub-list"></div>
         <noscript>
           <p class="section-note">The complete publication list is available in assets/publications.js and on <a href="https://scholar.google.com/citations?user=yb0e0FYAAAAJ&amp;hl=en">Google Scholar</a>.</p>
         </noscript>
@@ -389,6 +323,6 @@
     </div>
 
     <script src="assets/publications.js"></script>
-    <script src="assets/main.js?v=20260608"></script>
+    <script src="assets/main.js?v=20260608d"></script>
   </body>
 </html>

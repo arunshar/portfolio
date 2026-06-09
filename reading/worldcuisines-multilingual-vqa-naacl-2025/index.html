@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WorldCuisines: A Massive-Scale Benchmark for Multilingual and Multicultural Visual Question Answering on Global Cuisines - Reading notes - Arun Sharma</title>
+<meta name="description" content="Arun Sharma's reading notes on WorldCuisines: A Massive-Scale Benchmark for Multilingual and Multicultural Visual Question Answering on Global Cuisines (arXiv 2024 (v5, May 2025); NAACL 2025).">
+<link rel="canonical" href="https://arunshar.github.io/portfolio/reading/worldcuisines-multilingual-vqa-naacl-2025/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css?family=Titillium+Web:300,300italic,400,400italic,600,600italic" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/paper.css?v=20260608f">
+<link rel="stylesheet" href="../../assets/reading.css?v=20260609b">
+</head>
+<body class="project-page reading-page">
+<div class="wrap">
+  <nav class="topnav"><a href="../../index.html">Arun Sharma</a> <span aria-hidden="true">/</span> <a href="../../index.html#reading">Reading Resources</a></nav>
+
+  <header class="paper-header">
+    <h1>WorldCuisines: A Massive-Scale Benchmark for Multilingual and Multicultural Visual Question Answering on Global Cuisines</h1>
+    <p class="authors">G. Winata, F. Hudi, P. A. Irawan, D. Anugraha, R. A. Putri et al. (60+ authors; senior authors incl. D. I. Adelani, A. Oh, A. F. Aji, T. Watanabe, C.-W. Ngo)</p>
+    <p class="venue"><span class="rtype">arXiv 2024 (v5, May 2025); NAACL 2025</span> &middot; 2025 &middot; <span class="rating" title="2.5/5 relevance to my research">★★½☆☆<span class="num">2.5/5</span></span></p>
+    <div class="buttons">
+      <a class="btn" href="https://arxiv.org/abs/2410.12705" target="_blank" rel="noopener">Original source</a>
+      <a class="btn" href="../../index.html#reading">All reading notes</a>
+    </div>
+  </header>
+
+  <div class="paper-body">
+    <p class="notes-label">My reading notes</p>
+
+    <h2>Why it matters</h2>
+    <p>Tangential to Arun&#x27;s core spatial/physics-ML work, but its adversarial-context protocol (feeding a wrong location to flip a model&#x27;s prediction) and its native-speaker-verified data-curation pipeline are useful reference points for trustworthy multimodal evaluation and for building benchmarks with reliable ground truth.</p>
+
+    <h2>Summary</h2>
+        <p>WorldCuisines introduces a large multilingual, multicultural visual question answering (VQA) benchmark built around food as a proxy for culture. The authors assemble a curated knowledge base of 2,414 dishes with 6,045 Wikimedia-licensed images and rich metadata (coarse and fine categories, cuisine, location, regional cuisine), then construct a parallel VQA corpus of roughly one million question-image pairs spanning 30 language varieties (23 languages, 7 of them with two varieties each) across nine language families and 189 countries. Two tasks are posed: predicting a dish&#x27;s name and predicting where it is commonly eaten and originated, each with multiple-choice and open-ended answer formats. Distractors for the multiple-choice items are mined with a multilingual text-embedding model and cosine similarity over dish name plus description.</p>
+    <p>A notable design element is the three-way query design for dish-name prediction: no-context, contextualized (helpful), and adversarial. In the adversarial setting the prompt injects a misleading location or cuisine, testing whether a model anchors on the image or gets steered by the misleading text. The translation pipeline is handled by native speakers and is careful about morphological inflection (for example case marking on place names), prioritizing naturalness.</p>
+    <p>The authors evaluate 18 VLMs (15 open-source, 3 proprietary). Multiple-choice accuracy varies widely while open-ended is much harder, especially for dish names without context. GPT-4o leads overall and Llama 3.2 Instruct is the strongest open model. Helpful context reliably boosts accuracy, but adversarial context reliably degrades it, indicating models lean on textual cues over visual evidence. Performance is weaker for underrepresented and non-Latin-script languages, and a clear scaling trend (larger models do better) holds, most clearly for the open-source families. The training split (1M), two evaluation splits (12k and 60k), code, leaderboard, and knowledge base are released publicly on HuggingFace and GitHub.</p>
+
+    <h2>Key ideas</h2>
+    <ul>
+      <li>Uses food as a cultural proxy to build the largest multicultural VQA benchmark to date: ~1M parallel samples, 30 language varieties (23 languages, 7 with two varieties), 9 language families, 189 countries.</li>
+      <li>Two tasks (dish-name prediction and location/origin prediction) in both multiple-choice and open-ended formats, generated from a native-speaker-curated knowledge base of 2,414 dishes and 6,045 images.</li>
+      <li>An explicit adversarial-context subtask injects a misleading location/cuisine into the prompt to measure whether VLMs anchor on the image or are swayed by text; models are reliably misled.</li>
+      <li>Multiple-choice distractors are mined with a multilingual E5-Large Instruct embedding model plus cosine similarity over dish name and description.</li>
+      <li>Empirical takeaways: helpful context helps, adversarial context hurts, open-ended is far harder than multiple-choice, non-Latin/underrepresented languages lag, and a scaling trend holds (clearest for open-source models).</li>
+      <li>Multi-stage data curation (Wikimedia license verification, native-speaker translation with inflection awareness, parallel prompt templates) underpins ground-truth reliability; resources released openly.</li>
+    </ul>
+
+    <h2>Takeaways for my work</h2>
+    <ul>
+      <li>The adversarial-context protocol is a clean, transferable design for stress-testing whether a multimodal model trusts its sensor (image) versus a possibly-spoofed text prior, which echoes Arun&#x27;s denial/deception distortion framing in a non-spatial setting.</li>
+      <li>The curation-and-QA pipeline (native-speaker verification, licensed images, parallel multilingual templates) is a concrete template for generating trustworthy ground truth when building benchmarks for the MIRROR/anomaly platform.</li>
+      <li>Distractor mining via embedding similarity is a cheap, reusable recipe for constructing hard negatives in any retrieval-or-classification-style evaluation.</li>
+      <li>Persistent open-ended underperformance on underrepresented languages signals the bottleneck is generation capacity, not just knowledge: relevant if Arun ever serves multilingual outputs from his inference stack.</li>
+    </ul>
+
+    <div class="topics"><span class="tag">vision-language models</span><span class="tag">multilingual benchmark</span><span class="tag">VQA</span><span class="tag">adversarial robustness</span><span class="tag">cultural NLP</span></div>
+  </div>
+
+  <footer class="paper-footer">
+    <p>Reading notes and summary by Arun Sharma. These are my own notes; the work itself belongs to its authors. See the <a href="https://arxiv.org/abs/2410.12705" target="_blank" rel="noopener">original source</a> for the full document, which is not hosted here.</p>
+  </footer>
+</div>
+</body>
+</html>

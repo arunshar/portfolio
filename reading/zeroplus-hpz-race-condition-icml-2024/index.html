@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Enhancing Stability for Large Models Training in Constrained Bandwidth Networks - Reading notes - Arun Sharma</title>
+<meta name="description" content="Arun Sharma's reading notes on Enhancing Stability for Large Models Training in Constrained Bandwidth Networks (ICML 2024 ES-FoMo workshop (short paper), PMLR 235).">
+<link rel="canonical" href="https://arunshar.github.io/portfolio/reading/zeroplus-hpz-race-condition-icml-2024/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css?family=Titillium+Web:300,300italic,400,400italic,600,600italic" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/paper.css?v=20260608f">
+<link rel="stylesheet" href="../../assets/reading.css?v=20260609b">
+</head>
+<body class="project-page reading-page">
+<div class="wrap">
+  <nav class="topnav"><a href="../../index.html">Arun Sharma</a> <span aria-hidden="true">/</span> <a href="../../index.html#reading">Reading Resources</a></nav>
+
+  <header class="paper-header">
+    <h1>Enhancing Stability for Large Models Training in Constrained Bandwidth Networks</h1>
+    <p class="authors">Yun Dai, Tejas Dharamsi, Byron Hsu, Tao Song, Hamed Firooz (LinkedIn)</p>
+    <p class="venue"><span class="rtype">ICML 2024 ES-FoMo workshop (short paper), PMLR 235</span> &middot; 2024 &middot; <span class="rating" title="3.5/5 relevance to my research">★★★½☆<span class="num">3.5/5</span></span></p>
+    <div class="buttons">
+      <a class="btn" href="https://arxiv.org/abs/2407.01614" target="_blank" rel="noopener">Original source</a>
+      <a class="btn" href="../../index.html#reading">All reading notes</a>
+    </div>
+  </header>
+
+  <div class="paper-body">
+    <p class="notes-label">My reading notes</p>
+
+    <h2>Why it matters</h2>
+    <p>Directly relevant to Arun&#x27;s distributed-training and ML-systems track: a concrete, debuggable example of an async D2D-copy vs AllGather race that produces NaN divergence, the kind of correctness pitfall that surfaces when training large models on commodity clusters like MSI/Slurm. Reinforces that throughput optimizations (hpZ) can quietly corrupt convergence unless synchronization is explicit.</p>
+
+    <h2>Summary</h2>
+        <p>This short LinkedIn paper diagnoses why DeepSpeed ZeRO++&#x27;s hierarchical partitioning scheme (hpZ) causes large transformer fine-tuning to diverge to NaN on bandwidth-constrained, multi-node GPU clusters. hpZ keeps a full secondary copy of each layer&#x27;s weights replicated within a node so that backward-pass AllGather stays intra-node (high NVLink bandwidth) instead of crossing slow inter-node links. The secondary copy is allocated as an uninitialized (torch.empty) tensor and filled by an asynchronous device-to-device (D2D) memcpy. Because ZeRO prefetches AllGather kernels for upcoming modules, the AllGather on the secondary copy can be enqueued and launched before the async memcpy has finished writing it, so the collective aggregates arbitrary uninitialized values. The result is corrupted parameters propagated across devices and unstable, divergent training.</p>
+    <p>The fix is deliberately minimal: insert an explicit CUDA synchronization point between the D2D memcpy and the AllGather, guaranteeing the secondary copy is fully materialized before any collective reads it. This removes the race without changing the partitioning strategy or memory layout.</p>
+    <p>Empirically, on A100 nodes (8 GPUs/node, 600 GB/s NVLink intra-node, deliberately throttled to a single 12.5 Gbps Ethernet NIC per node to emulate commodity networking), full-parameter fine-tuning of Llama-2 (7B/13B/70B) and Falcon-40B on MMLU diverges with stock hpZ but converges reliably with the modified algorithm. The fix preserves hpZ&#x27;s throughput benefit, reporting up to roughly 98% higher tokens/s/node versus disabling hpZ (for Falcon-40B, measured against a qgZ-only baseline), and validation-loss-per-optimization-step curves are essentially identical to a stable no-hpZ baseline, so reliability is restored at negligible cost to optimization quality.</p>
+
+    <h2>Key ideas</h2>
+    <ul>
+      <li>ZeRO++ hpZ trades inter-node communication for an in-node secondary weight replica, built via an async D2D memcpy into a torch.empty buffer that ZeRO&#x27;s prefetching can race against.</li>
+      <li>The bug is a synchronization hazard: AllGather is enqueued before the memcpy settles, so the collective aggregates arbitrary uninitialized values and yields NaN loss.</li>
+      <li>The remedy is a single explicit CUDA sync between memcpy and AllGather, ordering completion before communication; no algorithmic redesign needed.</li>
+      <li>Stock hpZ fails to converge on Llama-2-7B/13B/70B and Falcon-40B under emulated low-bandwidth networking, while the patched version converges on all four.</li>
+      <li>The sync adds negligible overhead: hpZ&#x27;s throughput edge (up to ~98% over a no-hpZ qgZ-only baseline) is retained and per-step convergence matches the stable baseline.</li>
+      <li>Framed around democratizing large-model training on commodity hardware rather than requiring InfiniBand/NVLink-rich datacenters.</li>
+    </ul>
+
+    <h2>Takeaways for my work</h2>
+    <ul>
+      <li>When chasing distributed-training throughput (hpZ, custom collectives, prefetch overlap), audit ordering between async memory ops and collectives; silent NaN divergence is often a missing CUDA sync, not a hyperparameter or data problem.</li>
+      <li>For MIRROR/MSI-Slurm training on commodity interconnects, ZeRO++-style intra-node replication is attractive but verify convergence parity against a known-stable baseline before trusting throughput wins.</li>
+      <li>A useful debugging pattern: distinguish &#x27;training instability&#x27; (NaN / loss not decreasing) caused by systems-level race conditions from genuine optimization issues; reproduce by emulating slow inter-node links with a throttled NIC.</li>
+      <li>Throughput and correctness can be cleanly decoupled here; the lesson is to validate with per-optimization-step loss curves (algorithmic correctness) separately from wall-clock throughput.</li>
+    </ul>
+
+    <div class="topics"><span class="tag">distributed-training</span><span class="tag">ml-systems</span><span class="tag">ZeRO++/DeepSpeed</span><span class="tag">LLM-training-stability</span><span class="tag">GPU-synchronization</span></div>
+  </div>
+
+  <footer class="paper-footer">
+    <p>Reading notes and summary by Arun Sharma. These are my own notes; the work itself belongs to its authors. See the <a href="https://arxiv.org/abs/2407.01614" target="_blank" rel="noopener">original source</a> for the full document, which is not hosted here.</p>
+  </footer>
+</div>
+</body>
+</html>

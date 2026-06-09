@@ -1,0 +1,219 @@
+[
+  {
+    "slug": "zeroplus-hpz-race-condition-icml-2024",
+    "title": "Enhancing Stability for Large Models Training in Constrained Bandwidth Networks",
+    "authors": "Yun Dai, Tejas Dharamsi, Byron Hsu, Tao Song, Hamed Firooz (LinkedIn)",
+    "venue": "ICML 2024 ES-FoMo workshop (short paper), PMLR 235",
+    "year": "2024",
+    "type": "paper",
+    "source_url": "https://arxiv.org/abs/2407.01614",
+    "rating": 3.5,
+    "one_liner": "Finds and fixes a GPU race condition in ZeRO++ hpZ that silently breaks 40B-70B LLM training on low-bandwidth clusters.",
+    "topics": [
+      "distributed-training",
+      "ml-systems",
+      "ZeRO++/DeepSpeed",
+      "LLM-training-stability",
+      "GPU-synchronization"
+    ]
+  },
+  {
+    "slug": "scaling-down-serving-fast-slm-recsys-emnlp-2025",
+    "title": "Scaling Down, Serving Fast: Compressing and Deploying Efficient LLMs for Recommendation Systems",
+    "authors": "K. Behdin, A. Fatahibaarzi, Q. Song, Y. Dai, A. Gupta, Z. Wang, et al. (LinkedIn / MIT)",
+    "venue": "EMNLP 2025 (Industry Track)",
+    "year": "2025",
+    "type": "paper",
+    "source_url": "https://aclanthology.org/2025.emnlp-industry.119/",
+    "rating": 4,
+    "one_liner": "LinkedIn's playbook for shrinking a 100B+ RecSys LLM 20x via distillation, structured pruning, and FP8 quant, then serving it fast.",
+    "topics": [
+      "LLM inference serving",
+      "model compression",
+      "knowledge distillation",
+      "structured pruning",
+      "recommendation systems"
+    ]
+  },
+  {
+    "slug": "worldcuisines-multilingual-vqa-naacl-2025",
+    "title": "WorldCuisines: A Massive-Scale Benchmark for Multilingual and Multicultural Visual Question Answering on Global Cuisines",
+    "authors": "G. Winata, F. Hudi, P. A. Irawan, D. Anugraha, R. A. Putri et al. (60+ authors; senior authors incl. D. I. Adelani, A. Oh, A. F. Aji, T. Watanabe, C.-W. Ngo)",
+    "venue": "arXiv 2024 (v5, May 2025); NAACL 2025",
+    "year": "2025",
+    "type": "paper",
+    "source_url": "https://arxiv.org/abs/2410.12705",
+    "rating": 2.5,
+    "one_liner": "1M-sample VQA benchmark probing whether vision-language models recognize dishes and origins across 30 languages and 189 countries.",
+    "topics": [
+      "vision-language models",
+      "multilingual benchmark",
+      "VQA",
+      "adversarial robustness",
+      "cultural NLP"
+    ]
+  },
+  {
+    "slug": "murphy-rl-overview-2025",
+    "title": "Reinforcement Learning: An Overview",
+    "authors": "Kevin P. Murphy",
+    "venue": "arXiv 2024 (v5, Dec 2025)",
+    "year": "2025",
+    "type": "survey",
+    "source_url": "https://arxiv.org/abs/2412.05265",
+    "rating": 4.5,
+    "one_liner": "Kevin Murphy's 250-page modern RL monograph: value/policy/model-based, multi-agent, and a deep LLMs-and-RL chapter (RLHF, RLVR, PPO/GRPO/DPO).",
+    "topics": [
+      "reinforcement-learning",
+      "LLM-post-training",
+      "RLHF-RLVR",
+      "policy-optimization",
+      "survey"
+    ]
+  },
+  {
+    "slug": "geosr-bench-downstream-sr-benchmark",
+    "title": "Beyond Visual Fidelity: Benchmarking Super-Resolution Models for Large-Scale Remote Sensing Imagery via Downstream Task Integration",
+    "authors": "Zhili Li, Kangyang Chai, Zhihao Wang, Xiaowei Jia, Yanhua Li, Gengchen Mai, Sergii Skakun, Dinesh Manocha, Yiqun Xie",
+    "venue": "arXiv 2026 (v1, preprint; IEEE journal format)",
+    "year": "2026",
+    "type": "paper",
+    "source_url": "https://arxiv.org/abs/2605.00310v1",
+    "rating": 3.5,
+    "one_liner": "Satellite super-resolution benchmark showing PSNR/SSIM gains often fail to, and can inversely, predict downstream task utility.",
+    "topics": [
+      "remote-sensing",
+      "super-resolution",
+      "benchmark",
+      "GeoAI",
+      "downstream-task-evaluation"
+    ]
+  },
+  {
+    "slug": "geosr-bench-downstream-sr-benchmark-2",
+    "title": "Beyond Visual Fidelity: Benchmarking Super-Resolution Models for Large-Scale Remote Sensing Imagery via Downstream Task Integration",
+    "authors": "Zhili Li, Kangyang Chai, Zhihao Wang, Xiaowei Jia, Yanhua Li, Gengchen Mai, Sergii Skakun, Dinesh Manocha, Yiqun Xie",
+    "venue": "arXiv 2026 (v2); under review at IEEE TPAMI",
+    "year": "2026",
+    "type": "paper",
+    "source_url": "https://arxiv.org/abs/2605.00310v2",
+    "rating": 4,
+    "one_liner": "A remote-sensing super-resolution benchmark that scores SR models by downstream task utility, not just PSNR/SSIM.",
+    "topics": [
+      "remote sensing",
+      "super-resolution",
+      "GeoAI",
+      "benchmark dataset",
+      "downstream task evaluation"
+    ]
+  },
+  {
+    "slug": "code-as-agent-harness-survey-2026",
+    "title": "Code as Agent Harness: Toward Executable, Verifiable, and Stateful Agent Systems",
+    "authors": "X. Ning, K. Tieu, D. Fu, T. Wei et al. (UIUC, Meta, Stanford); senior authors H. Tong, J. He, T. Zhang",
+    "venue": "arXiv 2026 (v1), ~102pp survey",
+    "year": "2026",
+    "type": "survey",
+    "source_url": "https://arxiv.org/abs/2605.18747",
+    "rating": 3.5,
+    "one_liner": "Survey reframing code as the operational \"harness\" for LLM agents: reasoning, acting, state, verification, and multi-agent coordination.",
+    "topics": [
+      "LLM agents",
+      "agent harness",
+      "code generation",
+      "tool use & verification",
+      "multi-agent systems",
+      "ML systems"
+    ]
+  },
+  {
+    "slug": "gemini-embedding-2-multimodal",
+    "title": "Gemini Embedding 2: A Native Multimodal Embedding Model from Gemini",
+    "authors": "Gemini Embedding Team, Google DeepMind (M. Shanbhogue, Z. Li, S. Zhang, G. Hernández Ábrego, et al.)",
+    "venue": "arXiv 2026 (v1), tech report",
+    "year": "2026",
+    "type": "report",
+    "source_url": "https://arxiv.org/abs/2605.27295",
+    "rating": 3.5,
+    "one_liner": "Google's native multimodal embedding model: one Gemini-initialized encoder maps text, image, video, and audio into a shared vector space.",
+    "topics": [
+      "multimodal embeddings",
+      "contrastive learning",
+      "retrieval / RAG",
+      "foundation models",
+      "ML systems"
+    ]
+  },
+  {
+    "slug": "cockroachdb-resilient-geo-distributed-sql-sigmod-2020",
+    "title": "CockroachDB: The Resilient Geo-Distributed SQL Database",
+    "authors": "R. Taft, I. Sharif, A. Matei, N. VanBenschoten, J. Lewis, et al. (Cockroach Labs)",
+    "venue": "SIGMOD 2020 (Industry Track)",
+    "year": "2020",
+    "type": "paper",
+    "source_url": "https://doi.org/10.1145/3318464.3386134",
+    "rating": 4,
+    "one_liner": "How CockroachDB delivers serializable, geo-distributed SQL transactions on commodity clouds without atomic clocks.",
+    "topics": [
+      "distributed-databases",
+      "geo-distributed-systems",
+      "consensus-raft",
+      "transaction-isolation",
+      "ml-systems-infra"
+    ]
+  },
+  {
+    "slug": "brunton-kutz-data-driven-science-engineering-2e",
+    "title": "Data-Driven Science and Engineering: Machine Learning, Dynamical Systems, and Control (2nd ed.)",
+    "authors": "S. L. Brunton, J. N. Kutz",
+    "venue": "Textbook, 2nd ed., Cambridge University Press",
+    "year": "2022",
+    "type": "book",
+    "source_url": "https://databookuw.com",
+    "rating": 4.5,
+    "one_liner": "The canonical Brunton-Kutz textbook tying SVD, sparsity, ML, dynamical systems, control, ROMs, and physics-informed ML into one toolkit.",
+    "topics": [
+      "dynamical-systems",
+      "physics-informed-ML",
+      "reduced-order-models",
+      "control-theory",
+      "sparsity-and-SVD"
+    ]
+  },
+  {
+    "slug": "how-to-scale-your-model-tpus",
+    "title": "How to Scale Your Model: A Systems View of LLMs on TPUs",
+    "authors": "Jacob Austin, Sholto Douglas, Roy Frostig, Anselm Levskaya, Charlie Chen, Reiner Pope, et al. (Google DeepMind)",
+    "venue": "Online book (jax-ml.github.io/scaling-book), Google DeepMind",
+    "year": "2025",
+    "type": "book",
+    "source_url": "https://jax-ml.github.io/scaling-book/",
+    "rating": 4.5,
+    "one_liner": "A first-principles, roofline-driven playbook for scaling Transformer training and inference across thousands of TPUs (and GPUs).",
+    "topics": [
+      "LLM scaling",
+      "distributed training",
+      "inference serving",
+      "TPU/GPU systems",
+      "parallelism"
+    ]
+  },
+  {
+    "slug": "llm-query-scheduling-prefix-reuse-neurips-2025",
+    "title": "LLM Query Scheduling with Prefix Reuse and Latency Constraints",
+    "authors": "G. Dexter, S. Tang, A. Fatahi Baarzi, Q. Song, T. Dharamsi, A. Gupta (LinkedIn; Nubank)",
+    "venue": "NeurIPS 2025 (Poster); also arXiv 2502.04677",
+    "year": "2025",
+    "type": "paper",
+    "source_url": "https://neurips.cc/virtual/2025/poster/118899",
+    "rating": 4,
+    "one_liner": "Theory + algorithm for scheduling LLM queries under prefix-cache reuse and TTFT limits; k-LPM cuts P99 latency vs FCFS/LPM.",
+    "topics": [
+      "LLM inference serving",
+      "scheduling",
+      "prefix caching / RadixAttention",
+      "latency / TTFT",
+      "ML systems"
+    ]
+  }
+]

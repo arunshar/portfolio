@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CockroachDB: The Resilient Geo-Distributed SQL Database - Reading notes - Arun Sharma</title>
+<meta name="description" content="Arun Sharma's reading notes on CockroachDB: The Resilient Geo-Distributed SQL Database (SIGMOD 2020 (Industry Track)).">
+<link rel="canonical" href="https://arunshar.github.io/portfolio/reading/cockroachdb-resilient-geo-distributed-sql-sigmod-2020/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css?family=Titillium+Web:300,300italic,400,400italic,600,600italic" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/paper.css?v=20260608f">
+<link rel="stylesheet" href="../../assets/reading.css?v=20260609b">
+</head>
+<body class="project-page reading-page">
+<div class="wrap">
+  <nav class="topnav"><a href="../../index.html">Arun Sharma</a> <span aria-hidden="true">/</span> <a href="../../index.html#reading">Reading Resources</a></nav>
+
+  <header class="paper-header">
+    <h1>CockroachDB: The Resilient Geo-Distributed SQL Database</h1>
+    <p class="authors">R. Taft, I. Sharif, A. Matei, N. VanBenschoten, J. Lewis, et al. (Cockroach Labs)</p>
+    <p class="venue"><span class="rtype">SIGMOD 2020 (Industry Track)</span> &middot; 2020 &middot; <span class="rating" title="4/5 relevance to my research">★★★★☆<span class="num">4/5</span></span></p>
+    <div class="buttons">
+      <a class="btn" href="https://doi.org/10.1145/3318464.3386134" target="_blank" rel="noopener">Original source</a>
+      <a class="btn" href="../../index.html#reading">All reading notes</a>
+    </div>
+  </header>
+
+  <div class="paper-body">
+    <p class="notes-label">My reading notes</p>
+
+    <h2>Why it matters</h2>
+    <p>This is the canonical industry reference for the geo-distributed SQL layer Arun&#x27;s MIRROR platform serves on (K8s across regions), and its hybrid-logical-clock plus Raft-per-range design is directly relevant to running stateful, consistency-sensitive services across data centers. It is also a strong system-design-interview anchor for distributed-systems and ML-systems roles.</p>
+
+    <h2>Summary</h2>
+        <p>CockroachDB (CRDB) is a shared-nothing, horizontally scalable relational database built to serve global OLTP workloads while keeping strong consistency and surviving disk, node, availability-zone, and full-region failures. The motivating scenario is a company with users across continents that must satisfy data-residency rules (e.g., GDPR domiciling), keep data physically close to the users touching it, stay available through regional outages, and still expose familiar SQL with serializable transactions. CRDB&#x27;s stated differentiator is that it achieves all of this on off-the-shelf hardware with ordinary NTP-grade clocks, rather than the GPS/atomic-clock TrueTime infrastructure that Google Spanner depends on.</p>
+    <p>Architecturally the system is layered: a PostgreSQL-dialect SQL layer with a Cascades-style cost-based optimizer and a distributed (Volcano-style) execution engine on top, a transactional key-value layer, a distribution layer that maps everything into one monolithic ordered keyspace, a consensus-replication layer, and a local RocksDB-backed storage engine. Data is range-partitioned into ~64 MiB contiguous &quot;Ranges&quot; that split, merge, and rebalance automatically (including load-based splits to break up hotspots); each Range is by default replicated three ways across distinct nodes via its own Raft consensus group, with one replica holding a lease to serve fast local reads.</p>
+    <p>Consistency rests on two ideas. First, a hybrid-logical clock (HLC) per node combines coarse physical time with Lamport logical counters to track causality, enforce disjoint Range leases, and stay monotonic across restarts. Second, each transaction carries an uncertainty interval of width equal to the configured max clock offset (default 500 ms); a transaction that sees a value inside that window performs an uncertainty restart, which together with lease safeguards yields single-key linearizability and serializable isolation even under clock skew (skew beyond bounds can only cause stale reads, and a node that drifts past 80% of the bound relative to its peers self-terminates). A Parallel Commits protocol, formally model-checked in TLA+, lets a transaction commit in a single round of consensus by staging its status concurrently with replicating its writes.</p>
+    <p>The evaluation shows near-linear TPC-C scaling (about 12.5K tpmC at 10K warehouses up to ~124K tpmC at 100K warehouses, at near-maximum efficiency), high efficiency relative to published Amazon Aurora numbers, and generally higher throughput and lower tail latency than Cloud Spanner on YCSB (except update-heavy, high-contention Workload A). Geo-partitioning and &quot;follow-the-workload&quot; leaseholder placement keep latency low while satisfying residency constraints. A candid lessons-learned section covers the realities of running hundreds of thousands of Raft groups (heartbeat coalescing, pausing idle groups, adopting Joint Consensus for atomic membership changes) and the difficulty of removing SERIALIZABLE-related retries for application developers, which led them to drop standalone snapshot isolation and alias it to serializable.</p>
+
+    <h2>Key ideas</h2>
+    <ul>
+      <li>Range-based architecture: data split into ~64 MiB ordered Ranges, each its own Raft group with 3+ replicas, auto-splitting/merging/rebalancing including load-based splits to kill hotspots.</li>
+      <li>Hybrid-logical clocks (physical + Lamport logical) give causality tracking and monotonicity, letting CRDB avoid Spanner-style atomic clocks and run on commodity NTP hardware.</li>
+      <li>Uncertainty intervals plus lease disjointness safeguards deliver single-key linearizability and serializable isolation under loosely synchronized clocks; beyond-bound skew degrades only to possible stale reads, and a node that exceeds 80% of the max offset relative to peers self-terminates.</li>
+      <li>Parallel Commits cuts geo-distributed commit to a single consensus round-trip by staging transaction status in parallel with write replication; atomicity verified in TLA+.</li>
+      <li>Leaseholder and follower reads serve data locally, and geo-partitioning plus follow-the-workload leaseholder placement put data near the users accessing it for data-residency and latency control.</li>
+      <li>Near-linear TPC-C scaling (~12.5K to ~124K tpmC from 10K to 100K warehouses at near-max efficiency) and generally beating Cloud Spanner on YCSB, except high-contention update workloads.</li>
+    </ul>
+
+    <h2>Takeaways for my work</h2>
+    <ul>
+      <li>For MIRROR&#x27;s serve-on-K8s plane: this is the reference design for keeping a stateful service consistent across regions; the HLC + per-shard consensus + lease-based local reads pattern generalizes beyond databases to any geo-replicated stateful system.</li>
+      <li>The clock-uncertainty trade-off is a reusable mental model: bounding skew (500 ms NTP vs Spanner&#x27;s millisecond TrueTime) directly sets the uncertainty-restart cost, a clean example of trading hardware assumptions for software protocol complexity.</li>
+      <li>Strong system-design-interview material: range partitioning vs hashing for locality, Raft-per-shard scaling pain (heartbeat coalescing, pausing idle groups, Joint Consensus), and the serializable-vs-strict-serializable distinction.</li>
+      <li>Engineering reality check: even a well-specified algorithm (Raft) needs substantial hardening at scale, and serializable isolation pushes retry handling onto application code, worth remembering when designing the platform&#x27;s transactional control plane.</li>
+    </ul>
+
+    <div class="topics"><span class="tag">distributed-databases</span><span class="tag">geo-distributed-systems</span><span class="tag">consensus-raft</span><span class="tag">transaction-isolation</span><span class="tag">ml-systems-infra</span></div>
+  </div>
+
+  <footer class="paper-footer">
+    <p>Reading notes and summary by Arun Sharma. These are my own notes; the work itself belongs to its authors. See the <a href="https://doi.org/10.1145/3318464.3386134" target="_blank" rel="noopener">original source</a> for the full document, which is not hosted here.</p>
+  </footer>
+</div>
+</body>
+</html>

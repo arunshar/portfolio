@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scaling Down, Serving Fast: Compressing and Deploying Efficient LLMs for Recommendation Systems - Reading notes - Arun Sharma</title>
+<meta name="description" content="Arun Sharma's reading notes on Scaling Down, Serving Fast: Compressing and Deploying Efficient LLMs for Recommendation Systems (EMNLP 2025 (Industry Track)).">
+<link rel="canonical" href="https://arunshar.github.io/portfolio/reading/scaling-down-serving-fast-slm-recsys-emnlp-2025/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css?family=Titillium+Web:300,300italic,400,400italic,600,600italic" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/paper.css?v=20260608f">
+<link rel="stylesheet" href="../../assets/reading.css?v=20260609b">
+</head>
+<body class="project-page reading-page">
+<div class="wrap">
+  <nav class="topnav"><a href="../../index.html">Arun Sharma</a> <span aria-hidden="true">/</span> <a href="../../index.html#reading">Reading Resources</a></nav>
+
+  <header class="paper-header">
+    <h1>Scaling Down, Serving Fast: Compressing and Deploying Efficient LLMs for Recommendation Systems</h1>
+    <p class="authors">K. Behdin, A. Fatahibaarzi, Q. Song, Y. Dai, A. Gupta, Z. Wang, et al. (LinkedIn / MIT)</p>
+    <p class="venue"><span class="rtype">EMNLP 2025 (Industry Track)</span> &middot; 2025 &middot; <span class="rating" title="4/5 relevance to my research">★★★★☆<span class="num">4/5</span></span></p>
+    <div class="buttons">
+      <a class="btn" href="https://aclanthology.org/2025.emnlp-industry.119/" target="_blank" rel="noopener">Original source</a>
+      <a class="btn" href="../../index.html#reading">All reading notes</a>
+    </div>
+  </header>
+
+  <div class="paper-body">
+    <p class="notes-label">My reading notes</p>
+
+    <h2>Why it matters</h2>
+    <p>This is a concrete, production-validated recipe for the exact systems problem Arun&#x27;s MIRROR platform faces: compressing a large foundation model and serving it under tight latency on H100s. The distillation + structured pruning + quantization + prefix-caching stack maps directly to LLM inference serving, model scaling, and the train-on-Slurm/serve-on-K8s split.</p>
+
+    <h2>Summary</h2>
+        <p>LinkedIn engineers describe how they take an internal 100B+ Mixture-of-Experts foundation model (FM) for recommendation ranking, built on a Mixtral-style architecture with Llama-3.1-8B experts and text-based featurization, and compress it into small language models (SLMs) that meet online latency budgets. The core pipeline has three stages: distill the full model, apply one-shot structured pruning to cut size, then re-distill the pruned model to recover quality. They report more than 20x size reduction for predictive ranking tasks and over 5x for a reasoning task, with only modest accuracy loss measured in AUC (predictive) and validation loss / task metrics (generative).</p>
+    <p>On the training side, the paper is a careful ablation of distillation recipes. Knowledge distillation with teacher logit supervision consistently beats plain SFT at preserving FM quality (e.g., an 8B student loses only -0.06% AUC under KD vs -0.62% under SFT). For reasoning, a two-stage recipe (word-level forward-KL distillation followed by on-policy distillation, oFKL) outperforms single-stage, and they find non-obvious results: a smaller teacher can beat a larger one, students can surpass teachers, and tuned on-policy sampling fraction, generation length (~300 tokens), and temperature (0.8-0.9) all matter. Structured pruning uses the OSSCAR algorithm on MLP neurons and attention heads; gradual multi-step pruning with KD between steps recovers AUC better than one-shot, achieving near-lossless 3B-to-2.4B compression.</p>
+    <p>The deployment half is the systems payoff. They serve on 8x H100 nodes using SGLang with tensor parallelism, FP8 weight+activation quantization, FlashInfer attention, and RadixAttention prefix caching. Because ranking generates a single output token, the workload is prefill-dominated, so TTFT is the key metric; sharing a long per-user prefix across k candidate items (&quot;hot prefill&quot; via KV-cache reuse) means ranking more items barely raises latency. Pruning attention heads cuts attention latency ~40% and prefill ~28%. For the generative reasoning use case they compare quantization schemes across H100 and older A100 GPUs (FP8 best on H100; INT4 W4A16 best for decode on A100, INT8 W8A8 better for prefill-heavy work), and report a 20%+ online quality lift from KD plus data changes in a live A/B test.</p>
+
+    <h2>Key ideas</h2>
+    <ul>
+      <li>Three-stage compression pipeline: distill full FM, one-shot structured pruning, then re-distill the pruned student to recover generalization; &gt;20x reduction on ranking, &gt;5x on reasoning with modest quality loss.</li>
+      <li>Knowledge distillation with teacher logit supervision beats plain SFT for retaining foundation-model quality both before and after pruning (8B-KD -0.06% vs 8B-SFT -0.62% AUC).</li>
+      <li>Two-stage reasoning recipe (forward-KL word-level distillation then on-policy oFKL) wins; counterintuitively smaller teachers can beat larger ones and students can surpass teachers.</li>
+      <li>Gradual multi-step structured pruning (OSSCAR) with KD between steps recovers AUC far better than one-shot pruning, yielding near-lossless 3B-&gt;2.4B compression.</li>
+      <li>Ranking is prefill-dominant (single output token), so TTFT dominates and shared per-user prefixes enable KV-cache &#x27;hot prefill&#x27; that makes ranking many items nearly free.</li>
+      <li>Serving stack: SGLang + tensor parallelism + FP8 W&amp;A quant + FlashInfer + RadixAttention prefix caching on H100; attention-head pruning cuts attention latency ~40%, prefill ~28%; quantization choice is hardware-dependent (FP8 on H100, INT4/INT8 on A100).</li>
+    </ul>
+
+    <h2>Takeaways for my work</h2>
+    <ul>
+      <li>For MIRROR&#x27;s serve-on-K8s layer, this is a directly reusable recipe: distill+prune+FP8 a large model and lean on prefix caching (RadixAttention/SGLang) when many queries share context, which is common in geospatial candidate ranking.</li>
+      <li>The KD-beats-SFT-after-pruning result and gradual-pruning-with-KD pattern are practical defaults worth adopting when compressing any large surrogate or foundation model for latency-bound deployment.</li>
+      <li>Treat quantization scheme as a hardware-conditioned choice (FP8 on H100, INT4 W4A16 for decode vs INT8 W8A8 for prefill on A100) rather than a one-size default; benchmark TTFT vs TPOT separately by workload shape.</li>
+      <li>The prefill-vs-decode framing (single-token ranking = prefill-bound; reasoning = decode-bound) is a clean mental model for profiling and optimizing any spatial-AI inference service.</li>
+    </ul>
+
+    <div class="topics"><span class="tag">LLM inference serving</span><span class="tag">model compression</span><span class="tag">knowledge distillation</span><span class="tag">structured pruning</span><span class="tag">recommendation systems</span></div>
+  </div>
+
+  <footer class="paper-footer">
+    <p>Reading notes and summary by Arun Sharma. These are my own notes; the work itself belongs to its authors. See the <a href="https://aclanthology.org/2025.emnlp-industry.119/" target="_blank" rel="noopener">original source</a> for the full document, which is not hosted here.</p>
+  </footer>
+</div>
+</body>
+</html>

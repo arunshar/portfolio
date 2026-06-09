@@ -17,6 +17,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css?family=Titillium+Web:300,300italic,400,400italic,600,600italic" rel="stylesheet" />
     <link rel="stylesheet" href="assets/academic.css?v=20260609a" />
+    <link rel="stylesheet" href="assets/reading.css?v=20260609b" />
     <link rel="canonical" href="https://arunshar.github.io/portfolio/" />
   </head>
   <body class="home">
@@ -284,6 +285,84 @@
           <li><span class="date">Spring 2019</span> <a href="https://www.spatial.cs.umn.edu/Courses/Spring19/5708/index.php">CSCI 5708: Database Systems</a></li>
           <li><span class="date">Fall 2018</span> <a href="https://www-users.cselabs.umn.edu/classes/Fall-2018/csci4041/index.php?page=syllabus">CSCI 4041: Data Structures and Algorithms</a></li>
         </ul>
+      </section>
+
+      <section id="reading">
+        <h2>Reading Resources</h2>
+        <p class="section-note">
+          Papers and books I am reading, with short notes and a relevance rating
+          (out of 5). Click a title for my notes; "source" links to the original.
+        </p>
+        <div class="reading-list">
+      <!--READING:START-->
+      <article class="reading-entry">
+        <h3><a href="reading/brunton-kutz-data-driven-science-engineering-2e/">Data-Driven Science and Engineering: Machine Learning, Dynamical Systems, and Control (2nd ed.)</a></h3>
+        <p class="reading-meta">S. L. Brunton, J. N. Kutz &middot; <span class="rtype">Textbook, 2nd ed., Cambridge University Press</span> &middot; <span class="rating" title="4.5/5">★★★★½<span class="num">4.5/5</span></span></p>
+        <p class="reading-take">The canonical Brunton-Kutz textbook tying SVD, sparsity, ML, dynamical systems, control, ROMs, and physics-informed ML into one toolkit.</p>
+        <p class="reading-links"><a href="reading/brunton-kutz-data-driven-science-engineering-2e/">notes</a> &middot; <a href="https://databookuw.com" target="_blank" rel="noopener">source</a></p>
+      </article>
+      <article class="reading-entry">
+        <h3><a href="reading/how-to-scale-your-model-tpus/">How to Scale Your Model: A Systems View of LLMs on TPUs</a></h3>
+        <p class="reading-meta">Jacob Austin, Sholto Douglas, Roy Frostig, Anselm Levskaya, Charlie Chen, Reiner Pope, et al. (Google DeepMind) &middot; <span class="rtype">Online book (jax-ml.github.io/scaling-book), Google DeepMind</span> &middot; <span class="rating" title="4.5/5">★★★★½<span class="num">4.5/5</span></span></p>
+        <p class="reading-take">A first-principles, roofline-driven playbook for scaling Transformer training and inference across thousands of TPUs (and GPUs).</p>
+        <p class="reading-links"><a href="reading/how-to-scale-your-model-tpus/">notes</a> &middot; <a href="https://jax-ml.github.io/scaling-book/" target="_blank" rel="noopener">source</a></p>
+      </article>
+      <article class="reading-entry">
+        <h3><a href="reading/murphy-rl-overview-2025/">Reinforcement Learning: An Overview</a></h3>
+        <p class="reading-meta">Kevin P. Murphy &middot; <span class="rtype">arXiv 2024 (v5, Dec 2025)</span> &middot; <span class="rating" title="4.5/5">★★★★½<span class="num">4.5/5</span></span></p>
+        <p class="reading-take">Kevin Murphy&#x27;s 250-page modern RL monograph: value/policy/model-based, multi-agent, and a deep LLMs-and-RL chapter (RLHF, RLVR, PPO/GRPO/DPO).</p>
+        <p class="reading-links"><a href="reading/murphy-rl-overview-2025/">notes</a> &middot; <a href="https://arxiv.org/abs/2412.05265" target="_blank" rel="noopener">source</a></p>
+      </article>
+      <article class="reading-entry">
+        <h3><a href="reading/geosr-bench-downstream-sr-benchmark-2/">Beyond Visual Fidelity: Benchmarking Super-Resolution Models for Large-Scale Remote Sensing Imagery via Downstream Task Integration</a></h3>
+        <p class="reading-meta">Zhili Li, Kangyang Chai, Zhihao Wang, Xiaowei Jia, Yanhua Li, Gengchen Mai, Sergii Skakun, Dinesh Manocha, Yiqun Xie &middot; <span class="rtype">arXiv 2026 (v2); under review at IEEE TPAMI</span> &middot; <span class="rating" title="4/5">★★★★☆<span class="num">4/5</span></span></p>
+        <p class="reading-take">A remote-sensing super-resolution benchmark that scores SR models by downstream task utility, not just PSNR/SSIM.</p>
+        <p class="reading-links"><a href="reading/geosr-bench-downstream-sr-benchmark-2/">notes</a> &middot; <a href="reading/geosr-bench-downstream-sr-benchmark/">notes (v1)</a> &middot; <a href="https://arxiv.org/abs/2605.00310v2" target="_blank" rel="noopener">source</a></p>
+      </article>
+      <article class="reading-entry">
+        <h3><a href="reading/cockroachdb-resilient-geo-distributed-sql-sigmod-2020/">CockroachDB: The Resilient Geo-Distributed SQL Database</a></h3>
+        <p class="reading-meta">R. Taft, I. Sharif, A. Matei, N. VanBenschoten, J. Lewis, et al. (Cockroach Labs) &middot; <span class="rtype">SIGMOD 2020 (Industry Track)</span> &middot; <span class="rating" title="4/5">★★★★☆<span class="num">4/5</span></span></p>
+        <p class="reading-take">How CockroachDB delivers serializable, geo-distributed SQL transactions on commodity clouds without atomic clocks.</p>
+        <p class="reading-links"><a href="reading/cockroachdb-resilient-geo-distributed-sql-sigmod-2020/">notes</a> &middot; <a href="https://doi.org/10.1145/3318464.3386134" target="_blank" rel="noopener">source</a></p>
+      </article>
+      <article class="reading-entry">
+        <h3><a href="reading/llm-query-scheduling-prefix-reuse-neurips-2025/">LLM Query Scheduling with Prefix Reuse and Latency Constraints</a></h3>
+        <p class="reading-meta">G. Dexter, S. Tang, A. Fatahi Baarzi, Q. Song, T. Dharamsi, A. Gupta (LinkedIn; Nubank) &middot; <span class="rtype">NeurIPS 2025 (Poster); also arXiv 2502.04677</span> &middot; <span class="rating" title="4/5">★★★★☆<span class="num">4/5</span></span></p>
+        <p class="reading-take">Theory + algorithm for scheduling LLM queries under prefix-cache reuse and TTFT limits; k-LPM cuts P99 latency vs FCFS/LPM.</p>
+        <p class="reading-links"><a href="reading/llm-query-scheduling-prefix-reuse-neurips-2025/">notes</a> &middot; <a href="https://neurips.cc/virtual/2025/poster/118899" target="_blank" rel="noopener">source</a></p>
+      </article>
+      <article class="reading-entry">
+        <h3><a href="reading/scaling-down-serving-fast-slm-recsys-emnlp-2025/">Scaling Down, Serving Fast: Compressing and Deploying Efficient LLMs for Recommendation Systems</a></h3>
+        <p class="reading-meta">K. Behdin, A. Fatahibaarzi, Q. Song, Y. Dai, A. Gupta, Z. Wang, et al. (LinkedIn / MIT) &middot; <span class="rtype">EMNLP 2025 (Industry Track)</span> &middot; <span class="rating" title="4/5">★★★★☆<span class="num">4/5</span></span></p>
+        <p class="reading-take">LinkedIn&#x27;s playbook for shrinking a 100B+ RecSys LLM 20x via distillation, structured pruning, and FP8 quant, then serving it fast.</p>
+        <p class="reading-links"><a href="reading/scaling-down-serving-fast-slm-recsys-emnlp-2025/">notes</a> &middot; <a href="https://aclanthology.org/2025.emnlp-industry.119/" target="_blank" rel="noopener">source</a></p>
+      </article>
+      <article class="reading-entry">
+        <h3><a href="reading/code-as-agent-harness-survey-2026/">Code as Agent Harness: Toward Executable, Verifiable, and Stateful Agent Systems</a></h3>
+        <p class="reading-meta">X. Ning, K. Tieu, D. Fu, T. Wei et al. (UIUC, Meta, Stanford); senior authors H. Tong, J. He, T. Zhang &middot; <span class="rtype">arXiv 2026 (v1), ~102pp survey</span> &middot; <span class="rating" title="3.5/5">★★★½☆<span class="num">3.5/5</span></span></p>
+        <p class="reading-take">Survey reframing code as the operational &quot;harness&quot; for LLM agents: reasoning, acting, state, verification, and multi-agent coordination.</p>
+        <p class="reading-links"><a href="reading/code-as-agent-harness-survey-2026/">notes</a> &middot; <a href="https://arxiv.org/abs/2605.18747" target="_blank" rel="noopener">source</a></p>
+      </article>
+      <article class="reading-entry">
+        <h3><a href="reading/zeroplus-hpz-race-condition-icml-2024/">Enhancing Stability for Large Models Training in Constrained Bandwidth Networks</a></h3>
+        <p class="reading-meta">Yun Dai, Tejas Dharamsi, Byron Hsu, Tao Song, Hamed Firooz (LinkedIn) &middot; <span class="rtype">ICML 2024 ES-FoMo workshop (short paper), PMLR 235</span> &middot; <span class="rating" title="3.5/5">★★★½☆<span class="num">3.5/5</span></span></p>
+        <p class="reading-take">Finds and fixes a GPU race condition in ZeRO++ hpZ that silently breaks 40B-70B LLM training on low-bandwidth clusters.</p>
+        <p class="reading-links"><a href="reading/zeroplus-hpz-race-condition-icml-2024/">notes</a> &middot; <a href="https://arxiv.org/abs/2407.01614" target="_blank" rel="noopener">source</a></p>
+      </article>
+      <article class="reading-entry">
+        <h3><a href="reading/gemini-embedding-2-multimodal/">Gemini Embedding 2: A Native Multimodal Embedding Model from Gemini</a></h3>
+        <p class="reading-meta">Gemini Embedding Team, Google DeepMind (M. Shanbhogue, Z. Li, S. Zhang, G. Hernández Ábrego, et al.) &middot; <span class="rtype">arXiv 2026 (v1), tech report</span> &middot; <span class="rating" title="3.5/5">★★★½☆<span class="num">3.5/5</span></span></p>
+        <p class="reading-take">Google&#x27;s native multimodal embedding model: one Gemini-initialized encoder maps text, image, video, and audio into a shared vector space.</p>
+        <p class="reading-links"><a href="reading/gemini-embedding-2-multimodal/">notes</a> &middot; <a href="https://arxiv.org/abs/2605.27295" target="_blank" rel="noopener">source</a></p>
+      </article>
+      <article class="reading-entry">
+        <h3><a href="reading/worldcuisines-multilingual-vqa-naacl-2025/">WorldCuisines: A Massive-Scale Benchmark for Multilingual and Multicultural Visual Question Answering on Global Cuisines</a></h3>
+        <p class="reading-meta">G. Winata, F. Hudi, P. A. Irawan, D. Anugraha, R. A. Putri et al. (60+ authors; senior authors incl. D. I. Adelani, A. Oh, A. F. Aji, T. Watanabe, C.-W. Ngo) &middot; <span class="rtype">arXiv 2024 (v5, May 2025); NAACL 2025</span> &middot; <span class="rating" title="2.5/5">★★½☆☆<span class="num">2.5/5</span></span></p>
+        <p class="reading-take">1M-sample VQA benchmark probing whether vision-language models recognize dishes and origins across 30 languages and 189 countries.</p>
+        <p class="reading-links"><a href="reading/worldcuisines-multilingual-vqa-naacl-2025/">notes</a> &middot; <a href="https://arxiv.org/abs/2410.12705" target="_blank" rel="noopener">source</a></p>
+      </article>
+      <!--READING:END-->
+        </div>
       </section>
 
       <section id="links">

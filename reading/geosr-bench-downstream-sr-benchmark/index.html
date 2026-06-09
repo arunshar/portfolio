@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Beyond Visual Fidelity: Benchmarking Super-Resolution Models for Large-Scale Remote Sensing Imagery via Downstream Task Integration - Reading notes - Arun Sharma</title>
+<meta name="description" content="Arun Sharma's reading notes on Beyond Visual Fidelity: Benchmarking Super-Resolution Models for Large-Scale Remote Sensing Imagery via Downstream Task Integration (arXiv 2026 (v1, preprint; IEEE journal format)).">
+<link rel="canonical" href="https://arunshar.github.io/portfolio/reading/geosr-bench-downstream-sr-benchmark/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css?family=Titillium+Web:300,300italic,400,400italic,600,600italic" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/paper.css?v=20260608f">
+<link rel="stylesheet" href="../../assets/reading.css?v=20260609b">
+</head>
+<body class="project-page reading-page">
+<div class="wrap">
+  <nav class="topnav"><a href="../../index.html">Arun Sharma</a> <span aria-hidden="true">/</span> <a href="../../index.html#reading">Reading Resources</a></nav>
+
+  <header class="paper-header">
+    <h1>Beyond Visual Fidelity: Benchmarking Super-Resolution Models for Large-Scale Remote Sensing Imagery via Downstream Task Integration</h1>
+    <p class="authors">Zhili Li, Kangyang Chai, Zhihao Wang, Xiaowei Jia, Yanhua Li, Gengchen Mai, Sergii Skakun, Dinesh Manocha, Yiqun Xie</p>
+    <p class="venue"><span class="rtype">arXiv 2026 (v1, preprint; IEEE journal format)</span> &middot; 2026 &middot; <span class="rating" title="3.5/5 relevance to my research">★★★½☆<span class="num">3.5/5</span></span></p>
+    <div class="buttons">
+      <a class="btn" href="https://arxiv.org/abs/2605.00310v1" target="_blank" rel="noopener">Original source</a>
+      <a class="btn" href="../../index.html#reading">All reading notes</a>
+    </div>
+  </header>
+
+  <div class="paper-body">
+    <p class="notes-label">My reading notes</p>
+
+    <h2>Why it matters</h2>
+    <p>Directly relevant to Arun&#x27;s GeoAI and trustworthy spatiotemporal ML work: a rigorous, evidence-backed warning that fidelity metrics mislead when generative/SR models feed Earth-monitoring pipelines, echoing his spurious-detail / distortion-aware thesis framing. Co-authored by spatial-AI names in his exact venue community (Xiaowei Jia, Gengchen Mai, Yiqun Xie).</p>
+
+    <h2>Summary</h2>
+        <p>The paper argues that the satellite super-resolution (SR) literature optimizes and reports the wrong thing. Image-fidelity metrics like PSNR and SSIM dominate evaluation, but the actual value of a super-resolved satellite image is whether it helps downstream Earth-monitoring tasks (land-cover segmentation, infrastructure mapping, biophysical regression). The authors build GeoSR-Bench, which they position as the first SR benchmark to connect resolution enhancement directly to downstream task performance rather than perceptual similarity.</p>
+    <p>The benchmark covers two cross-platform, real (not synthetically downsampled) SR settings spanning a roughly 16x scale jump: coarse-to-medium (MODIS 500m to Landsat-8 30m) and medium-to-high (Sentinel-2 10m to NAIP 0.6m). Data are spatially co-located, temporally aligned, and quality-controlled image pairs drawn from about 36,000 locations, with stratified land-cover sampling that deliberately over-weights texture-rich urban scenes where SR matters most. Each SR setting ships five pixel-level downstream tasks (segmentation plus regression targets like gross primary production and canopy height), with labels sourced from established products (ESA WorldCover, USDA CDL, NLCD, Microsoft Buildings/Roads, etc.).</p>
+    <p>Across 270 experimental settings (9 SR models spanning transformer, neural-operator, GAN, and diffusion families; 3 task models: UNet, SegFormer, Swin Transformer; 5 tasks per SR setting), the headline finding is that fidelity gains do not reliably track downstream gains, and the correlation can be negative, especially among the top-performing models and notably in the harder Sentinel-2-to-NAIP regime. A top-k correlation analysis sharpens this: agreement between PSNR/SSIM and task utility appears mainly as k grows to include weaker models, whereas within the competitive top groups that actually matter for model selection the fidelity metrics give little or even misleading guidance. The dataset, trained models, and protocols are open-sourced.</p>
+
+    <h2>Key ideas</h2>
+    <ul>
+      <li>GeoSR-Bench reframes SR evaluation around downstream pixel-level tasks (segmentation and regression) instead of PSNR/SSIM, using two real cross-platform settings: MODIS to Landsat-8 and Sentinel-2 to NAIP.</li>
+      <li>Uses real, co-located, temporally aligned image pairs (not synthetic downsampling) with stratified urban/non-urban land-cover sampling emphasizing texture-rich urban scenes; about 36,000 locations total (roughly 20k SR pairs plus 16k downstream-labeled sets).</li>
+      <li>Benchmarks 9 SR models across four paradigms (transformer, neural operator, GAN, diffusion) feeding 3 downstream models over 5 tasks each, totaling 270 settings.</li>
+      <li>Central result: PSNR/SSIM improvements often do not correlate with downstream task gains, and correlations can be negative, particularly for the strongest models and the harder medium-to-high task.</li>
+      <li>A top-k correlation analysis shows fidelity-vs-utility agreement strengthens only as k grows to include weaker models; among the competitive top groups the metrics are uninformative or misleading for model selection.</li>
+      <li>Sharper SR outputs can hallucinate spurious detail that degrades downstream maps, motivating task-integrated SR development rather than fidelity-only optimization.</li>
+    </ul>
+
+    <h2>Takeaways for my work</h2>
+    <ul>
+      <li>For MIRROR/DAFM and any generative spatial model, do not validate solely on reconstruction fidelity: bake a downstream task probe (segmentation/regression accuracy) into the eval harness, since fidelity can anti-correlate with utility.</li>
+      <li>The &#x27;spurious details hurt decisions&#x27; result is direct empirical support for Arun&#x27;s distortion-aware framing; cite it when arguing generative outputs need physics/task constraints, not just visual realism.</li>
+      <li>GeoSR-Bench is a ready-made, open multi-platform evaluation suite (MODIS/Landsat/Sentinel-2/NAIP with aligned labels, code at github.com/ai-spatial/GeoSR-Bench) usable as a testbed or comparison baseline for his RS/SR portfolio work.</li>
+      <li>Engineering note: the 270-setting matrix (SR model x task model x task) is a clean template for a reproducible, parallelizable benchmarking pipeline on Slurm.</li>
+    </ul>
+
+    <div class="topics"><span class="tag">remote-sensing</span><span class="tag">super-resolution</span><span class="tag">benchmark</span><span class="tag">GeoAI</span><span class="tag">downstream-task-evaluation</span></div>
+  </div>
+
+  <footer class="paper-footer">
+    <p>Reading notes and summary by Arun Sharma. These are my own notes; the work itself belongs to its authors. See the <a href="https://arxiv.org/abs/2605.00310v1" target="_blank" rel="noopener">original source</a> for the full document, which is not hosted here.</p>
+  </footer>
+</div>
+</body>
+</html>

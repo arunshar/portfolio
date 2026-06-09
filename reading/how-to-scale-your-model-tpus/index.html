@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How to Scale Your Model: A Systems View of LLMs on TPUs - Reading notes - Arun Sharma</title>
+<meta name="description" content="Arun Sharma's reading notes on How to Scale Your Model: A Systems View of LLMs on TPUs (Online book (jax-ml.github.io/scaling-book), Google DeepMind).">
+<link rel="canonical" href="https://arunshar.github.io/portfolio/reading/how-to-scale-your-model-tpus/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css?family=Titillium+Web:300,300italic,400,400italic,600,600italic" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/paper.css?v=20260608f">
+<link rel="stylesheet" href="../../assets/reading.css?v=20260609b">
+</head>
+<body class="project-page reading-page">
+<div class="wrap">
+  <nav class="topnav"><a href="../../index.html">Arun Sharma</a> <span aria-hidden="true">/</span> <a href="../../index.html#reading">Reading Resources</a></nav>
+
+  <header class="paper-header">
+    <h1>How to Scale Your Model: A Systems View of LLMs on TPUs</h1>
+    <p class="authors">Jacob Austin, Sholto Douglas, Roy Frostig, Anselm Levskaya, Charlie Chen, Reiner Pope, et al. (Google DeepMind)</p>
+    <p class="venue"><span class="rtype">Online book (jax-ml.github.io/scaling-book), Google DeepMind</span> &middot; 2025 &middot; <span class="rating" title="4.5/5 relevance to my research">★★★★½<span class="num">4.5/5</span></span></p>
+    <div class="buttons">
+      <a class="btn" href="https://jax-ml.github.io/scaling-book/" target="_blank" rel="noopener">Original source</a>
+      <a class="btn" href="../../index.html#reading">All reading notes</a>
+    </div>
+  </header>
+
+  <div class="paper-body">
+    <p class="notes-label">My reading notes</p>
+
+    <h2>Why it matters</h2>
+    <p>Directly serves Arun&#x27;s ML-systems track: it gives a quantitative, back-of-envelope framework for choosing parallelism schemes, estimating training/inference cost, and reasoning about communication vs compute bounds, the exact skills behind MIRROR&#x27;s Slurm training and Kubernetes serving. The inference chapters (KV cache, continuous batching, prefix caching, prefill/generation split) map straight onto his interest in LLM inference serving and scheduling.</p>
+
+    <h2>Summary</h2>
+        <p>This is a 141-page online book from Google DeepMind that treats LLM performance as a tractable engineering problem rather than black magic. The core thesis is that a handful of first-principles tools, primarily roofline analysis (is a given operation bound by compute, memory bandwidth, or inter-chip communication?), let you predict how a Transformer will behave on real hardware and pick the right way to split it across many chips. The recurring goal is &quot;strong scaling&quot;: adding chips and getting a near-linear throughput gain, which fails once communication overtakes the shrinking per-device compute you could otherwise use to hide it.</p>
+    <p>The book builds bottom-up. Early chapters cover rooflines, the internals of TPUs (systolic arrays, memory hierarchy, ICI/inter-chip networking) with a comparison appendix on GPUs, and a unified notation for sharded matrix multiplication plus the collective operations they require (AllGather, ReduceScatter, AllToAll, AllReduce). A &quot;Transformer math&quot; chapter teaches careful counting of parameters and FLOPs for every matmul, including MoE sparsity, gradient checkpointing, and KV caching. The two central chapters analyze training (data parallelism, FSDP/ZeRO, tensor parallelism, pipelining, plus memory-saving techniques, each with the explicit crossover point where it becomes communication-bound) and inference (latency vs throughput, prefill vs generation, KV-cache sharding, speculative sampling, continuous batching, prefix caching, and an inference-engine design discussion referencing JetStream).</p>
+    <p>Two hands-on chapters apply the whole framework to LLaMA-3 on TPU v5p/v5e pods, focusing mainly on the 70B model for both training and serving (the 8B and 405B variants are largely left to the exercises). The final chapters are practical JAX: parallelism via jax.jit and shard_map, plus how to read the XLA/JAX profiler (trace viewer, graph viewer, memory profile) to debug real workloads. Throughout, the authors pose worked problems with solutions, making it usable as a self-study course.</p>
+
+    <h2>Key ideas</h2>
+    <ul>
+      <li>Roofline analysis is the unifying lens: every op is classified as compute-bound, memory-bandwidth-bound, or communication-bound, and you reason about scaling by tracking which regime you are in as chip count grows.</li>
+      <li>Strong scaling is the target and communication is the enemy: parallelism shrinks per-device compute that would otherwise hide comms, so each scheme has a derivable crossover where it becomes communication-bound.</li>
+      <li>Four parallelism schemes for training (data, FSDP/ZeRO, tensor, pipeline) plus memory-saving tricks (rematerialization, optimizer/model sharding, host offload, gradient accumulation), each with explicit comms-cost accounting.</li>
+      <li>Inference is a different beast from training: it splits into prefill (parallel prompt processing into a KV cache) and incremental generation, with latency added as a first-class metric alongside throughput.</li>
+      <li>Concrete inference engineering: KV-cache sharding, speculative sampling, continuous batching, and prefix caching, illustrated with the JetStream engine and modeled on LLaMA-2/3 serving scenarios.</li>
+      <li>Carefully counting params and FLOPs per Transformer sub-block (and for MoE) lets you predict memory use, compute vs comms time, and when attention dominates the feed-forward blocks.</li>
+    </ul>
+
+    <h2>Takeaways for my work</h2>
+    <ul>
+      <li>For MIRROR&#x27;s training plane, the FSDP/tensor-parallel crossover math gives Arun a principled way to pick a parallelism scheme for a given model size and MSI/Agate H100 topology instead of guessing, even though the book is TPU-centric (the GPU appendix and roofline logic transfer).</li>
+      <li>The inference chapters (prefill/generation split, KV-cache sharding, continuous batching, prefix caching, latency-throughput tradeoff curves) are a ready reference for the K8s serving side and pair well with his llm-inference-serving and vllm skills.</li>
+      <li>The worked LLaMA-3 70B sharding examples (with 405B left as exercises) are a reusable template for back-of-envelope cost/time estimates Arun can cite in research-scientist or ML-engineer interviews.</li>
+      <li>The JAX profiler walkthrough (trace/graph/memory views, reading an XLA op) is a practical debugging guide if any of his diffusion/PhysicsNeMo work touches JAX or needs roofline-style profiling discipline.</li>
+    </ul>
+
+    <div class="topics"><span class="tag">LLM scaling</span><span class="tag">distributed training</span><span class="tag">inference serving</span><span class="tag">TPU/GPU systems</span><span class="tag">parallelism</span></div>
+  </div>
+
+  <footer class="paper-footer">
+    <p>Reading notes and summary by Arun Sharma. These are my own notes; the work itself belongs to its authors. See the <a href="https://jax-ml.github.io/scaling-book/" target="_blank" rel="noopener">original source</a> for the full document, which is not hosted here.</p>
+  </footer>
+</div>
+</body>
+</html>

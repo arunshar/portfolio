@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Data-Driven Science and Engineering: Machine Learning, Dynamical Systems, and Control (2nd ed.) - Reading notes - Arun Sharma</title>
+<meta name="description" content="Arun Sharma's reading notes on Data-Driven Science and Engineering: Machine Learning, Dynamical Systems, and Control (2nd ed.) (Textbook, 2nd ed., Cambridge University Press).">
+<link rel="canonical" href="https://arunshar.github.io/portfolio/reading/brunton-kutz-data-driven-science-engineering-2e/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css?family=Titillium+Web:300,300italic,400,400italic,600,600italic" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/paper.css?v=20260608f">
+<link rel="stylesheet" href="../../assets/reading.css?v=20260609b">
+</head>
+<body class="project-page reading-page">
+<div class="wrap">
+  <nav class="topnav"><a href="../../index.html">Arun Sharma</a> <span aria-hidden="true">/</span> <a href="../../index.html#reading">Reading Resources</a></nav>
+
+  <header class="paper-header">
+    <h1>Data-Driven Science and Engineering: Machine Learning, Dynamical Systems, and Control (2nd ed.)</h1>
+    <p class="authors">S. L. Brunton, J. N. Kutz</p>
+    <p class="venue"><span class="rtype">Textbook, 2nd ed., Cambridge University Press</span> &middot; 2022 &middot; <span class="rating" title="4.5/5 relevance to my research">★★★★½<span class="num">4.5/5</span></span></p>
+    <div class="buttons">
+      <a class="btn" href="https://databookuw.com" target="_blank" rel="noopener">Original source</a>
+      <a class="btn" href="../../index.html#reading">All reading notes</a>
+    </div>
+  </header>
+
+  <div class="paper-body">
+    <p class="notes-label">My reading notes</p>
+
+    <h2>Why it matters</h2>
+    <p>This is the reference text behind the SINDy/DMD/Koopman/POD-DEIM baselines that any physics-informed or spatiotemporal method (Pi-DPM, MIRROR, surrogate spatial nets) should beat, and Chapter 14 directly grounds PINNs, SINDy autoencoders, and neural-operator learning. It gives Arun the classical-dynamics vocabulary and reduced-order-model machinery to position generative/physics-aware work against strong, interpretable baselines.</p>
+
+    <h2>Summary</h2>
+        <p>Brunton and Kutz (both at the University of Washington) present an integrated graduate-level textbook (761 pages, 14 chapters across 4 parts) that fuses data-driven methods and machine learning with classical engineering mathematics, dynamical systems, and control theory. The recurring thesis is that high-dimensional complex systems (turbulence, climate, brain, epidemiology, robotics) hide dominant low-dimensional structure, and that finding the right coordinate transforms plus optimization unlocks sensing, prediction, estimation, and control. The authors frame data-driven discovery as a &quot;fourth paradigm&quot; that augments rather than replaces empirical, analytical, and computational science.</p>
+    <p>Part I builds the linear-algebra and signal foundations: the SVD (with PCA, randomized SVD, tensor decompositions), Fourier/wavelet/Laplace transforms and image processing, and sparsity / compressed sensing (sparse regression, robust PCA, sparse sensor placement). Part II covers core ML: regression and model selection (cross-validation, information criteria, the Pareto front), clustering and classification (k-means, EM/mixture models, SVM, random forests), and a neural-networks chapter spanning backprop, SGD, CNNs, RNNs, autoencoders, and GANs.</p>
+    <p>Part III turns to dynamics and control: data-driven dynamical systems (DMD, SINDy, Koopman operator theory), classical linear control (LQR, Kalman filter, LQG, robust/frequency-domain methods), and balanced model reduction plus system identification. Part IV reaches research-level material: data-driven and machine-learning control (MPC, extremum seeking), a new reinforcement-learning chapter (model-free Q-learning, deep RL), reduced-order models (POD-Galerkin, gappy POD, DEIM, neural-network time-steppers), and a new physics-informed ML chapter covering SINDy autoencoders, Koopman forecasting, operator learning, PINNs, and learned coarse-graining for PDEs.</p>
+    <p>The second edition adds the RL and physics-informed ML chapters, parallel Python and MATLAB code throughout (with R available online), per-chapter homework that ranges up to reproducing modern research papers, and companion YouTube video lectures. Each chapter is largely modular and designed to double as a stand-alone short course.</p>
+
+    <h2>Key ideas</h2>
+    <ul>
+      <li>Dominant low-dimensional structure: complex high-dimensional systems admit compact representations via SVD/PCA, POD, and learned coordinate transforms, which is the backbone for both modeling and control.</li>
+      <li>Data-driven dynamics: DMD, SINDy (sparse identification of nonlinear dynamics), and Koopman operator theory extract interpretable governing equations and linear embeddings directly from time-series data.</li>
+      <li>Sparsity and compressed sensing: l1/sparse-regression machinery enables reconstruction from few measurements, robust PCA, and optimal/sparse sensor placement.</li>
+      <li>Control integration: classical control (LQR, Kalman, LQG, MPC, robust control) is unified with data-driven model reduction and a new reinforcement-learning chapter (Q-learning, deep RL).</li>
+      <li>Reduced-order models: POD-Galerkin, gappy POD, and DEIM (plus randomized linear algebra and neural-net surrogates) give cheap, accurate surrogates for expensive PDE simulations.</li>
+      <li>Physics-informed ML (2nd-ed chapter): PINNs, SINDy autoencoders, Koopman forecasting, and neural operator learning embed physical constraints and symmetries into trainable models.</li>
+    </ul>
+
+    <h2>Takeaways for my work</h2>
+    <ul>
+      <li>Use the SINDy/DMD/Koopman and POD-DEIM chapters as the classical, interpretable baselines that Pi-DPM, MIRROR, and PINN-style work must outperform; cite them when justifying why a generative or learned approach is needed.</li>
+      <li>The reduced-order-model material (gappy POD, DEIM, randomized SVD, neural-net time-steppers) is a direct template for building fast surrogate spatial networks and for the surrogate side of the MIRROR anomaly platform.</li>
+      <li>Sparse sensor placement and compressed-sensing chapters map onto spatial-data settings with sparse/denied observations, relevant to trajectory-gap and deception-detection work.</li>
+      <li>Companion Python/MATLAB code on github.com/dynamicslab and per-section YouTube video lectures make this a practical pull-from reference for runnable baselines, not just theory.</li>
+    </ul>
+
+    <div class="topics"><span class="tag">dynamical-systems</span><span class="tag">physics-informed-ML</span><span class="tag">reduced-order-models</span><span class="tag">control-theory</span><span class="tag">sparsity-and-SVD</span></div>
+  </div>
+
+  <footer class="paper-footer">
+    <p>Reading notes and summary by Arun Sharma. These are my own notes; the work itself belongs to its authors. See the <a href="https://databookuw.com" target="_blank" rel="noopener">original source</a> for the full document, which is not hosted here.</p>
+  </footer>
+</div>
+</body>
+</html>

@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Code as Agent Harness: Toward Executable, Verifiable, and Stateful Agent Systems - Reading notes - Arun Sharma</title>
+<meta name="description" content="Arun Sharma's reading notes on Code as Agent Harness: Toward Executable, Verifiable, and Stateful Agent Systems (arXiv 2026 (v1), ~102pp survey).">
+<link rel="canonical" href="https://arunshar.github.io/portfolio/reading/code-as-agent-harness-survey-2026/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css?family=Titillium+Web:300,300italic,400,400italic,600,600italic" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/paper.css?v=20260608f">
+<link rel="stylesheet" href="../../assets/reading.css?v=20260609b">
+</head>
+<body class="project-page reading-page">
+<div class="wrap">
+  <nav class="topnav"><a href="../../index.html">Arun Sharma</a> <span aria-hidden="true">/</span> <a href="../../index.html#reading">Reading Resources</a></nav>
+
+  <header class="paper-header">
+    <h1>Code as Agent Harness: Toward Executable, Verifiable, and Stateful Agent Systems</h1>
+    <p class="authors">X. Ning, K. Tieu, D. Fu, T. Wei et al. (UIUC, Meta, Stanford); senior authors H. Tong, J. He, T. Zhang</p>
+    <p class="venue"><span class="rtype">arXiv 2026 (v1), ~102pp survey</span> &middot; 2026 &middot; <span class="rating" title="3.5/5 relevance to my research">★★★½☆<span class="num">3.5/5</span></span></p>
+    <div class="buttons">
+      <a class="btn" href="https://arxiv.org/abs/2605.18747" target="_blank" rel="noopener">Original source</a>
+      <a class="btn" href="../../index.html#reading">All reading notes</a>
+    </div>
+  </header>
+
+  <div class="paper-body">
+    <p class="notes-label">My reading notes</p>
+
+    <h2>Why it matters</h2>
+    <p>Directly relevant to Arun&#x27;s MIRROR anomaly platform and agentic tooling: it gives a vocabulary and design checklist (Plan-Execute-Verify loop, deterministic sensors, sandboxed/permissioned execution, evidence-carrying verification, telemetry-driven self-evolution) for building reliable long-horizon agent systems that train on Slurm and serve on Kubernetes. The verification-and-oracle-adequacy chapter maps onto his trustworthy-ML and synthetic-ground-truth interests.</p>
+
+    <h2>Summary</h2>
+        <p>This is a large survey (over 100 pages, dozens of authors across UIUC, Meta, and Stanford) that reframes the role of code in LLM agent systems. The core thesis: code is no longer just an output to be generated, but the executable, inspectable, and stateful medium through which an agent reasons, acts, observes feedback, and verifies progress. The authors call this view &quot;code as agent harness,&quot; where a harness is the software layer (tools, APIs, sandboxes, memory, validators, permission boundaries, execution loops, feedback channels) that turns a stateless model into a functional long-running agent. They argue the bottleneck of autonomy is not just base-model reasoning but the reliability of the system connecting model outputs to long-horizon actions and persistent state.</p>
+    <p>The survey is organized into three connected layers. The Harness Interface layer covers code for reasoning (program-delegated computation, formal/symbolic verification, iterative code-grounded reasoning), code for acting (grounded skill selection, programmatic policy generation, lifelong code-based agents), and code for environment modeling (structured world representations, execution-trace world models, code-grounded evaluation, verifiable environment construction). The Harness Mechanisms layer covers planning (linear, structural, search-based, orchestration), memory and context engineering (working/semantic/experiential/long-term/multi-agent memory plus context compaction and state offloading), tool use (function-oriented, environment-interaction, verification-driven, workflow-orchestration), a Plan-Execute-Verify (PEV) control loop where the harness acts as a &quot;cybernetic governor&quot; reading deterministic sensors (linters, tests, type checkers, fuzzers, CI), and agentic harness engineering for telemetry-driven self-optimization. The Scaling layer extends to multi-agent orchestration over shared code artifacts: role specialization (planner/coder/reviewer/tester), interaction modes (collaborative/adversarial/red-team), workflow topologies, execution-feedback synchronization, and a position argument for a shared code-centric harness substrate with state convergence.</p>
+    <p>The final part surveys tangible applications (coding assistants, GUI/OS automation, embodied agents, scientific discovery, personalization/recommendation, DevOps, enterprise workflows) and lays out seven open problems: harness-level evaluation beyond final task success and oracle adequacy; semantic verification beyond executable feedback (a &quot;verification stack with explicit scope&quot; where each check declares what it can and cannot verify, and every accepted action carries an evidence bundle); self-evolving harnesses without regression (treating each harness mutation like a safety-critical code change with a change contract and rollback); transactional shared program state with semantic (not just textual) conflict resolution; human-in-the-loop safety and accountability as harness state; multimodal code-harness systems; and a call toward a science of harness engineering. It ships a companion GitHub paper list.</p>
+
+    <h2>Key ideas</h2>
+    <ul>
+      <li>Central reframe: code is the executable/inspectable/stateful substrate of an agent, not just a generated artifact; the harness (tools, sandboxes, memory, validators, permission boundaries, feedback loops) is what turns a stateless model into a long-running agent.</li>
+      <li>Three-layer taxonomy: harness interface (code for reasoning/acting/environment), harness mechanisms (planning, memory, tool use, control, optimization), and scaling to multi-agent orchestration over shared code.</li>
+      <li>Plan-Execute-Verify (PEV) control loop with the harness as a &#x27;cybernetic governor&#x27; that reads deterministic sensors (linters, tests, type checkers, fuzzers, CI) and gates state transitions via sandboxed, permissioned execution.</li>
+      <li>Distinguishes model-internal capabilities, system-provided harness infrastructure, and the underexplored agent-initiated code artifacts (regression tests, temporary tools, DSL programs, reusable skills, intermediate program states).</li>
+      <li>Oracle adequacy is the recurring danger: executable feedback can give a false sense of correctness (green tests are not the full spec); proposes composing a multi-artifact verification stack where each check declares its scope and confidence, with evidence bundles per action.</li>
+      <li>Self-evolving harnesses should carry a &#x27;change contract&#x27; (component modified, failure targeted, invariants preserved, falsification test, rollback) and use canary/held-out regression suites; multi-agent state needs transactional, assumption-level (not file-diff-only) conflict resolution.</li>
+    </ul>
+
+    <h2>Takeaways for my work</h2>
+    <ul>
+      <li>For MIRROR (Slurm train / K8s serve): adopt the PEV framing and the separable harness layers (orchestration, working state, execution substrate, evaluation harness, observability, governance) as an explicit design checklist rather than incidental glue.</li>
+      <li>The &#x27;evidence bundle per accepted action&#x27; and &#x27;each verifier declares what it cannot verify&#x27; ideas transfer cleanly to Arun&#x27;s trustworthy-ML and synthetic-ground-truth work: a generated anomaly/sample should carry provenance, the checks run, untested regions, and residual risk.</li>
+      <li>Useful, concrete harness-level metrics to instrument any agent system: trajectory efficiency (tool calls/tokens/edits), verification strength (coverage, oracle diversity, false-acceptance rate), recovery ability, state consistency, safety compliance, and replayability.</li>
+      <li>Best read as an annotated map of the agent-systems literature plus a shared vocabulary; light on novel empirical results, so use it for framing/positioning and the curated reference list, not for benchmarks.</li>
+    </ul>
+
+    <div class="topics"><span class="tag">LLM agents</span><span class="tag">agent harness</span><span class="tag">code generation</span><span class="tag">tool use &amp; verification</span><span class="tag">multi-agent systems</span><span class="tag">ML systems</span></div>
+  </div>
+
+  <footer class="paper-footer">
+    <p>Reading notes and summary by Arun Sharma. These are my own notes; the work itself belongs to its authors. See the <a href="https://arxiv.org/abs/2605.18747" target="_blank" rel="noopener">original source</a> for the full document, which is not hosted here.</p>
+  </footer>
+</div>
+</body>
+</html>

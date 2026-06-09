@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LLM Query Scheduling with Prefix Reuse and Latency Constraints - Reading notes - Arun Sharma</title>
+<meta name="description" content="Arun Sharma's reading notes on LLM Query Scheduling with Prefix Reuse and Latency Constraints (NeurIPS 2025 (Poster); also arXiv 2502.04677).">
+<link rel="canonical" href="https://arunshar.github.io/portfolio/reading/llm-query-scheduling-prefix-reuse-neurips-2025/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css?family=Titillium+Web:300,300italic,400,400italic,600,600italic" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/paper.css?v=20260608f">
+<link rel="stylesheet" href="../../assets/reading.css?v=20260609b">
+</head>
+<body class="project-page reading-page">
+<div class="wrap">
+  <nav class="topnav"><a href="../../index.html">Arun Sharma</a> <span aria-hidden="true">/</span> <a href="../../index.html#reading">Reading Resources</a></nav>
+
+  <header class="paper-header">
+    <h1>LLM Query Scheduling with Prefix Reuse and Latency Constraints</h1>
+    <p class="authors">G. Dexter, S. Tang, A. Fatahi Baarzi, Q. Song, T. Dharamsi, A. Gupta (LinkedIn; Nubank)</p>
+    <p class="venue"><span class="rtype">NeurIPS 2025 (Poster); also arXiv 2502.04677</span> &middot; 2025 &middot; <span class="rating" title="4/5 relevance to my research">★★★★☆<span class="num">4/5</span></span></p>
+    <div class="buttons">
+      <a class="btn" href="https://neurips.cc/virtual/2025/poster/118899" target="_blank" rel="noopener">Original source</a>
+      <a class="btn" href="../../index.html#reading">All reading notes</a>
+    </div>
+  </header>
+
+  <div class="paper-body">
+    <p class="notes-label">My reading notes</p>
+
+    <h2>Why it matters</h2>
+    <p>Directly relevant to Arun&#x27;s ML-systems work on LLM inference serving and scheduling: it formalizes when prefix-cache (RadixAttention) scheduling helps or hurts tail latency, and gives a tunable, drop-in scheduler (k-LPM) for SGLang/vLLM-style serving stacks like the ones that would serve his MIRROR platform.</p>
+
+    <h2>Summary</h2>
+        <p>This paper studies how to order incoming LLM queries when the serving engine reuses shared KV-cache prefixes (RadixAttention, the radix-tree prefix-reuse mechanism behind SGLang). The authors build a simple roofline-inspired cost model for prefill-dominated inference in which a query&#x27;s processing time scales with its length minus the prefix it shares with the previously processed query, plus a c_attn term that captures the balance between linear FFN cost and quadratic attention cost. Within this model they prove that deciding whether a stream of timestamped queries can be scheduled to meet a per-query time-to-first-token (TTFT) constraint is NP-hard, via reduction from 3-PARTITION. This is a sharp contrast to the easy cases: with no prefix reuse, FCFS is optimal, and with uniform arrival times, longest-prefix-match (LPM) is optimal. So prefix reuse combined with non-uniform online arrivals is what makes scheduling genuinely hard.</p>
+    <p>To get a usable result despite the hardness, they introduce a structured data-generative model (a regular arrival shuffled queue) that mirrors real prefix-sharing workloads: a shared base/user prefix plus a per-query unique document, i.e. a height-two prefix tree. They propose k-LPM, which interleaves FCFS-style fairness with LPM-style reuse: process the oldest queued query, then take k-1 greedy longest-prefix-match steps. It reduces to FCFS at k=1 and LPM at k=infinity. They prove that under the generative model k-LPM achieves lower worst-case TTFT than both FCFS and LPM simultaneously for a range of inter-arrival gaps and prefix lengths, and that an approximation algorithm exists for the (1-p)-percentile TTFT constraint running in O(n*exp(1/p log 1/p)) time.</p>
+    <p>Empirically they serve Llama-3.1-8B-Instruct on SGLang v0.4.1 across eight A100 GPUs, using an industrial 360Brew-style prompt set (shared instruction/profile/history prefix, varying question). A small k (k=2) gives the best P99 TTFT across a wide range of Poisson request rates, beating both FCFS and LPM, and the empirical behavior tracks the theory even where the theoretical assumptions are relaxed. The takeaways match intuition: FCFS wins at low load, LPM wins at high load, and k-LPM keeps the advantage across the spectrum with a single tunable knob.</p>
+
+    <h2>Key ideas</h2>
+    <ul>
+      <li>Prefix-aware online scheduling is NP-hard: deciding feasibility of per-query TTFT constraints under RadixAttention reduces from 3-PARTITION, even though FCFS (no reuse) and LPM (uniform arrivals) are each optimal in their easy special cases.</li>
+      <li>A tractable prefill-dominated cost model: each query&#x27;s cost is proportional to its length minus the maximal prefix overlap with the previously processed query, with a c_attn constant capturing the FFN-vs-quadratic-attention balance for a fixed architecture.</li>
+      <li>k-LPM generalizes FCFS and LPM: per Algorithm 1, process the oldest query, then do k-1 greedy longest-prefix-match steps; k=1 is FCFS, k=infinity is LPM, and k trades fairness/waiting-time against cache reuse.</li>
+      <li>Provable improvement under a realistic tree-structured workload model (a regular arrival shuffled queue: shared user prefix + unique doc, a height-two tree): k-LPM beats both FCFS and LPM on worst-case TTFT for a range of arrival gaps and prefix lengths.</li>
+      <li>Existence of a percentile-TTFT approximation algorithm running in O(n*exp(1/p log 1/p)) time that either certifies infeasibility or returns a schedule meeting the (1-p)-percentile constraint.</li>
+      <li>Real serving validation: Llama-3.1-8B-Instruct on SGLang v0.4.1 over 8xA100; k=2 gives best P99 TTFT across Poisson request rates, FCFS wins low load, LPM wins high load, k-LPM wins broadly.</li>
+    </ul>
+
+    <h2>Takeaways for my work</h2>
+    <ul>
+      <li>For MIRROR&#x27;s K8s serving plane: prefix-cache scheduling order is a real tail-latency lever, and k-LPM is a low-effort SGLang patch (implemented as a minor extension of the existing LPM scheduler) worth trying when prompts share a base/system prefix.</li>
+      <li>The &#x27;oldest-then-k-greedy&#x27; pattern is a clean, transferable recipe for balancing fairness against cache reuse; the same FCFS-vs-greedy tension shows up in any batch system with shared-work reuse, not just LLM prefill.</li>
+      <li>Choose k empirically (k=2 or 3 worked well even when it did not match the true prefix replica count of 4); tune via back-testing since the optimal k depends on load and prefix structure.</li>
+      <li>Useful framing for systems interviews/RS roles: prefix reuse turns an easy FCFS scheduling problem NP-hard, a concrete example of how caching/memoization couples queue items and breaks naive optimality.</li>
+    </ul>
+
+    <div class="topics"><span class="tag">LLM inference serving</span><span class="tag">scheduling</span><span class="tag">prefix caching / RadixAttention</span><span class="tag">latency / TTFT</span><span class="tag">ML systems</span></div>
+  </div>
+
+  <footer class="paper-footer">
+    <p>Reading notes and summary by Arun Sharma. These are my own notes; the work itself belongs to its authors. See the <a href="https://neurips.cc/virtual/2025/poster/118899" target="_blank" rel="noopener">original source</a> for the full document, which is not hosted here.</p>
+  </footer>
+</div>
+</body>
+</html>

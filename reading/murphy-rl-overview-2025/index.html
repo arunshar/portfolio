@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reinforcement Learning: An Overview - Reading notes - Arun Sharma</title>
+<meta name="description" content="Arun Sharma's reading notes on Reinforcement Learning: An Overview (arXiv 2024 (v5, Dec 2025)).">
+<link rel="canonical" href="https://arunshar.github.io/portfolio/reading/murphy-rl-overview-2025/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css?family=Titillium+Web:300,300italic,400,400italic,600,600italic" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/paper.css?v=20260608f">
+<link rel="stylesheet" href="../../assets/reading.css?v=20260609b">
+</head>
+<body class="project-page reading-page">
+<div class="wrap">
+  <nav class="topnav"><a href="../../index.html">Arun Sharma</a> <span aria-hidden="true">/</span> <a href="../../index.html#reading">Reading Resources</a></nav>
+
+  <header class="paper-header">
+    <h1>Reinforcement Learning: An Overview</h1>
+    <p class="authors">Kevin P. Murphy</p>
+    <p class="venue"><span class="rtype">arXiv 2024 (v5, Dec 2025)</span> &middot; 2025 &middot; <span class="rating" title="4.5/5 relevance to my research">★★★★½<span class="num">4.5/5</span></span></p>
+    <div class="buttons">
+      <a class="btn" href="https://arxiv.org/abs/2412.05265" target="_blank" rel="noopener">Original source</a>
+      <a class="btn" href="../../index.html#reading">All reading notes</a>
+    </div>
+  </header>
+
+  <div class="paper-body">
+    <p class="notes-label">My reading notes</p>
+
+    <h2>Why it matters</h2>
+    <p>A single, current, mathematically rigorous reference that connects classical RL to the LLM post-training methods (RLHF, RLVR, GRPO/PPO/DPO, reasoning models) Arun needs for the pi-grpo stack and RS/ML-engineer interviews. Also frames optimization, active learning, and Bayesian optimization as sequential decision problems, which ties to his active-learning surrogate and anomaly-platform work.</p>
+
+    <h2>Summary</h2>
+        <p>This is a book-length tutorial monograph (253 pages, v5 dated Dec 3, 2025) by Kevin Murphy that surveys modern reinforcement learning from first principles to the frontier. It opens by framing RL as sequential decision making under the maximum expected utility principle, laying out the canonical model zoo: POMDPs, MDPs, goal-conditioned and contextual MDPs, contextual bandits, and belief-state MDPs, plus the observation that black-box optimization, Bayesian optimization, active learning, and even SGD can all be read as decision problems.</p>
+    <p>The core chapters proceed through the standard taxonomy. Value-based RL covers Bellman equations, value/policy iteration, Monte Carlo and TD(lambda) learning, SARSA, and Q-learning with its deep extensions (DQN, experience replay, the deadly triad, target networks, double/dueling/Rainbow, hindsight relabeling). Policy-based RL covers policy gradients, the policy gradient theorem, actor-critic, trust-region/proximal methods, off-policy variants, gradient-free optimization, and the RL-as-inference view. Model-based RL covers decision-time planning (MCTS-style, MuZero), background planning, learned world models, and predictive representations. A multi-agent chapter treats games, solution concepts, and algorithms.</p>
+    <p>The chapter most relevant to current practice is LLMs and RL, which is unusually thorough for a survey. It walks through RL fine-tuning vs SFT, reward models (process vs outcome), RLHF via the Bradley-Terry preference model, RL with verifiable rewards (RLVR) for math and code, reasoning/thinking models, and the families of policy-optimization algorithms now standard in post-training: PPO, GRPO and its Dr-GRPO correction, VinePPO, DPO and direct-alignment variants, KL (and chi-squared) regularization, and best-of-N. Later chapters cover regret minimization, exploration-exploitation, distributional RL, intrinsic motivation, hierarchical RL, imitation and offline RL, and a short note on general RL/AIXI. The treatment is notation-consistent and citation-dense, functioning as both a teaching text and a map into the primary literature rather than presenting new results.</p>
+
+    <h2>Key ideas</h2>
+    <ul>
+      <li>Unifies RL under one universal sequential-decision framework (agent internal state, policy, world model) and shows bandits, BayesOpt, active learning, and SGD as special cases</li>
+      <li>Complete modern coverage of the value/policy/model-based/multi-agent taxonomy, including the deep-RL stabilization tricks (deadly triad, target networks, double/dueling/Rainbow DQN)</li>
+      <li>A standout LLMs-and-RL chapter: RLHF (Bradley-Terry), RLVR for math/code, process vs outcome reward models, and reasoning/thinking models</li>
+      <li>Side-by-side derivations of the LLM post-training algorithm family: PPO, GRPO, Dr-GRPO, VinePPO, DPO, with KL / chi-squared regularization and best-of-N</li>
+      <li>Treats verification-easier-than-generation and the path to super-human performance as the conceptual case for RL over SFT</li>
+      <li>Acts as an annotated map into the primary literature; citation-dense, notation-consistent, no new empirical results</li>
+    </ul>
+
+    <h2>Takeaways for my work</h2>
+    <ul>
+      <li>Use as the canonical reference for the pi-grpo work: the GRPO -&gt; Dr-GRPO advantage-normalization fix and VinePPO baselines are spelled out with the exact estimators worth implementing/citing</li>
+      <li>The RLVR and process-vs-outcome-reward framing is directly reusable for designing verifiable reward signals in physics-informed or anomaly-detection RL loops where ground truth is checkable</li>
+      <li>The bandit / BayesOpt / active-learning-as-RL framing connects to Arun&#x27;s active-learning surrogate and sampling work; the belief-state and exploration-exploitation chapters give principled acquisition-policy language</li>
+      <li>A high-signal interview-prep resource for RS/ML-engineer roles: covers the post-training stack (RLHF, DPO, PPO/GRPO) and classical RL at a depth that maps to common system-design and ML-fundamentals questions</li>
+    </ul>
+
+    <div class="topics"><span class="tag">reinforcement-learning</span><span class="tag">LLM-post-training</span><span class="tag">RLHF-RLVR</span><span class="tag">policy-optimization</span><span class="tag">survey</span></div>
+  </div>
+
+  <footer class="paper-footer">
+    <p>Reading notes and summary by Arun Sharma. These are my own notes; the work itself belongs to its authors. See the <a href="https://arxiv.org/abs/2412.05265" target="_blank" rel="noopener">original source</a> for the full document, which is not hosted here.</p>
+  </footer>
+</div>
+</body>
+</html>

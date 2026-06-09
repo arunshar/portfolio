@@ -1,0 +1,26 @@
+/* reading.css - "Reading Resources" homepage section + per-document notes pages.
+   Loaded on the homepage (alongside academic.css) and on reading/<slug>/ pages
+   (alongside paper.css). Uses the --faint / --muted / --rule vars defined in both. */
+
+/* homepage section ------------------------------------------------------- */
+.reading-list{ display:flex; flex-direction:column; gap:1.05rem; }
+.reading-entry h3{ font-size:17px; font-weight:600; margin:0 0 .1rem; line-height:1.3; }
+.reading-entry .reading-meta{ color:var(--faint); font-size:14px; margin:.05rem 0 .18rem; }
+.reading-entry .reading-meta .rtype{ font-style:italic; }
+.reading-entry .reading-take{ margin:.12rem 0 .25rem; font-size:15px; }
+.reading-entry .reading-links{ font-size:14px; }
+.reading-entry .reading-links a{ white-space:nowrap; }
+
+/* star rating ------------------------------------------------------------ */
+.rating{ color:#e8a200; letter-spacing:1.5px; white-space:nowrap; font-style:normal; }
+.rating .num{ color:var(--faint); font-size:.82em; letter-spacing:0; margin-left:.3rem; }
+
+/* notes page extras ------------------------------------------------------ */
+.reading-page .paper-header .venue .rating{ font-size:15px; }
+.reading-page .topics{ margin:1.6rem 0 0; }
+.reading-page .topics .tag{
+  display:inline-block; font-size:13px; color:var(--muted);
+  background:#f4f4f4; border:1px solid #e4e4e4; border-radius:999px;
+  padding:.13rem .65rem; margin:.18rem .35rem .18rem 0;
+}
+.reading-page .notes-label{ font-size:13px; text-transform:uppercase; letter-spacing:.06em; color:var(--faint); margin:0 0 .2rem; }

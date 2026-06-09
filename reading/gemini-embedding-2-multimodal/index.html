@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gemini Embedding 2: A Native Multimodal Embedding Model from Gemini - Reading notes - Arun Sharma</title>
+<meta name="description" content="Arun Sharma's reading notes on Gemini Embedding 2: A Native Multimodal Embedding Model from Gemini (arXiv 2026 (v1), tech report).">
+<link rel="canonical" href="https://arunshar.github.io/portfolio/reading/gemini-embedding-2-multimodal/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css?family=Titillium+Web:300,300italic,400,400italic,600,600italic" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/paper.css?v=20260608f">
+<link rel="stylesheet" href="../../assets/reading.css?v=20260609b">
+</head>
+<body class="project-page reading-page">
+<div class="wrap">
+  <nav class="topnav"><a href="../../index.html">Arun Sharma</a> <span aria-hidden="true">/</span> <a href="../../index.html#reading">Reading Resources</a></nav>
+
+  <header class="paper-header">
+    <h1>Gemini Embedding 2: A Native Multimodal Embedding Model from Gemini</h1>
+    <p class="authors">Gemini Embedding Team, Google DeepMind (M. Shanbhogue, Z. Li, S. Zhang, G. Hernández Ábrego, et al.)</p>
+    <p class="venue"><span class="rtype">arXiv 2026 (v1), tech report</span> &middot; 2026 &middot; <span class="rating" title="3.5/5 relevance to my research">★★★½☆<span class="num">3.5/5</span></span></p>
+    <div class="buttons">
+      <a class="btn" href="https://arxiv.org/abs/2605.27295" target="_blank" rel="noopener">Original source</a>
+      <a class="btn" href="../../index.html#reading">All reading notes</a>
+    </div>
+  </header>
+
+  <div class="paper-body">
+    <p class="notes-label">My reading notes</p>
+
+    <h2>Why it matters</h2>
+    <p>A single foundation-model-initialized encoder that produces a unified retrieval space across modalities is directly useful for Arun&#x27;s MIRROR RAG/serving stack and for cross-modal anomaly retrieval; the multi-stage contrastive recipe and synthetic-data ablations are a clean reference for training general-purpose embedders. Native audio beating ASR cascades is a concrete argument against pipelined preprocessing that generalizes to his spatiotemporal pipelines.</p>
+
+    <h2>Summary</h2>
+        <p>This is a Google DeepMind technical report introducing Gemini Embedding 2, an embedding model that natively encodes text, image, video, and audio (and arbitrary interleaved combinations) into a single high-dimensional vector space (up to 3072 dims, with Matryoshka support optimized for 768 and 1536). Rather than CLIP-style late fusion with separate per-modality encoders, the model is initialized from a multimodal Gemini backbone, given bidirectional attention, and adapted into an encoder: tokens go through the transformer, are mean-pooled, then linearly projected to the target dimension. Treating the Gemini init as the &quot;pre-training&quot; stage is the core architectural bet, since deep cross-modal fusion is inherited rather than learned from paired data alone.</p>
+    <p>Training is multi-task and multi-stage with an NCE / in-batch-negatives contrastive loss (cosine similarity, temperature, optional hard negatives, plus a masking term for classification-style tasks with few labels). The recipe has three phases: Pre-Fine-Tuning on large noisy query-target pairs over image/text/code with big batches; Fine-Tuning over text, code, document, image, audio, and video tasks (many with hard-negative triplets), with per-task batch sizes and empirically tuned sampling rates; and a final Model Soup stage that averages checkpoints across runs for extra generalization. A randomly dropped task-string prefix improves robustness when no task instruction is given.</p>
+    <p>The model reports state-of-the-art or near-SOTA across a broad benchmark suite: 69.9 mean on MTEB Multilingual and 84.0 on MTEB Code (vs 76.0 for the prior text-only Gemini Embedding, and ahead of domain-specific voyage-code-3), plus strong cross-modal retrieval (62.9 R@1 on MSCOCO text-to-image, a 91.2 text-to-image mean and a 63.1 image-to-text mean across the four caption benchmarks, and 68.8 NDCG@10 text-to-video on Vatex). Document retrieval on ViDoRe V2 (64.9) is competitive with Voyage and ahead of Amazon Nova MME. Two findings stand out for systems work: native audio retrieval beats an ASR-to-text cascade (73.99 vs 70.40 mrr@10 average, with the cross-lingual gap widening to 72.56 vs 67.55 because the embedding preserves acoustic ambiguity instead of committing to a hard transcription), and Gemini-synthesized training data drives a large jump on hard MTEB Code tasks (the w/-synthetic model reaches 86.3, a +15.8-point average gain over the prior text-only Gemini Embedding on the three selected tasks). Zero-shot robustness in specialized domains (microscopy, astronomy, fine art, culinary) is notably more stable across domains than CLIP/SigLIP2/TIPS baselines.</p>
+
+    <h2>Key ideas</h2>
+    <ul>
+      <li>Native (early-fusion) multimodal embedding: one Gemini-initialized bidirectional transformer encodes text/image/video/audio and interleaved combos, vs CLIP-style modality-specific late fusion</li>
+      <li>Encoder built by mean-pooling token embeddings then a linear projection; uses Matryoshka (MRL) multi-loss so one model serves 768/1536/3072-dim embeddings</li>
+      <li>Multi-stage recipe: Pre-Fine-Tuning (noisy image/text/code pairs, large batches) then Fine-Tuning (hard-negative triplets, per-task batch/sampling tuning) then Model Soup checkpoint averaging</li>
+      <li>Contrastive NCE loss with in-batch negatives, optional hard negatives, a same-query/label masking term, and randomly dropped task-string prefixes for robustness</li>
+      <li>Native audio retrieval beats an ASR-then-encode cascade (73.99 vs 70.40 mrr@10 average), with a larger cross-lingual gain (72.56 vs 67.55) because the embedding avoids hard transcription errors</li>
+      <li>Strong cross-modal retrieval (62.9 MSCOCO text-to-image R@1, 91.2 text-to-image mean, 63.1 image-to-text mean) and a +15.8-pt synthetic-data gain on selected MTEB Code tasks; zero-shot domain transfer (astronomy, microscopy, art, recipes) far more stable than CLIP/SigLIP2/TIPS</li>
+    </ul>
+
+    <h2>Takeaways for my work</h2>
+    <ul>
+      <li>For MIRROR&#x27;s RAG/serving layer, a unified multimodal embedder removes per-modality encoder plumbing; the mean-pool + linear-projection + MRL pattern is a low-cost way to ship one model at multiple dim budgets for latency/cost tradeoffs</li>
+      <li>The native-audio-beats-cascade result is a transferable argument: avoid lossy preprocessing bottlenecks (e.g., discretizing or transcribing a signal) when a single encoder can preserve the raw representation; relevant to spatiotemporal/sensor pipelines</li>
+      <li>The PFT to FT to model-soup recipe plus synthetic-data ablation is a reusable blueprint for training a general-purpose embedder where labeled data is scarce, which mirrors Arun&#x27;s rare-anomaly setting</li>
+      <li>Cross-domain stability (no sharp peaks/valleys vs baselines) is the metric to watch for a trustworthy embedding space; a useful evaluation framing for anomaly/retrieval reliability claims</li>
+    </ul>
+
+    <div class="topics"><span class="tag">multimodal embeddings</span><span class="tag">contrastive learning</span><span class="tag">retrieval / RAG</span><span class="tag">foundation models</span><span class="tag">ML systems</span></div>
+  </div>
+
+  <footer class="paper-footer">
+    <p>Reading notes and summary by Arun Sharma. These are my own notes; the work itself belongs to its authors. See the <a href="https://arxiv.org/abs/2605.27295" target="_blank" rel="noopener">original source</a> for the full document, which is not hosted here.</p>
+  </footer>
+</div>
+</body>
+</html>

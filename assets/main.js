@@ -63,13 +63,16 @@
           ? '<details class="pub-fold"><summary>BibTeX</summary><pre>' +
             escapeHtml(p.bibtex) + "</pre></details>"
           : "";
-        return (
-          '<article class="pub-entry" id="pub-' + escapeHtml(p.id) + '">' +
-          "<h3>" + title + "</h3>" +
+        var meta = "<h3>" + title + "</h3>" +
           '<p class="pub-authors">' + authors + "</p>" +
-          venue + linkRow + abstract + bibtex +
-          "</article>"
-        );
+          venue + linkRow + abstract + bibtex;
+        if (p.image) {
+          return '<article class="pub-entry has-thumb" id="pub-' + escapeHtml(p.id) + '">' +
+            '<a class="pub-thumb" href="' + escapeHtml(p.titleUrl || "#") + '" target="_blank" rel="noopener">' +
+            '<img src="' + escapeHtml(p.image) + '" alt="" loading="lazy"></a>' +
+            '<div class="pub-meta">' + meta + "</div></article>";
+        }
+        return '<article class="pub-entry" id="pub-' + escapeHtml(p.id) + '">' + meta + "</article>";
       })
       .join("");
 

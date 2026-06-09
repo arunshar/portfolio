@@ -243,6 +243,16 @@ def build_project(p, cfg):
     title, body, toc, svgs = sanitize(html, fig_dir)
     title = title or slug
 
+    # project teaser: prefer the HF Space demo screenshot if present, else the paper figure
+    shot = ROOT / "assets" / "figures" / f"{slug}.png"
+    if shot.exists():
+        teaser = (f'<figure class="teaser teaser-shot">'
+                  f'<img src="../../assets/figures/{slug}.png" alt="{title} demo" loading="lazy"></figure>')
+        thumb = f"assets/figures/{slug}.png"
+    else:
+        teaser = teaser_html(svgs, title)
+        thumb = f"projects/{slug}/figures/{svgs[0]}" if svgs else ""
+
     # replace make4ht's figure SVGs with clean pdflatex-rendered, scale-spread
     # ones (fixes the tight/overlapping TikZ boxes); falls back to make4ht on any issue
     if svgs:
@@ -289,7 +299,7 @@ def build_project(p, cfg):
         "AFFILIATION": affil,
         "VENUE": p.get("venue", ""),
         "BUTTONS": buttons_html(slug, links),
-        "TEASER": teaser_html(svgs, title),
+        "TEASER": teaser,
         "TOC": toc_html(toc),
         "BODY": body,
         "BIBTEX": gen_bibtex(title, slug, site_base, author),
@@ -301,7 +311,7 @@ def build_project(p, cfg):
     return {
         "slug": slug, "title": title, "venue": p.get("venue", ""),
         "blurb": p.get("blurb", ""),
-        "teaser": f"projects/{slug}/figures/{svgs[0]}" if svgs else "",
+        "teaser": thumb,
         "page": f"projects/{slug}/",
         "pdf": f"assets/papers/{slug}.pdf",
         "github": links["github"], "demo": links["demo"],

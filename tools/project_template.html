@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{TITLE}} - Arun Sharma</title>
+<meta name="description" content="{{BLURB}}">
+<link rel="stylesheet" href="paper.gen.css">
+<link rel="stylesheet" href="../../assets/paper.css">
+<script>window.MathJax = { tex: { tags: "ams" } };</script>
+<script async id="MathJax-script" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js"></script>
+</head>
+<body class="project-page">
+<div class="wrap">
+  <nav class="topnav"><a href="../../index.html">Arun Sharma</a> <span aria-hidden="true">/</span> <a href="../../index.html#projects">Selected Projects</a></nav>
+
+  <header class="paper-header">
+    <h1>{{TITLE}}</h1>
+    <p class="authors">{{AUTHOR}}</p>
+    <p class="affiliation">{{AFFILIATION}}</p>
+    <p class="venue">{{VENUE}}</p>
+    <div class="buttons">{{BUTTONS}}</div>
+  </header>
+
+  {{TEASER}}
+
+  {{TOC}}
+
+  <article class="paper-body">
+{{BODY}}
+  </article>
+
+  <section class="bibtex-block" id="bibtex">
+    <h2>BibTeX</h2>
+    <button class="copy-bib" type="button" data-target="bibtex-code">Copy</button>
+    <pre><code id="bibtex-code">{{BIBTEX}}</code></pre>
+  </section>
+
+  <footer class="paper-footer">
+    <p>Project page for "{{TITLE}}", rendered from the LaTeX source. <a href="../../index.html">Back to homepage</a>.</p>
+  </footer>
+</div>
+<script src="../../assets/paper.js"></script>
+</body>
+</html>

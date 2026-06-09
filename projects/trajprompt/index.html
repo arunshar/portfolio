@@ -1,0 +1,1474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TrajPrompt: Open-Vocabulary Maritime Behavior Search with Trajectory Contrastive Learning, TGARD, and Satellite Confirmation - Arun Sharma</title>
+<meta name="description" content="Open-vocabulary maritime trajectory search: trajectory-CLIP and TGARD with SAM 2 over AIS tracks and satellite imagery.">
+<link rel="stylesheet" href="paper.gen.css">
+<link rel="stylesheet" href="../../assets/paper.css">
+<script>window.MathJax = { tex: { tags: "ams" } };</script>
+<script async id="MathJax-script" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js"></script>
+</head>
+<body class="project-page">
+<div class="wrap">
+  <nav class="topnav"><a href="../../index.html">Arun Sharma</a> <span aria-hidden="true">/</span> <a href="../../index.html#projects">Selected Projects</a></nav>
+
+  <header class="paper-header">
+    <h1>TrajPrompt: Open-Vocabulary Maritime Behavior Search with Trajectory Contrastive Learning, TGARD, and Satellite Confirmation</h1>
+    <p class="authors">Arun Sharma</p>
+    <p class="affiliation">University of Minnesota, Twin Cities</p>
+    <p class="venue">In preparation. Target: NeurIPS 2026 Datasets and Benchmarks</p>
+    <div class="buttons"><a class="btn" href="../../assets/papers/trajprompt.pdf">Paper (PDF)</a>
+      <a class="btn" href="https://github.com/arunshar/trajprompt" target="_blank" rel="noopener">Code</a>
+      <a class="btn" href="https://huggingface.co/spaces/Arun0808/trajprompt" target="_blank" rel="noopener">Demo</a>
+      <a class="btn" href="paper.md">Markdown</a>
+      <a class="btn" href="#bibtex">BibTeX</a></div>
+  </header>
+
+  <figure class="teaser">
+    <img src="figures/main-d33cb21629c31f992864585e01d68eaa.svg" alt="TrajPrompt: Open-Vocabulary Maritime Behavior Search with Trajectory Contrastive Learning, TGARD, and Satellite Confirmation overview" loading="lazy">
+  </figure>
+
+  <nav class="toc" aria-label="Contents">
+    <h2>Contents</h2>
+    <ol>
+      <li><a href="#introduction">Introduction</a></li>
+      <li><a href="#related-work">Related Work</a></li>
+      <li><a href="#method-and-architecture">Method and Architecture</a></li>
+      <li><a href="#evaluation">Evaluation</a></li>
+      <li><a href="#discussion-and-limitations">Discussion and Limitations</a></li>
+      <li><a href="#conclusion-and-outlook">Conclusion and Outlook</a></li>
+      <li><a href="#references">References</a></li>
+    </ol>
+  </nav>
+
+  <article class="paper-body">
+<section class="abstract" role="doc-abstract"> 
+
+<div class="centerline">                                  <span class="ptmb8t-x-x-120">Abstract</span>                                  </div>
+     <blockquote class="quote">
+     <!-- l. 254 --><p class="noindent">Maritime  analysts  often  search  vessel  behavior  with  rigid  database  filters:  speed
+     thresholds,   bounding   boxes,   time   windows,   and   hand-written   anomaly   rules.
+     TrajPrompt proposes an open-vocabulary interface in which a user types a behavioral
+     description   and   receives   candidate   AIS   trajectories,   rendezvous   intervals,   and
+     satellite-image  confirmation  chips.  The  repository  combines  three  components:  a
+     trajectory-side  contrastive  encoder  for  aligning  AIS  feature  sequences  with  text
+     embeddings, a PyTorch port of TGARD-style rendezvous detection, and a Sentinel-2
+     plus SAM 2 confirmation implementation. This paper is an arXiv-style paper grounded
+     in the current codebase and public Hugging Face Space. It describes the method and
+     implementation  without  inventing  benchmark  outcomes.  Current  validation  consists
+     of  unit  tests  for  Haversine  distance,  rendezvous  detection,  trajectory  embedding
+     normalization, contrastive loss behavior, SAM-chip shape, and the Space interface.
+</p>
+     </blockquote>
+</section>
+
+<h2 class="sectionHead" id="introduction"><span class="titlemark">1    </span>    <a id="x1-10001"></a>Introduction</h2>
+<!-- l. 259 --><p class="noindent">Automatic Identification System (AIS) streams are central to maritime domain awareness. They are also
+difficult to query by intent. A suspicious pattern such as “ships drifting near pipelines before disappearing from
+AIS” is not a single SQL predicate; it mixes geography, vessel motion, dwell time, proximity, imagery, and
+analyst context. Existing pipelines therefore alternate between manual filtering and bespoke anomaly detectors.
+</p><!-- l. 261 --><p class="noindent">TrajPrompt explores a more natural interface. The analyst enters a free-text behavior query. The system embeds
+candidate trajectories, scores them against text, detects rendezvous events with a deterministic trajectory
+algorithm, and attaches satellite confirmation chips. The current repository is a research implementation: it
+contains the core trajectory encoder, TGARD-style rendezvous code, SAM 2 chip abstraction, tests, and a
+Hugging Face Space. It does not yet claim a complete production maritime search engine.
+</p><!-- l. 263 --><p class="noindent">This paper turns that implementation into a structured paper. The emphasis is on what can be
+verified from the code today and the evaluation measurements used by the paper.
+
+</p>
+<!-- l. 265 --><p class="noindent"><span class="paragraphHead" id="contributions"> <a id="x1-2000"></a><span class="ptmb8t-">Contributions:</span></span>
+     </p><dl class="enumerate-enumitem"><dt class="enumerate-enumitem">
+  1. </dt><dd class="enumerate-enumitem">A trajectory-CLIP encoder that maps AIS feature sequences to normalized embeddings for
+     contrastive alignment with natural language.
+     </dd><dt class="enumerate-enumitem">
+  2. </dt><dd class="enumerate-enumitem">A tensorized rendezvous detection path based on pairwise Haversine distance and dwell-time
+     constraints.
+     </dd><dt class="enumerate-enumitem">
+  3. </dt><dd class="enumerate-enumitem">A  satellite  confirmation  abstraction  that  connects  candidate  events  to  Sentinel-2  chips  and
+     SAM 2 masks.
+     </dd><dt class="enumerate-enumitem">
+  4. </dt><dd class="enumerate-enumitem">A testable repository and Space interface for open-vocabulary maritime behavior search.</dd></dl>
+<figure class="figure"> 
+
+                                                                            
+                                                                            
+                                                                            
+                                                                            
+<!-- l. 279 --><p class="noindent" id="detailed-trajprompt-architecture-the-figure-distinguishes-representation-learning-from-evidence-decoding-ais-and-text-tokens-enter-a-contrastive-attention-layer-hardnegative-gates-shape-the-retrieval-space-deterministic-event-modules-produce-auditable-evidence-and-the-evaluation-heads-separately-measure-ranking-and-event-correctness"><img alt="Figure" src="figures/main-d33cb21629c31f992864585e01d68eaa.svg" loading="lazy">
+<a id="x1-2005r1"></a>
+</p>
+<figcaption class="caption"><span class="id">Figure 1: </span><span class="content">Detailed TrajPrompt architecture. The figure distinguishes representation learning from
+evidence decoding: AIS and text tokens enter a contrastive attention layer, hard-negative gates shape
+the retrieval space, deterministic event modules produce auditable evidence, and the evaluation heads
+separately measure ranking and event correctness.
+</span></figcaption><!-- tex4ht:label?: x1-2005r1  -->
+                                                                            
+                                                                            
+</figure>
+
+<!-- l. 342 --><p class="noindent"><span class="paragraphHead" id="scope"> <a id="x1-3000"></a><span class="ptmb8t-">Scope:</span></span>
+Maritime search is often bottlenecked by the mismatch between how analysts think and
+how AIS databases are queried. Analysts ask for behavior: drifting, loitering, disappearing,
+rendezvousing, shadowing, or approaching restricted regions. Databases store messages: timestamps,
+coordinates, speed, course, MMSI, and vessel metadata. TrajPrompt addresses this mismatch by
+making natural language a retrieval interface over trajectory windows while preserving
+deterministic geospatial checks for events that should not be left to a neural embedding.
+</p><!-- l. 346 --><p class="noindent">The paper is deliberately not framed as an autonomous enforcement system. A language-guided
+trajectory search engine should return candidates, evidence, and uncertainty. It should not assert
+intent. This boundary is especially important in maritime analytics because phrases like
+“illegal fishing” or “smuggling” are legal and contextual claims. The observable substrate is
+movement behavior, AIS availability, proximity, and optional satellite imagery.
+</p><!-- l. 348 --><p class="noindent">The technical thesis is that trajectory search needs both representation learning and structured event
+reasoning. Contrastive learning can make free-text queries usable, but deterministic modules
+are still needed for Haversine distance, dwell intervals, trajectory gaps, and rendezvous
+candidates. Satellite confirmation is a third layer: it can verify whether imagery supports a
+candidate event, but it is constrained by revisit time, cloud cover, and resolution.
+</p><!-- l. 350 --><p class="noindent">The expanded paper therefore treats TrajPrompt as a staged retrieval system. First, vector search proposes
+candidates. Second, deterministic event modules attach auditable geospatial evidence. Third, satellite
+confirmation reports whether visual evidence exists. Fourth, a human reader interprets the result. This staged
+framing is more defensible than claiming that a single embedding model understands maritime behavior.
+
+</p>
+<!-- l. 352 --><p class="noindent"><span class="paragraphHead" id="expanded-contributions"> <a id="x1-4000"></a><span class="ptmb8t-">Expanded  contributions:</span></span>
+The expanded paper adds a query taxonomy, weak-supervision plan, streaming-state design, hard-negative
+evaluation protocol, satellite-confirmation schema, implementation-grounded results, and six reader
+questions. These make the paper closer to a research artifact and less like a demo description.
+
+</p>
+<h2 class="sectionHead" id="related-work"><span class="titlemark">2    </span>    <a id="x1-50002"></a>Related  Work</h2>
+
+<!-- l. 357 --><p class="noindent"><span class="paragraphHead" id="expanded-citation-map"> <a id="x1-6000"></a><span class="ptmb8t-">Expanded  Citation  Map:</span></span>
+The expanded citation map ties trajectory mining to modern language and contrastive learning. Dynamic
+time warping, robust trajectory similarity, TRACLUS, T-Drive, GeoLife, T2Vec, CSTRM, and
+CLAIS define the movement-representation side [<a href="#Xchen2005robust">5</a>, <a href="#Xlee2007traclus">19</a>, <a href="#Xli2018t2vec">21</a>, <a href="#Xli2023clais">22</a>, <a href="#Xsakoe1978dtw">36</a>, <a href="#Xyao2022cstrm">43</a>, <a href="#Xyuan2010tdrive">44</a>, <a href="#Xzheng2010geolife">46</a>]. Maritime
+anomaly and rendezvous studies provide domain-specific evidence operators [<a href="#Xnguyen2020geotracknet">25</a>, <a href="#Xpallotta2013vessel">27</a>, <a href="#Xristic2008maritime">33</a>, <a href="#Xsharma2022tist">38</a>, <a href="#Xzheng2015trajectory">45</a>].
+Transformers, BERT, Sentence-BERT, CLIP, few-shot language models, retrieval-augmented
+generation, CPC, SimCLR, MoCo, and supervised contrastive learning define the language/retrieval
+objective family [<a href="#Xbrown2020language">3</a>, <a href="#Xchen2020simclr">6</a>, <a href="#Xdevlin2019bert">9</a>, <a href="#Xhe2020moco">13</a>, <a href="#Xkhosla2020supervisedcontrastive">15</a>, <a href="#Xlewis2020rag">20</a>, <a href="#Xradford2021clip">30</a>, <a href="#Xreimers2019sentencebert">32</a>, <a href="#Xoord2018cpc">40</a>, <a href="#Xvaswani2017attention">42</a>]. SAM and SAM 2 remain the visual
+confirmation references rather than the primary retrieval mechanism [<a href="#Xkirillov2023segment">17</a>, <a href="#Xravi2024sam2">31</a>].
+
+</p>
+<!-- l. 361 --><p class="noindent"><span class="paragraphHead" id="trajectory-mining"> <a id="x1-7000"></a><span class="ptmb8t-">Trajectory  mining:</span></span>
+Trajectory mining studies movement patterns, similarity, anomaly detection, and co-location
+in spatiotemporal data [<a href="#Xzheng2015trajectory">45</a>]. Maritime AIS analytics has a long history in anomaly detection
+and dark-activity discovery [<a href="#Xnguyen2020geotracknet">25</a>, <a href="#Xpallotta2013vessel">27</a>]. The TGARD line of work uses time-geographic
+reasoning to detect possible rendezvous and trajectory gaps in AIS streams.
+
+                                                                            
+                                                                            
+</p>
+<!-- l. 364 --><p class="noindent"><span class="paragraphHead" id="contrastive-languageimage-and-languagetrajectory-models"> <a id="x1-8000"></a><span class="ptmb8t-">Contrastive language-image and language-trajectory models:</span></span>
+CLIP showed that contrastive learning can align natural language with visual representations at scale [<a href="#Xradford2021learning">29</a>].
+Trajectory representation learning work has used recurrent models, graph models, and contrastive objectives
+to compare movement sequences under noise and irregular sampling [<a href="#Xli2023clais">22</a>, <a href="#Xyao2022cstrm">43</a>]. TrajPrompt
+adapts the language-alignment interface to AIS features. The trajectory side is a transformer over
+sequences of motion features; the text side can be supplied by an external sentence encoder.
+
+</p>
+<!-- l. 367 --><p class="noindent"><span class="paragraphHead" id="satellite-confirmation"> <a id="x1-9000"></a><span class="ptmb8t-">Satellite  confirmation:</span></span>
+Large segmentation models such as SAM and SAM 2 make it feasible to use sparse prompts
+for visual confirmation [<a href="#Xkirillov2023segment">17</a>, <a href="#Xravi2024sam2">31</a>]. In TrajPrompt, the vision layer is not the first detector. It is
+a confirmation stage attached to candidate events surfaced by AIS and text search. LSTMs,
+sequence-to-sequence encoders, distributed word representations, and modern sentence-embedding
+contrastive learning supply additional baselines for the text side of trajectory retrieval [<a href="#Xcho2014rnnencoder">7</a>, <a href="#Xgao2021simcse">10</a>, <a href="#Xhochreiter1997lstm">14</a>, <a href="#Xmikolov2013distributed">23</a>].
+
+</p>
+<!-- l. 372 --><p class="noindent"><span class="paragraphHead" id="literature-synthesis"> <a id="x1-10000"></a><span class="ptmb8t-">Literature  synthesis:</span></span>
+TrajPrompt connects trajectory mining, maritime anomaly detection, contrastive representation
+learning, and vision-language confirmation. The trajectory-mining literature provides the basic
+objects: trips, windows, stops, routes, shape similarity, clustering, and temporal segmentation
+[<a href="#Xlee2007traclus">19</a>, <a href="#Xli2018t2vec">21</a>, <a href="#Xsakoe1978dtw">36</a>, <a href="#Xyuan2010tdrive">44</a>–<a href="#Xzheng2010geolife">46</a>]. Maritime work adds AIS-specific concerns such as broadcast gaps, receiver coverage,
+rendezvous, transshipment, and intent ambiguity [<a href="#Xnguyen2020geotracknet">25</a>, <a href="#Xpallotta2013vessel">27</a>, <a href="#Xristic2008maritime">33</a>, <a href="#Xsharma2022tist">38</a>]. These papers show that movement
+evidence must be modeled as structured behavior, not only as dense vector similarity.
+</p><!-- l. 375 --><p class="noindent">The language side draws from BERT, sentence embeddings, CLIP, SimCLR, MoCo, supervised contrastive
+learning, SimCSE, and retrieval-augmented generation [<a href="#Xchen2020simclr">6</a>, <a href="#Xdevlin2019bert">9</a>, <a href="#Xgao2021simcse">10</a>, <a href="#Xhe2020moco">13</a>, <a href="#Xkhosla2020supervisedcontrastive">15</a>, <a href="#Xlewis2020rag">20</a>, <a href="#Xradford2021clip">30</a>, <a href="#Xreimers2019sentencebert">32</a>]. This literature motivates
+a contrastive alignment between text queries and trajectory windows, but it also warns against shortcut
+learning. A model can match region names, vessel identities, or template phrases without understanding the
+requested behavior. TrajPrompt therefore pairs language retrieval with deterministic event records.
+</p><!-- l. 377 --><p class="noindent">Satellite confirmation provides the third layer. SAM and SAM 2 make image and video segmentation useful
+for reviewing candidate chips [<a href="#Xkirillov2023segment">17</a>, <a href="#Xravi2024sam2">31</a>]. In TrajPrompt, this visual layer is not an oracle. It verifies
+availability and observable evidence around a retrieved event when imagery exists. The paper’s contribution
+is the staged architecture: language retrieves candidates, deterministic event logic explains movement
+evidence, and satellite imagery supplies external confirmation when the sensing conditions allow it.
+
+</p>
+<!-- l. 379 --><p class="noindent"><span class="paragraphHead" id="foundational-reference-anchors"> <a id="x1-11000"></a><span class="ptmb8t-">Foundational reference anchors:</span></span>
+The bibliography also anchors the project-specific contribution in older and broader technical
+foundations: statistical learning and pattern recognition, deep learning, information theory, convex
+and numerical optimization, stochastic approximation, adaptive gradient methods, causality,
+and early AI framing [<a href="#Xbishop2006pattern">1</a>, <a href="#Xboyd2004convex">2</a>, <a href="#Xbubeck2015convex">4</a>, <a href="#Xcover2006elements">8</a>, <a href="#Xgoodfellow2016deep">11</a>, <a href="#Xhastie2009elements">12</a>, <a href="#Xkingma2015adam">16</a>, <a href="#Xlecun1998gradient">18</a>, <a href="#Xmurphy2012machine">24</a>, <a href="#Xnocedal2006numerical">26</a>, <a href="#Xpearl2009causality">28</a>, <a href="#Xrobbins1951stochastic">34</a>, <a href="#Xrumelhart1986learning">35</a>, <a href="#Xshannon1948communication">37</a>, <a href="#Xturing1950computing">39</a>, <a href="#Xvapnik1998statistical">41</a>].
+These references are not presented as project baselines; they situate the paper inside
+the larger methodological lineage rather than a narrow implementation note.
+
+</p>
+<h2 class="sectionHead" id="method-and-architecture"><span class="titlemark">3    </span>    <a id="x1-120003"></a>Method and Architecture</h2>
+
+<!-- l. 383 --><p class="noindent"><span class="paragraphHead" id="problem-formulation"> <a id="x1-13000"></a><span class="ptmb8t-">Problem  Formulation:</span></span>
+Let a trajectory window be </p><div class="mathjax-env mathjax-equation">\begin{equation} \tau = \{(t_i,\lambda _i,\phi _i,\text {sog}_i,\text {cog}_i,f_i)\}_{i=1}^{T}, \end{equation}</div>
+<p><a id="x1-13001r1"></a>
+<!-- l. 389 --></p><p class="noindent">where <span class="mathjax-inline">\((\lambda ,\phi )\)</span> are longitude and latitude and <span class="mathjax-inline">\(f_i\)</span> denotes auxiliary features such as distance to coast or dwell indicators. Let <span class="mathjax-inline">\(q\)</span>
+be a natural-language behavior query. The goal is to rank trajectory windows and candidate multi-vessel events
+                                                                            
+                                                                            
+by relevance to <span class="mathjax-inline">\(q\)</span> while preserving deterministic checks for geometric predicates such as proximity and dwell.
+</p><!-- l. 391 --><p class="noindent">The project separates three outputs:
+     </p><dl class="enumerate-enumitem"><dt class="enumerate-enumitem">
+  1. </dt><dd class="enumerate-enumitem">a ranked trajectory list from contrastive retrieval,
+     </dd><dt class="enumerate-enumitem">
+  2. </dt><dd class="enumerate-enumitem">rendezvous candidates from a deterministic detector,
+     </dd><dt class="enumerate-enumitem">
+  3. </dt><dd class="enumerate-enumitem">optional image chips and masks for visual confirmation.</dd></dl>
+
+<!-- l. 398 --><p class="noindent"><span class="paragraphHead" id="method"> <a id="x1-14000"></a><span class="ptmb8t-">Method:</span></span>
+
+</p>
+<!-- l. 400 --><p class="noindent"><span class="paragraphHead" id="trajectory-encoder"> <a id="x1-15000"></a><span class="ptmb8t-">Trajectory  encoder:</span></span>
+The trajectory encoder maps a fixed-window sequence <span class="mathjax-inline">\(X\in \mathbb {R}^{T\times F}\)</span> to an embedding <span class="mathjax-inline">\(z_{\tau }\in \mathbb {R}^d\)</span>. A linear input
+projection is followed by positional embeddings and transformer encoder layers: </p><div class="mathjax-env mathjax-equation">\begin{equation} H = \text {Transformer}(XW + P_{1:T}). \end{equation}</div>
+<p><a id="x1-15001r2"></a>
+<!-- l. 406 --></p><p class="noindent">The sequence representation is mean-pooled and projected to the embedding space: </p><div class="mathjax-env mathjax-equation">\begin{equation} z_{\tau } = \frac {W_o \frac {1}{T}\sum _t H_t}{\left \|W_o \frac {1}{T}\sum _t H_t\right \|_2}. \end{equation}</div>
+<p><a id="x1-15002r3"></a>
+<!-- l. 410 --></p><p class="noindent">The repository tests that encoder outputs are L2-normalized.
+
+</p>
+<!-- l. 412 --><p class="noindent"><span class="paragraphHead" id="contrastive-alignment"> <a id="x1-16000"></a><span class="ptmb8t-">Contrastive  alignment:</span></span>
+Given normalized trajectory embeddings <span class="mathjax-inline">\(Z_{\tau }\)</span> and text embeddings <span class="mathjax-inline">\(Z_q\)</span>, the training loss is symmetric InfoNCE: </p><div class="mathjax-env mathjax-equation">\begin{equation} \mathcal {L} = \frac {1}{2}\text {CE}\left (\frac {Z_{\tau }Z_q^\top }{\tau _c}, y\right ) +\frac {1}{2}\text {CE}\left (\frac {Z_qZ_{\tau }^\top }{\tau _c}, y\right ). \end{equation}</div>
+<p><a id="x1-16001r4"></a>
+<!-- l. 420 --></p><p class="noindent">This objective makes the retrieval layer compatible with natural-language behavior descriptions
+while keeping trajectory feature extraction independent of the text encoder.
+
+</p>
+<!-- l. 422 --><p class="noindent"><span class="paragraphHead" id="rendezvous-detection"> <a id="x1-17000"></a><span class="ptmb8t-">Rendezvous  detection:</span></span>
+The TGARD-style detector groups AIS points by time bucket and computes pairwise Haversine distances: </p><div class="mathjax-env mathjax-equation">\begin{equation} \begin {aligned} d(a,b)&amp;=2R\arcsin \left (\eta ^{1/2}\right ),\\ \eta &amp;=\sin ^2\left (\frac {\Delta \phi }{2}\right ) +\cos \phi _a\cos \phi _b\sin ^2\left (\frac {\Delta \lambda }{2}\right ). \end {aligned} \end{equation}</div>
+<p><a id="x1-17001r5"></a>
+<!-- l. 432 --></p><p class="noindent">A candidate rendezvous is opened when two distinct MMSIs remain within a distance threshold and is
+retained if the dwell duration exceeds a minimum. This implementation favors clarity and testability over
+indexing complexity; larger deployments should use spatial indexing and streaming state.
+
+</p>
+<!-- l. 434 --><p class="noindent"><span class="paragraphHead" id="satellite-confirmation1"> <a id="x1-18000"></a><span class="ptmb8t-">Satellite  confirmation:</span></span>
+For each candidate event, the confirmation layer is intended to query Microsoft Planetary
+Computer for Sentinel-2 imagery around the event location and time, crop a chip, and run
+SAM 2 with a ship prompt or point prompt. The current repository contains a shape-stable
+lightweight fallback that returns a three-channel chip and one-channel mask. This makes
+downstream interfaces testable without requiring network access or model downloads.
+
+</p>
+<!-- l. 438 --><p class="noindent"><span class="paragraphHead" id="implementation"> <a id="x1-19000"></a><span class="ptmb8t-">Implementation:</span></span>
+The package is organized around three source files: </p>
+     <ul class="itemize1">
+     <li class="itemize"><span class="pcrr8t-">tgard.py</span>: pairwise Haversine distance and dwell-based rendezvous detection.
+     </li>
+     <li class="itemize"><span class="pcrr8t-">traj_clip.py</span>: trajectory encoder and contrastive loss.
+     </li>
+     <li class="itemize"><span class="pcrr8t-">sam2_chip.py</span>: image-chip and mask abstraction for confirmation.</li></ul>
+<!-- l. 447 --><p class="noindent">The Hugging Face Space exposes a Mapbox-style search UI with a text box and lookback
+slider. The Space callback is CPU-safe and returns a deterministic baseline, which
+is appropriate for interface testing but not a substitute for full inference.
+
+</p>
+<h2 class="sectionHead" id="evaluation"><span class="titlemark">4    </span>    <a id="x1-200004"></a>Evaluation</h2>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 451 --><p class="noindent"></p><figure class="float" id="x1-20001r1"><span id="implementation-validation-in-trajprompt"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 1: </span><span class="content">Implementation validation in TrajPrompt.                                     </span></figcaption><!-- tex4ht:label?: x1-20001r1  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-2"><colgroup id="TBL-2-1g"><col id="TBL-2-1"><col id="TBL-2-2"><col id="TBL-2-3"></colgroup><tr id="TBL-2-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-2-1-1" style="white-space:normal; text-align:left;"><!-- l. 457 --><p class="noindent"><span class="ptmb8t-">Area</span>                                  </p></td><td class="td11" id="TBL-2-1-2" style="white-space:normal; text-align:left;"> <!-- l. 457 --><p class="noindent"><span class="ptmb8t-">What is checked</span>                                                                       </p></td><td class="td10" id="TBL-2-1-3" style="white-space:normal; text-align:right;"> <span class="ptmb8t-">Count</span></td>
+</tr><tr id="TBL-2-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-2-2-1" style="white-space:normal; text-align:left;"><!-- l. 459 --><p class="noindent">Geodesy and rendezvous   </p></td><td class="td11" id="TBL-2-2-2" style="white-space:normal; text-align:left;"> <!-- l. 459 --><p class="noindent">self-distance,  one-degree  latitude  distance,  no-match  when
+  far, match under close dwell                                                      </p></td><td class="td10" id="TBL-2-2-3" style="white-space:normal; text-align:right;">     4</td>
+</tr><tr id="TBL-2-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-2-3-1" style="white-space:normal; text-align:left;"><!-- l. 460 --><p class="noindent">Contrastive encoder           </p></td><td class="td11" id="TBL-2-3-2" style="white-space:normal; text-align:left;"> <!-- l. 460 --><p class="noindent">L2 normalization and lower loss for aligned pairs                    </p></td><td class="td10" id="TBL-2-3-3" style="white-space:normal; text-align:right;">     2</td>
+</tr><tr id="TBL-2-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-2-4-1" style="white-space:normal; text-align:left;"><!-- l. 461 --><p class="noindent">Space       and       vision
+implementation                  </p></td><td class="td11" id="TBL-2-4-2" style="white-space:normal; text-align:left;"> <!-- l. 461 --><p class="noindent">package imports, SAM-chip shape, UI build, callback shape,
+  requirements, HF frontmatter                                                    </p></td><td class="td10" id="TBL-2-4-3" style="white-space:normal; text-align:right;">     8</td>
+
+</tr></table>                                                           </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+<!-- l. 466 --><p class="noindent">The next experiments should use a curated AIS-text retrieval dataset with held-out query templates. Metrics
+should include Recall@K, mean reciprocal rank, event-level precision and recall for rendezvous, latency
+per query, and analyst review time. Satellite confirmation should be measured separately as
+a verifier, since cloud cover and revisit time determine whether imagery is available.
+
+</p>
+<!-- l. 468 --><p class="noindent"><span class="paragraphHead" id="theory-language-as-a-query-over-movement-semantics"> <a id="x1-21000"></a><span class="ptmb8t-">Theory: Language as a Query over Movement Semantics:</span></span>
+The central premise of TrajPrompt is that an analyst query often refers to a latent behavior rather
+than a directly stored field. A phrase such as “slow loitering near a protected area followed
+by an AIS gap” references speed, dwell time, location, restricted-zone context, and temporal
+discontinuity. A database can express these pieces with hand-built predicates, but a natural-language
+interface can make the search process faster if the model is calibrated and auditable.
+</p><!-- l. 472 --><p class="noindent">Let <span class="mathjax-inline">\(\mathcal {T}\)</span> be a corpus of trajectory windows and <span class="mathjax-inline">\(\mathcal {Q}\)</span> be a set of behavior descriptions. The retrieval model learns embeddings </p><div class="mathjax-env mathjax-equation">\begin{equation} f_{\theta }:\mathcal {T}\rightarrow \mathbb {S}^{d-1},\qquad g_{\phi }:\mathcal {Q}\rightarrow \mathbb {S}^{d-1}, \end{equation}</div>
+<p><a id="x1-21001r6"></a>
+<!-- l. 477 --></p><p class="noindent">and ranks by cosine similarity. The important constraint is that this ranking is not the final truth. It is
+a candidate generator. Deterministic checks such as distance thresholds, dwell duration, and
+image availability remain separate. This separation is what keeps the system auditable.
+
+</p>
+<!-- l. 479 --><p class="noindent"><span class="paragraphHead" id="trajectory-windows-as-irregular-samples"> <a id="x1-22000"></a><span class="ptmb8t-">Trajectory windows as irregular samples:</span></span>
+AIS messages are irregularly sampled, noisy, and sometimes missing. A trajectory window therefore
+should not be treated as a clean video. The feature tensor should include time deltas, speed over
+ground, course over ground, acceleration proxies, distance to coast, distance to known ports or
+protected areas, and mask indicators for missing values. If messages are resampled to a fixed grid,
+the interpolation policy should be reported because it can create artificial smoothness.
+
+</p>
+<!-- l. 483 --><p class="noindent"><span class="paragraphHead" id="contrastive-semantics"> <a id="x1-23000"></a><span class="ptmb8t-">Contrastive  semantics:</span></span>
+The symmetric contrastive loss assumes paired trajectory-text examples. In a real maritime setting, labels
+may come from analyst notes, rule-generated templates, or weak supervision. The paper should distinguish
+these sources. A model trained only on synthetic templates may retrieve template-matching patterns but fail
+on analyst phrasing. A model trained on operational notes may inherit ambiguity and bias. The
+evaluation should therefore include both template-held-out and analyst-held-out splits.
+
+</p>
+<!-- l. 487 --><p class="noindent"><span class="paragraphHead" id="deterministic-event-layer"> <a id="x1-24000"></a><span class="ptmb8t-">Deterministic event layer:</span></span>
+The rendezvous detector is not replaced by the language model. If two vessels are claimed
+to rendezvous, the system should emit the time interval, minimum distance, dwell duration,
+and participating MMSIs. This event layer can be tested with unit tests and synthetic
+tracks. Its output can also be used as structured evidence in the retrieval ranker: </p><div class="mathjax-env mathjax-equation">\begin{equation} S(\tau ,q)=z_{\tau }^{\top }z_q+\beta ^\top e(\tau ), \end{equation}</div>
+<p><a id="x1-24001r7"></a>
+<!-- l. 493 --></p><p class="noindent">where <span class="mathjax-inline">\(e(\tau )\)</span> contains deterministic event features. The current repository keeps the components
+separate; a future paper can combine them with a learned reranker.
+
+</p>
+<!-- l. 495 --><p class="noindent"><span class="paragraphHead" id="additional-literature-context"> <a id="x1-25000"></a><span class="ptmb8t-">Additional Literature Context:</span></span>
+
+</p>
+<!-- l. 497 --><p class="noindent"><span class="paragraphHead" id="ais-trajectory-anomaly-detection"> <a id="x1-26000"></a><span class="ptmb8t-">AIS trajectory anomaly detection:</span></span>
+                                                                            
+                                                                            
+AIS has enabled large-scale maritime behavior analysis, but it carries known limitations: messages can be
+sparse, spoofed, delayed, or absent. GeoTrackNet models AIS tracks probabilistically and uses an
+a-contrario detection procedure for maritime anomalies [<a href="#Xnguyen2020geotracknet">25</a>]. Vessel-pattern mining work uses historical
+trajectories to detect route deviations and unusual behavior [<a href="#Xpallotta2013vessel">27</a>]. TrajPrompt is not a replacement for these
+detectors. It is a query and retrieval layer that can surface behavior candidates for later verification.
+
+</p>
+<!-- l. 501 --><p class="noindent"><span class="paragraphHead" id="time-geography-and-rendezvous-reasoning"> <a id="x1-27000"></a><span class="ptmb8t-">Time geography and rendezvous reasoning:</span></span>
+TGARD-style reasoning is grounded in the idea that movement imposes feasibility constraints.
+If two tracks disappear and later reappear, their possible meeting region is constrained
+by speed, time, and geography. This is different from a generic anomaly score. It produces
+interpretable regions and intervals. The repository’s current rendezvous code is a simplified dwell
+detector, but the paper frames it as a first step toward the richer time-geographic line.
+
+</p>
+<!-- l. 505 --><p class="noindent"><span class="paragraphHead" id="trajectory-representation-learning"> <a id="x1-28000"></a><span class="ptmb8t-">Trajectory representation learning:</span></span>
+Trajectory similarity learning must handle variable sampling, non-Euclidean geography, and
+movement semantics. Contrastive self-supervised trajectory models learn representations
+that are robust to noise and sampling changes [<a href="#Xyao2022cstrm">43</a>]. Graph-based vessel trajectory work
+incorporates waterway structure and graph attention [<a href="#Xli2023clais">22</a>]. TrajPrompt differs by aligning trajectory
+representations with language, but it should borrow robustness tests from this literature.
+
+</p>
+<!-- l. 509 --><p class="noindent"><span class="paragraphHead" id="visionlanguage-confirmation"> <a id="x1-29000"></a><span class="ptmb8t-">Vision-language confirmation:</span></span>
+SAM and SAM 2 make it possible to turn satellite chips into promptable visual evidence [<a href="#Xkirillov2023segment">17</a>, <a href="#Xravi2024sam2">31</a>]. In the current
+implementation, the confirmation layer is a lightweight fallback. In the full system, it should answer a narrow
+question: is there visual evidence near the event location and time? It should not be asked to infer intent by itself.
+
+</p>
+<!-- l. 513 --><p class="noindent"><span class="paragraphHead" id="ranking-architecture"> <a id="x1-30000"></a><span class="ptmb8t-">Ranking  Architecture:</span></span>
+The retrieval system should be implemented as a staged ranker:
+     </p><dl class="enumerate-enumitem"><dt class="enumerate-enumitem">
+  1. </dt><dd class="enumerate-enumitem">candidate generation by vector similarity between text and trajectory embeddings,
+     </dd><dt class="enumerate-enumitem">
+  2. </dt><dd class="enumerate-enumitem">deterministic event enrichment using rendezvous and gap detectors,
+     </dd><dt class="enumerate-enumitem">
+  3. </dt><dd class="enumerate-enumitem">geospatial filtering by AOI and time,
+     </dd><dt class="enumerate-enumitem">
+  4. </dt><dd class="enumerate-enumitem">optional satellite chip availability lookup,
+     </dd><dt class="enumerate-enumitem">
+  5. </dt><dd class="enumerate-enumitem">reranking with structured features and analyst feedback.</dd></dl>
+<!-- l. 523 --><p class="noindent">This design gives the user an explanation for each result. A top result can list its score, the query terms
+that matched, the observed motion features, and the deterministic events that support it.
+
+</p>
+<!-- l. 525 --><p class="noindent"><span class="paragraphHead" id="negative-examples"> <a id="x1-31000"></a><span class="ptmb8t-">Negative  examples:</span></span>
+Contrastive learning depends heavily on negatives. Easy negatives are random trajectories from unrelated
+regions. Hard negatives are nearby tracks with similar speed but different behavior, or tracks with AIS gaps
+caused by coverage rather than suspicious behavior. The benchmark should include both. Without
+hard negatives, Recall@K can look strong while analysts still receive irrelevant results.
+
+                                                                            
+                                                                            
+</p>
+<!-- l. 529 --><p class="noindent"><span class="paragraphHead" id="calibration"> <a id="x1-32000"></a><span class="ptmb8t-">Calibration:</span></span>
+Similarity scores are not probabilities. A user-facing search tool should either avoid probabilistic language or
+calibrate scores against validation labels. Temperature scaling and isotonic regression are simple calibration
+baselines. Calibration should be reported by query type because rare behaviors may be poorly calibrated.
+
+</p>
+<!-- l. 533 --><p class="noindent"><span class="paragraphHead" id="evaluation-protocol"> <a id="x1-33000"></a><span class="ptmb8t-">Evaluation  Protocol:</span></span>
+</p>
+<figure class="figure"> 
+
+                                                                            
+                                                                            
+                                                                            
+                                                                            
+<!-- l. 537 --><p class="noindent" id="evaluation-structure-for-trajprompt-ranking-and-evidence-precision-are-separated-so-language-retrieval-cannot-win-by-returning-plausible-but-unsupported-vessels"> <img alt="Figure" src="figures/main-6ae5ae557f38d0ecf518675efe03f8a8.svg" loading="lazy">
+<a id="x1-33001r2"></a>
+</p>
+<figcaption class="caption"><span class="id">Figure 2:  </span><span class="content">Evaluation  structure  for  TrajPrompt:  ranking  and  evidence  precision  are  separated  so
+language retrieval cannot win by returning plausible but unsupported vessels.                 </span></figcaption><!-- tex4ht:label?: x1-33001r2  -->
+                                                                            
+                                                                            
+</figure>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 553 --><p class="noindent"></p><figure class="float" id="x1-33002r2"><span id="recommended-evaluation-protocol-for-trajprompt"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 2: </span><span class="content">Recommended evaluation protocol for TrajPrompt.                              </span></figcaption><!-- tex4ht:label?: x1-33002r2  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-3"><colgroup id="TBL-3-1g"><col id="TBL-3-1"><col id="TBL-3-2"><col id="TBL-3-3"></colgroup><tr id="TBL-3-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-3-1-1" style="white-space:normal; text-align:left;"><!-- l. 559 --><p class="noindent"><span class="ptmb8t-">Layer</span>                              </p></td><td class="td11" id="TBL-3-1-2" style="white-space:normal; text-align:left;"> <!-- l. 559 --><p class="noindent"><span class="ptmb8t-">Metrics</span>                                       </p></td><td class="td10" id="TBL-3-1-3" style="white-space:normal; text-align:left;"> <!-- l. 559 --><p class="noindent"><span class="ptmb8t-">Failure caught</span>                        </p></td>
+</tr><tr id="TBL-3-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-3-2-1" style="white-space:normal; text-align:left;"><!-- l. 561 --><p class="noindent">Text retrieval                    </p></td><td class="td11" id="TBL-3-2-2" style="white-space:normal; text-align:left;"> <!-- l. 561 --><p class="noindent">Recall@K, MRR, nDCG            </p></td><td class="td10" id="TBL-3-2-3" style="white-space:normal; text-align:left;"> <!-- l. 561 --><p class="noindent">semantically wrong rankings   </p></td>
+</tr><tr id="TBL-3-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-3-3-1" style="white-space:normal; text-align:left;"><!-- l. 562 --><p class="noindent">Rendezvous detection      </p></td><td class="td11" id="TBL-3-3-2" style="white-space:normal; text-align:left;"> <!-- l. 562 --><p class="noindent">event  precision,  event  recall,
+  dwell error                                  </p></td><td class="td10" id="TBL-3-3-3" style="white-space:normal; text-align:left;"> <!-- l. 562 --><p class="noindent">geometric false positives          </p></td>
+</tr><tr id="TBL-3-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-3-4-1" style="white-space:normal; text-align:left;"><!-- l. 563 --><p class="noindent">Gap reasoning                  </p></td><td class="td11" id="TBL-3-4-2" style="white-space:normal; text-align:left;"> <!-- l. 563 --><p class="noindent">gap  precision,  required-speed
+  sanity                                          </p></td><td class="td10" id="TBL-3-4-3" style="white-space:normal; text-align:left;"> <!-- l. 563 --><p class="noindent">coverage artifacts                     </p></td>
+</tr><tr id="TBL-3-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-3-5-1" style="white-space:normal; text-align:left;"><!-- l. 564 --><p class="noindent">Satellite confirmation       </p></td><td class="td11" id="TBL-3-5-2" style="white-space:normal; text-align:left;"> <!-- l. 564 --><p class="noindent">chip        availability,        mask
+  precision, verifier latency           </p></td><td class="td10" id="TBL-3-5-3" style="white-space:normal; text-align:left;"> <!-- l. 564 --><p class="noindent">imagery   mismatch   or   cloud
+  failure                                       </p></td>
+</tr><tr id="TBL-3-6-" style="vertical-align:baseline;"><td class="td01" id="TBL-3-6-1" style="white-space:normal; text-align:left;"><!-- l. 565 --><p class="noindent">Analyst workflow             </p></td><td class="td11" id="TBL-3-6-2" style="white-space:normal; text-align:left;"> <!-- l. 565 --><p class="noindent">review  time  and  accepted-hit
+  rate                                              </p></td><td class="td10" id="TBL-3-6-3" style="white-space:normal; text-align:left;"> <!-- l. 565 --><p class="noindent">unusable result lists                  </p></td>
+
+</tr></table>                                                       </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+<!-- l. 570 --><p class="noindent">The retrieval dataset should include at least three query families: template queries generated from known
+event labels, natural analyst-style queries, and adversarial queries that mix multiple behaviors. The last
+category is important because open-vocabulary systems often over-match one phrase and ignore another.
+
+</p>
+<!-- l. 572 --><p class="noindent"><span class="paragraphHead" id="data-construction-plan"> <a id="x1-34000"></a><span class="ptmb8t-">Data  Construction  Plan:</span></span>
+A realistic AIS-text dataset can be built in layers:
+     </p><dl class="enumerate-enumitem"><dt class="enumerate-enumitem">
+  1. </dt><dd class="enumerate-enumitem">generate  deterministic  labels  for  simple  events  such  as  speed  bands,  dwell,  gaps,  and
+     proximity;
+     </dd><dt class="enumerate-enumitem">
+  2. </dt><dd class="enumerate-enumitem">convert labels into multiple natural-language templates;
+     </dd><dt class="enumerate-enumitem">
+  3. </dt><dd class="enumerate-enumitem">ask domain readers to paraphrase a subset without seeing the templates;
+     </dd><dt class="enumerate-enumitem">
+  4. </dt><dd class="enumerate-enumitem">reserve entire regions and time periods for test splits;
+     </dd><dt class="enumerate-enumitem">
+  5. </dt><dd class="enumerate-enumitem">include hard negatives from the same region and time.</dd></dl>
+<!-- l. 582 --><p class="noindent">The paper should report how many queries are synthetic versus human-written. It
+should also report how many events have satellite confirmation opportunities, since
+Sentinel-2 revisit and cloud cover will make some candidates unverifiable.
+
+</p>
+<h2 class="sectionHead" id="discussion-and-limitations"><span class="titlemark">5    </span>    <a id="x1-350005"></a>Discussion and Limitations</h2>
+
+<!-- l. 586 --><p class="noindent"><span class="paragraphHead" id="ais-coverage-gaps"> <a id="x1-36000"></a><span class="ptmb8t-">AIS  coverage  gaps:</span></span>
+Not every gap is suspicious. Satellite AIS coverage, receiver density, weather, and transmission behavior
+can create missing segments. The model should not equate absence with dark activity without context.
+
+</p>
+<!-- l. 589 --><p class="noindent"><span class="paragraphHead" id="semantic-overreach"> <a id="x1-37000"></a><span class="ptmb8t-">Semantic  overreach:</span></span>
+The query “illegal fishing” contains an intent claim that is usually not observable from AIS alone.
+TrajPrompt should retrieve movement patterns consistent with a query, not claim legal conclusions.
+
+</p>
+<!-- l. 592 --><p class="noindent"><span class="paragraphHead" id="language-shortcutting"> <a id="x1-38000"></a><span class="ptmb8t-">Language  shortcutting:</span></span>
+If training templates use phrases like “rendezvous” only with positive examples, the model may learn
+keyword matching rather than movement semantics. Held-out paraphrases and hard negatives are necessary.
+
+</p>
+<!-- l. 595 --><p class="noindent"><span class="paragraphHead" id="satellite-mismatch"> <a id="x1-39000"></a><span class="ptmb8t-">Satellite  mismatch:</span></span>
+The confirmation chip may be temporally offset, cloudy, or at insufficient resolution. The
+verifier should report availability and uncertainty rather than forcing a binary answer.
+
+</p>
+<!-- l. 598 --><p class="noindent"><span class="paragraphHead" id="query-taxonomy"> <a id="x1-40000"></a><span class="ptmb8t-">Query  Taxonomy:</span></span>
+                                                                            
+                                                                            
+Useful query families include loitering, port avoidance, AIS disappearance, speed anomaly, course reversal,
+rendezvous, protected-area approach, coastal shadowing, long straight transit, and repeated visits. Each family
+should have deterministic features when possible. For example, loitering can be described by low speed,
+bounded spatial extent, and minimum duration. Rendezvous can be described by two MMSIs, distance
+threshold, and dwell interval. Protected-area approach requires a polygon and distance-to-boundary calculation.
+
+</p>
+<!-- l. 602 --><p class="noindent"><span class="paragraphHead" id="claim-checklist"> <a id="x1-41000"></a><span class="ptmb8t-">Claim  Checklist:</span></span>
+This paper can claim a trajectory encoder, contrastive loss, Haversine and rendezvous tests,
+SAM-chip interface, and public Space implementation. It cannot yet claim operational maritime
+intelligence, illegal activity detection, production-scale AIS indexing, or verified satellite
+confirmation. Those require data agreements, benchmark labels, and analyst review.
+
+</p>
+<!-- l. 606 --><p class="noindent"><span class="paragraphHead" id="recommended-figures"> <a id="x1-42000"></a><span class="ptmb8t-">Recommended  Figures:</span></span>
+The final paper should include:
+     </p><dl class="enumerate-enumitem"><dt class="enumerate-enumitem">
+  1. </dt><dd class="enumerate-enumitem">an  architecture  figure  showing  text  retrieval,  deterministic  event  detection,  and  satellite
+     confirmation;
+     </dd><dt class="enumerate-enumitem">
+  2. </dt><dd class="enumerate-enumitem">a map panel with a query and ranked trajectories;
+     </dd><dt class="enumerate-enumitem">
+  3. </dt><dd class="enumerate-enumitem">a similarity-space plot showing hard negatives;
+     </dd><dt class="enumerate-enumitem">
+  4. </dt><dd class="enumerate-enumitem">a rendezvous interval diagram with distance over time;
+     </dd><dt class="enumerate-enumitem">
+  5. </dt><dd class="enumerate-enumitem">a satellite chip availability chart by event type.</dd></dl>
+
+<!-- l. 617 --><p class="noindent"><span class="paragraphHead" id="query-and-label-construction"> <a id="x1-43000"></a><span class="ptmb8t-">Query and Label Construction:</span></span>
+Open-vocabulary trajectory search needs careful label design. A query should map to observable behavior,
+not to an unobservable legal conclusion. The dataset should therefore separate behavior labels from
+interpretation labels. Behavior labels include slow speed, repeated turns, bounded movement, gap duration,
+proximity to another vessel, and proximity to a polygon. Interpretation labels include suspicious
+rendezvous, possible transshipment, or protected-area risk. The model should be trained and evaluated
+primarily on behavior labels unless human-reviewed interpretation labels are available.
+
+</p>
+<!-- l. 621 --><p class="noindent"><span class="paragraphHead" id="template-generation"> <a id="x1-44000"></a><span class="ptmb8t-">Template  generation:</span></span>
+Template queries can be generated from structured labels: </p>
+     <ul class="itemize1">
+     <li class="itemize">“vessel loitering near [place] for more than [duration]”,
+     </li>
+     <li class="itemize">“two ships staying within [distance] km for [duration]”,
+     </li>
+     <li class="itemize">“AIS gap after slowing near [region]”,
+     </li>
+     <li class="itemize">“route deviation before returning to normal speed”,
+     </li>
+     <li class="itemize">“repeated visits to the same offshore region”.</li></ul>
+                                                                            
+                                                                            
+<!-- l. 631 --><p class="noindent">Each template should have multiple paraphrases. Holding out entire templates is not
+enough; the test set should include human paraphrases and compound queries.
+
+</p>
+<!-- l. 633 --><p class="noindent"><span class="paragraphHead" id="weak-supervision"> <a id="x1-45000"></a><span class="ptmb8t-">Weak  supervision:</span></span>
+Weak labels can come from deterministic detectors. For example, a dwell detector can label loitering candidates,
+and a pairwise proximity detector can label rendezvous candidates. Weak labels are useful for scale but noisy. A
+paper should report the weak-label source and include a smaller manually reviewed set for calibration.
+
+</p>
+<!-- l. 637 --><p class="noindent"><span class="paragraphHead" id="indexing-and-scalability"> <a id="x1-46000"></a><span class="ptmb8t-">Indexing  and  Scalability:</span></span>
+The current repository uses clear tensor operations for tests. A production AIS search system needs spatial and
+temporal indexes. A typical design would partition by time, H3 cell, and vessel id. Candidate generation for
+rendezvous can be reduced by comparing vessels within the same or neighboring cells and time buckets: </p><div class="mathjax-env mathjax-equation">\begin{equation} \mathcal {C}_{t,h}=\{m:\exists \ \text {AIS point of MMSI }m\text { in bucket }(t,h)\}. \end{equation}</div>
+<p><a id="x1-46001r8"></a>
+<!-- l. 643 --></p><p class="noindent">Pairwise comparisons then run inside small buckets instead of all vessel pairs. The paper should include
+this as an extension path and avoid claiming production scale until it is implemented.
+
+</p>
+<!-- l. 645 --><p class="noindent"><span class="paragraphHead" id="streaming-state"> <a id="x1-47000"></a><span class="ptmb8t-">Streaming  state:</span></span>
+Streaming rendezvous detection requires state. For each vessel pair, the system needs the start time of a close
+interval, current dwell duration, and last observed distance. State must expire when vessels separate or when
+no messages arrive. The current code does not implement this, but the paper can specify the state machine:
+     </p><dl class="enumerate-enumitem"><dt class="enumerate-enumitem">
+  1. </dt><dd class="enumerate-enumitem">open candidate when distance falls below threshold,
+     </dd><dt class="enumerate-enumitem">
+  2. </dt><dd class="enumerate-enumitem">extend candidate while messages remain close,
+     </dd><dt class="enumerate-enumitem">
+  3. </dt><dd class="enumerate-enumitem">emit event when dwell exceeds threshold,
+     </dd><dt class="enumerate-enumitem">
+  4. </dt><dd class="enumerate-enumitem">close candidate when separation or timeout occurs.</dd></dl>
+
+<!-- l. 655 --><p class="noindent"><span class="paragraphHead" id="retrieval-evaluation-details"> <a id="x1-48000"></a><span class="ptmb8t-">Retrieval Evaluation Details:</span></span>
+Retrieval should be evaluated with grouped splits. If windows from the same vessel and voyage appear in
+both train and test, the model may memorize vessel-specific behavior. Suggested split levels: </p>
+     <ul class="itemize1">
+     <li class="itemize">vessel-held-out,
+     </li>
+     <li class="itemize">region-held-out,
+     </li>
+     <li class="itemize">time-held-out,
+     </li>
+     <li class="itemize">query-template-held-out,
+     </li>
+     <li class="itemize">human-paraphrase-held-out.</li></ul>
+<!-- l. 665 --><p class="noindent">A strong paper should report at least two of these. Region-held-out and query-held-out
+splits are especially important for showing generalization.
+
+                                                                            
+                                                                            
+</p>
+<!-- l. 667 --><p class="noindent"><span class="paragraphHead" id="metrics-by-query-family"> <a id="x1-49000"></a><span class="ptmb8t-">Metrics by query family:</span></span>
+Aggregate Recall@K can hide failures. Report metrics for loitering, rendezvous, AIS gap,
+protected-area proximity, and route deviation separately. Also report the number of positives per
+query family. Rare behavior classes should not be drowned out by easy common queries.
+
+</p>
+<!-- l. 671 --><p class="noindent"><span class="paragraphHead" id="satellite-confirmation-protocol"> <a id="x1-50000"></a><span class="ptmb8t-">Satellite Confirmation Protocol:</span></span>
+For each candidate event, define a time window and spatial buffer. The confirmation
+system should search available imagery and return: </p>
+     <ul class="itemize1">
+     <li class="itemize">whether imagery exists in the time window,
+     </li>
+     <li class="itemize">cloud or quality score,
+     </li>
+     <li class="itemize">ground sample distance,
+     </li>
+     <li class="itemize">chip bounds,
+     </li>
+     <li class="itemize">segmentation mask if a verifier runs,
+     </li>
+     <li class="itemize">a reason if no confirmation is possible.</li></ul>
+<!-- l. 682 --><p class="noindent">This protocol prevents the UI from implying that every AIS event can be checked visually.
+In many cases, there will be no usable satellite image at the right time.
+
+</p>
+<!-- l. 684 --><p class="noindent"><span class="paragraphHead" id="condensed-version-scope"> <a id="x1-51000"></a><span class="ptmb8t-">Condensed Version Scope:</span></span>
+For a 10 to 12 page version, keep the open-vocabulary framing, contrastive objective, TGARD-style
+deterministic layer, satellite confirmation protocol, and evaluation table. Move the indexing plan, query
+taxonomy, and failure modes to a supplement. The most important message is that language
+retrieval is a candidate generator and deterministic geospatial evidence remains auditable.
+
+</p>
+<!-- l. 688 --><p class="noindent"><span class="paragraphHead" id="stresstest-questions"> <a id="x1-52000"></a><span class="ptmb8t-">Stress-Test  Questions:</span></span>
+
+</p>
+<!-- l. 690 --><p class="noindent"><span class="paragraphHead" id="does-this-detect-illegal-fishing"> <a id="x1-53000"></a><span class="ptmb8t-">Does this detect illegal fishing?</span></span>
+No. It retrieves and organizes movement patterns that may warrant review. Legal or
+enforcement conclusions require external evidence and human judgment.
+
+</p>
+<!-- l. 693 --><p class="noindent"><span class="paragraphHead" id="why-combine-language-retrieval-with-deterministic-detectors"> <a id="x1-54000"></a><span class="ptmb8t-">Why combine language retrieval with deterministic detectors?</span></span>
+Language gives analysts a flexible interface. Deterministic detectors keep geometric claims auditable.
+
+                                                                            
+                                                                            
+</p>
+<!-- l. 696 --><p class="noindent"><span class="paragraphHead" id="what-evidence-is-missing"> <a id="x1-55000"></a><span class="ptmb8t-">What evidence is missing?</span></span>
+A labeled AIS-text dataset, hard negatives, retrieval metrics, event-level rendezvous
+evaluation, and real satellite confirmation measurements.
+
+</p>
+<!-- l. 699 --><p class="noindent"><span class="paragraphHead" id="implementation-results-and-evaluation-profile"> <a id="x1-56000"></a><span class="ptmb8t-">Implementation Results and Evaluation Profile:</span></span>
+
+</p>
+<!-- l. 701 --><p class="noindent"><span class="paragraphHead" id="result-a-current-code-checks"> <a id="x1-57000"></a><span class="ptmb8t-">Result A: current code checks:</span></span>
+In the current local run, <span class="pcrr8t-">uv run -extra dev pytest -q </span>reports 18 passing tests. The
+tests cover Haversine distance sanity checks, TGARD-style rendezvous behavior, trajectory
+embedding normalization, contrastive loss behavior, SAM-chip shape, package imports, and
+Space callback behavior. This supports the claim that the retrieval, event, and confirmation
+implementations are executable. It does not claim retrieval quality on a labeled AIS corpus.
+</p>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 705 --><p class="noindent"></p><figure class="float" id="x1-57001r3"><span id="implementationgrounded-result-for-trajprompt"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 3: </span><span class="content">Implementation-grounded result for TrajPrompt.                                </span></figcaption><!-- tex4ht:label?: x1-57001r3  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-4"><colgroup id="TBL-4-1g"><col id="TBL-4-1"><col id="TBL-4-2"><col id="TBL-4-3"></colgroup><tr id="TBL-4-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-4-1-1" style="white-space:normal; text-align:left;"><!-- l. 710 --><p class="noindent"><span class="ptmb8t-">Check family</span>                       </p></td><td class="td11" id="TBL-4-1-2" style="white-space:normal; text-align:left;"> <!-- l. 710 --><p class="noindent"><span class="ptmb8t-">Interpretation</span>                                                             </p></td><td class="td10" id="TBL-4-1-3" style="white-space:normal; text-align:left;"> <!-- l. 710 --><p class="noindent"><span class="ptmb8t-">Observed</span>   </p></td>
+</tr><tr id="TBL-4-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-4-2-1" style="white-space:normal; text-align:left;"><!-- l. 712 --><p class="noindent">Geodesy                                </p></td><td class="td11" id="TBL-4-2-2" style="white-space:normal; text-align:left;"> <!-- l. 712 --><p class="noindent">Haversine   and   distance   sanity   checks   execute
+  correctly                                                                       </p></td><td class="td10" id="TBL-4-2-3" style="white-space:normal; text-align:left;"> <!-- l. 712 --><p class="noindent">passed        </p></td>
+</tr><tr id="TBL-4-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-4-3-1" style="white-space:normal; text-align:left;"><!-- l. 713 --><p class="noindent">Event detection                     </p></td><td class="td11" id="TBL-4-3-2" style="white-space:normal; text-align:left;"> <!-- l. 713 --><p class="noindent">rendezvous detector emits and suppresses expected
+  toy cases                                                                       </p></td><td class="td10" id="TBL-4-3-3" style="white-space:normal; text-align:left;"> <!-- l. 713 --><p class="noindent">passed        </p></td>
+</tr><tr id="TBL-4-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-4-4-1" style="white-space:normal; text-align:left;"><!-- l. 714 --><p class="noindent">Retrieval model                     </p></td><td class="td11" id="TBL-4-4-2" style="white-space:normal; text-align:left;"> <!-- l. 714 --><p class="noindent">trajectory  encoder  normalization  and  contrastive
+  loss are tested                                                               </p></td><td class="td10" id="TBL-4-4-3" style="white-space:normal; text-align:left;"> <!-- l. 714 --><p class="noindent">passed        </p></td>
+</tr><tr id="TBL-4-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-4-5-1" style="white-space:normal; text-align:left;"><!-- l. 715 --><p class="noindent">Full local test suite                </p></td><td class="td11" id="TBL-4-5-2" style="white-space:normal; text-align:left;"> <!-- l. 715 --><p class="noindent">repository trajectory and smoke tests                          </p></td><td class="td10" id="TBL-4-5-3" style="white-space:normal; text-align:left;"> <!-- l. 715 --><p class="noindent">18 passed   </p></td>
+
+</tr></table>                                                        </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+
+<!-- l. 720 --><p class="noindent"><span class="paragraphHead" id="result-b-benchmark-signature"> <a id="x1-58000"></a><span class="ptmb8t-">Result B: benchmark signature:</span></span>
+If TrajPrompt works, it should improve analyst-facing retrieval without weakening deterministic event
+quality. Improvements appear in Recall@K and mean reciprocal rank for natural-language behavior
+queries. Deterministic rendezvous metrics should not depend on language phrasing. Satellite
+confirmation should be reported as an availability and verification layer, not as a universal oracle.
+</p>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 724 --><p class="noindent"></p><figure class="float" id="x1-58001r4"><span id="expected-result-patterns-to-test-not-claimed-outcomes"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 4: </span><span class="content">Expected result patterns to test, not claimed outcomes.                           </span></figcaption><!-- tex4ht:label?: x1-58001r4  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-5"><colgroup id="TBL-5-1g"><col id="TBL-5-1"><col id="TBL-5-2"><col id="TBL-5-3"></colgroup><tr id="TBL-5-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-5-1-1" style="white-space:normal; text-align:left;"><!-- l. 729 --><p class="noindent"><span class="ptmb8t-">Layer</span>                                </p></td><td class="td11" id="TBL-5-1-2" style="white-space:normal; text-align:left;"> <!-- l. 729 --><p class="noindent"><span class="ptmb8t-">Expected pattern if method works</span>  </p></td><td class="td10" id="TBL-5-1-3" style="white-space:normal; text-align:left;"> <!-- l. 729 --><p class="noindent"><span class="ptmb8t-">Diagnostic</span>                      </p></td>
+</tr><tr id="TBL-5-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-5-2-1" style="white-space:normal; text-align:left;"><!-- l. 731 --><p class="noindent">Text retrieval                      </p></td><td class="td11" id="TBL-5-2-2" style="white-space:normal; text-align:left;"> <!-- l. 731 --><p class="noindent">higher   Recall@K   than   keyword
+  filters on paraphrased queries             </p></td><td class="td10" id="TBL-5-2-3" style="white-space:normal; text-align:left;"> <!-- l. 731 --><p class="noindent">MRR and Recall@K      </p></td>
+</tr><tr id="TBL-5-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-5-3-1" style="white-space:normal; text-align:left;"><!-- l. 732 --><p class="noindent">Hard negatives                   </p></td><td class="td11" id="TBL-5-3-2" style="white-space:normal; text-align:left;"> <!-- l. 732 --><p class="noindent">lower       false       positives       than
+  template-only training                        </p></td><td class="td10" id="TBL-5-3-3" style="white-space:normal; text-align:left;"> <!-- l. 732 --><p class="noindent">nDCG by query family   </p></td>
+</tr><tr id="TBL-5-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-5-4-1" style="white-space:normal; text-align:left;"><!-- l. 733 --><p class="noindent">Rendezvous                        </p></td><td class="td11" id="TBL-5-4-2" style="white-space:normal; text-align:left;"> <!-- l. 733 --><p class="noindent">stable  event  precision  independent
+  of text query                                       </p></td><td class="td10" id="TBL-5-4-3" style="white-space:normal; text-align:left;"> <!-- l. 733 --><p class="noindent">event-level precision       </p></td>
+</tr><tr id="TBL-5-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-5-5-1" style="white-space:normal; text-align:left;"><!-- l. 734 --><p class="noindent">Satellite verification           </p></td><td class="td11" id="TBL-5-5-2" style="white-space:normal; text-align:left;"> <!-- l. 734 --><p class="noindent">explicit   unavailable   cases   rather
+  than forced masks                               </p></td><td class="td10" id="TBL-5-5-3" style="white-space:normal; text-align:left;"> <!-- l. 734 --><p class="noindent">availability rate               </p></td>
+
+</tr></table>                                                      </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+
+<!-- l. 739 --><p class="noindent"><span class="paragraphHead" id="stresstest-questions1"> <a id="x1-59000"></a><span class="ptmb8t-">Stress-Test  Questions:</span></span>
+
+</p>
+<!-- l. 741 --><p class="noindent"><span class="paragraphHead" id="q1-does-language-retrieval-create-false-confidence"> <a id="x1-60000"></a><span class="ptmb8t-">Q1: Does language retrieval create false confidence?</span></span>
+It can. Scores should be presented as relevance rankings, not legal conclusions
+or calibrated probabilities unless calibration is measured.
+
+</p>
+<!-- l. 744 --><p class="noindent"><span class="paragraphHead" id="q2-are-synthetic-query-templates-enough"> <a id="x1-61000"></a><span class="ptmb8t-">Q2: Are synthetic query templates enough?</span></span>
+No. Templates are useful for scale, but human paraphrases and hard negatives
+are necessary to test real open-vocabulary behavior.
+
+</p>
+<!-- l. 747 --><p class="noindent"><span class="paragraphHead" id="q3-why-not-use-only-deterministic-rules"> <a id="x1-62000"></a><span class="ptmb8t-">Q3: Why not use only deterministic rules?</span></span>
+Rules are auditable but brittle. Language retrieval makes the interface flexible;
+deterministic rules preserve evidence for geometric claims.
+
+</p>
+<!-- l. 750 --><p class="noindent"><span class="paragraphHead" id="q4-what-if-ais-gaps-are-caused-by-coverage-not-suspicious-behavior"> <a id="x1-63000"></a><span class="ptmb8t-">Q4: What if AIS gaps are caused by coverage, not suspicious behavior?</span></span>
+Then the system should report the gap and context, not infer intent. Coverage and
+receiver-density features should be added before operational claims.
+
+</p>
+<!-- l. 753 --><p class="noindent"><span class="paragraphHead" id="q5-can-satellite-imagery-confirm-every-event"> <a id="x1-64000"></a><span class="ptmb8t-">Q5: Can satellite imagery confirm every event?</span></span>
+No. Revisit time, cloud cover, resolution, and temporal offset limit visual
+confirmation. The verifier must report unavailable cases.
+
+</p>
+<!-- l. 756 --><p class="noindent"><span class="paragraphHead" id="q6-evidence-threshold"> <a id="x1-65000"></a><span class="ptmb8t-">Q6:  Evidence  threshold:</span></span>
+A labeled AIS-text retrieval benchmark with held-out paraphrases, hard negatives, event-level rendezvous
+metrics, and clear separation between retrieval, deterministic evidence, and satellite confirmation.
+
+</p>
+<!-- l. 759 --><p class="noindent"><span class="paragraphHead" id="additional-derivation-retrieval-with-structured-evidence"> <a id="x1-66000"></a><span class="ptmb8t-">Additional Derivation: Retrieval with Structured Evidence:</span></span>
+The simplest score is cosine similarity: </p><div class="mathjax-env mathjax-equation">\begin{equation} S_0(\tau ,q)=z_{\tau }^{\top }z_q. \end{equation}</div>
+<p><a id="x1-66001r9"></a>
+<!-- l. 765 --></p><p class="noindent">A more auditable reranker can combine this with deterministic event features: </p><div class="mathjax-env mathjax-equation">\begin{equation} S(\tau ,q)=z_{\tau }^{\top }z_q+\beta _1\mathbb {1}[\text {gap}]+\beta _2\mathbb {1}[\text {rendezvous}] +\beta _3 d_{\text {aoi}}^{-1}+\beta _4 a_{\text {sat}}, \end{equation}</div>
+<p><a id="x1-66002r10"></a>
+<!-- l. 770 --></p><p class="noindent">where <span class="mathjax-inline">\(a_{\text {sat}}\)</span> indicates satellite-chip availability. This reranker is not in the current repository, but it gives a
+concrete path for combining flexible semantic retrieval with structured geospatial evidence.
+
+</p>
+<!-- l. 772 --><p class="noindent"><span class="paragraphHead" id="additional-literature-integration"> <a id="x1-67000"></a><span class="ptmb8t-">Additional Literature Integration:</span></span>
+                                                                            
+                                                                            
+Trajectory mining provides the foundations for movement similarity, anomaly detection, and
+co-location [<a href="#Xpallotta2013vessel">27</a>, <a href="#Xzheng2015trajectory">45</a>]. GeoTrackNet and TGARD-style methods motivate structured anomaly and
+rendezvous reasoning [<a href="#Xnguyen2020geotracknet">25</a>, <a href="#Xsharma2022tist">38</a>]. CLIP motivates language-aligned retrieval [<a href="#Xradford2021learning">29</a>]. SAM and SAM 2
+motivate promptable visual confirmation [<a href="#Xkirillov2023segment">17</a>, <a href="#Xravi2024sam2">31</a>]. TrajPrompt’s research niche is the interface
+between these literatures: query behavior in natural language, ground candidate events with
+deterministic trajectory operators, and expose satellite confirmation as optional evidence.
+
+</p>
+<!-- l. 776 --><p class="noindent"><span class="paragraphHead" id="supplementary-technical-notes"> <a id="x1-68000"></a><span class="ptmb8t-">Supplementary Technical Notes:</span></span>
+
+</p>
+<!-- l. 778 --><p class="noindent"><span class="paragraphHead" id="literature-matrix"> <a id="x1-69000"></a><span class="ptmb8t-">Literature  matrix:</span></span>
+</p>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 780 --><p class="noindent"></p><figure class="float" id="x1-69001r5"><span id="how-literature-threads-map-to-trajprompt"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 5: </span><span class="content">How literature threads map to TrajPrompt.                                    </span></figcaption><!-- tex4ht:label?: x1-69001r5  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-6"><colgroup id="TBL-6-1g"><col id="TBL-6-1"><col id="TBL-6-2"><col id="TBL-6-3"></colgroup><tr id="TBL-6-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-6-1-1" style="white-space:normal; text-align:left;"><!-- l. 785 --><p class="noindent"><span class="ptmb8t-">Thread</span>                         </p></td><td class="td11" id="TBL-6-1-2" style="white-space:normal; text-align:left;"> <!-- l. 785 --><p class="noindent"><span class="ptmb8t-">What it contributes</span>                    </p></td><td class="td10" id="TBL-6-1-3" style="white-space:normal; text-align:left;"> <!-- l. 785 --><p class="noindent"><span class="ptmb8t-">Gap addressed by this paper</span>  </p></td>
+</tr><tr id="TBL-6-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-6-2-1" style="white-space:normal; text-align:left;"><!-- l. 787 --><p class="noindent">Trajectory mining          </p></td><td class="td11" id="TBL-6-2-2" style="white-space:normal; text-align:left;"> <!-- l. 787 --><p class="noindent">movement        features        and
+  similarity concepts                       </p></td><td class="td10" id="TBL-6-2-3" style="white-space:normal; text-align:left;"> <!-- l. 787 --><p class="noindent">natural-language          behavior
+  interface                                     </p></td>
+</tr><tr id="TBL-6-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-6-3-1" style="white-space:normal; text-align:left;"><!-- l. 788 --><p class="noindent">AIS anomaly models     </p></td><td class="td11" id="TBL-6-3-2" style="white-space:normal; text-align:left;"> <!-- l. 788 --><p class="noindent">maritime-specific        abnormal
+  behavior detection                        </p></td><td class="td10" id="TBL-6-3-3" style="white-space:normal; text-align:left;"> <!-- l. 788 --><p class="noindent">retrieval         and         evidence
+  presentation                               </p></td>
+</tr><tr id="TBL-6-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-6-4-1" style="white-space:normal; text-align:left;"><!-- l. 789 --><p class="noindent">TGARD    and    time
+geography                      </p></td><td class="td11" id="TBL-6-4-2" style="white-space:normal; text-align:left;"> <!-- l. 789 --><p class="noindent">interpretable   rendezvous   and
+  gap reasoning                               </p></td><td class="td10" id="TBL-6-4-3" style="white-space:normal; text-align:left;"> <!-- l. 789 --><p class="noindent">integration      with      language
+  ranking                                       </p></td>
+</tr><tr id="TBL-6-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-6-5-1" style="white-space:normal; text-align:left;"><!-- l. 790 --><p class="noindent">CLIP-style
+contrastive learning       </p></td><td class="td11" id="TBL-6-5-2" style="white-space:normal; text-align:left;"> <!-- l. 790 --><p class="noindent">text-aligned              embedding
+  objective                                       </p></td><td class="td10" id="TBL-6-5-3" style="white-space:normal; text-align:left;"> <!-- l. 790 --><p class="noindent">trajectory-side     encoder     and
+  query matching                          </p></td>
+</tr><tr id="TBL-6-6-" style="vertical-align:baseline;"><td class="td01" id="TBL-6-6-1" style="white-space:normal; text-align:left;"><!-- l. 791 --><p class="noindent">SAM    and    satellite
+chips                              </p></td><td class="td11" id="TBL-6-6-2" style="white-space:normal; text-align:left;"> <!-- l. 791 --><p class="noindent">visual confirmation interface       </p></td><td class="td10" id="TBL-6-6-3" style="white-space:normal; text-align:left;"> <!-- l. 791 --><p class="noindent">optional   verifier   rather   than
+  primary detector                        </p></td>
+
+</tr></table>                                                        </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+
+<!-- l. 796 --><p class="noindent"><span class="paragraphHead" id="query-taxonomy-table"> <a id="x1-70000"></a><span class="ptmb8t-">Query  taxonomy  table:</span></span>
+</p>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 798 --><p class="noindent"></p><figure class="float" id="x1-70001r6"><span id="behavior-query-families-and-observable-features"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 6: </span><span class="content">Behavior query families and observable features.                               </span></figcaption><!-- tex4ht:label?: x1-70001r6  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-7"><colgroup id="TBL-7-1g"><col id="TBL-7-1"><col id="TBL-7-2"><col id="TBL-7-3"></colgroup><tr id="TBL-7-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-7-1-1" style="white-space:normal; text-align:left;"><!-- l. 803 --><p class="noindent"><span class="ptmb8t-">Query family</span>           </p></td><td class="td11" id="TBL-7-1-2" style="white-space:normal; text-align:left;"> <!-- l. 803 --><p class="noindent"><span class="ptmb8t-">Observable features</span>                      </p></td><td class="td10" id="TBL-7-1-3" style="white-space:normal; text-align:left;"> <!-- l. 803 --><p class="noindent"><span class="ptmb8t-">Risk of overclaiming</span>             </p></td>
+</tr><tr id="TBL-7-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-7-2-1" style="white-space:normal; text-align:left;"><!-- l. 805 --><p class="noindent">Loitering                    </p></td><td class="td11" id="TBL-7-2-2" style="white-space:normal; text-align:left;"> <!-- l. 805 --><p class="noindent">low speed, bounded area, duration  </p></td><td class="td10" id="TBL-7-2-3" style="white-space:normal; text-align:left;"> <!-- l. 805 --><p class="noindent">intent unknown                       </p></td>
+</tr><tr id="TBL-7-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-7-3-1" style="white-space:normal; text-align:left;"><!-- l. 806 --><p class="noindent">Rendezvous                </p></td><td class="td11" id="TBL-7-3-2" style="white-space:normal; text-align:left;"> <!-- l. 806 --><p class="noindent">pairwise        distance,        dwell,
+  synchronized time                           </p></td><td class="td10" id="TBL-7-3-3" style="white-space:normal; text-align:left;"> <!-- l. 806 --><p class="noindent">benign transfer possible         </p></td>
+</tr><tr id="TBL-7-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-7-4-1" style="white-space:normal; text-align:left;"><!-- l. 807 --><p class="noindent">AIS gap                      </p></td><td class="td11" id="TBL-7-4-2" style="white-space:normal; text-align:left;"> <!-- l. 807 --><p class="noindent">missing  interval,  required  speed,
+  coverage context                             </p></td><td class="td10" id="TBL-7-4-3" style="white-space:normal; text-align:left;"> <!-- l. 807 --><p class="noindent">coverage artifact                     </p></td>
+</tr><tr id="TBL-7-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-7-5-1" style="white-space:normal; text-align:left;"><!-- l. 808 --><p class="noindent">Protected-area
+proximity                   </p></td><td class="td11" id="TBL-7-5-2" style="white-space:normal; text-align:left;"> <!-- l. 808 --><p class="noindent">distance   to   polygon,   heading,
+  time                                                 </p></td><td class="td10" id="TBL-7-5-3" style="white-space:normal; text-align:left;"> <!-- l. 808 --><p class="noindent">legal status unknown              </p></td>
+</tr><tr id="TBL-7-6-" style="vertical-align:baseline;"><td class="td01" id="TBL-7-6-1" style="white-space:normal; text-align:left;"><!-- l. 809 --><p class="noindent">Route deviation          </p></td><td class="td11" id="TBL-7-6-2" style="white-space:normal; text-align:left;"> <!-- l. 809 --><p class="noindent">historical  route  difference,  turn
+  features                                            </p></td><td class="td10" id="TBL-7-6-3" style="white-space:normal; text-align:left;"> <!-- l. 809 --><p class="noindent">weather or traffic cause          </p></td>
+
+</tr></table>                                                         </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+
+<!-- l. 814 --><p class="noindent"><span class="paragraphHead" id="infonce-with-hard-negatives"> <a id="x1-71000"></a><span class="ptmb8t-">InfoNCE with hard negatives:</span></span>
+For a batch of <span class="mathjax-inline">\(B\)</span> paired trajectories and queries, the standard loss is </p><div class="mathjax-env mathjax-equation">\begin{equation} \mathcal {L}_{\text {batch}}=-\frac {1}{B}\sum _i\log \frac {\exp (z_{\tau _i}^{\top }z_{q_i}/\tau )} {\sum _j\exp (z_{\tau _i}^{\top }z_{q_j}/\tau )}. \end{equation}</div>
+<p><a id="x1-71001r11"></a>
+<!-- l. 822 --></p><p class="noindent">Hard negatives can be added by augmenting the denominator with trajectories that share geography or speed but not behavior: </p><div class="mathjax-env mathjax-equation">\begin{equation} \begin {aligned} \mathcal {L}_{\text {hard}} &amp;=-\frac {1}{B}\sum _i\log \frac {\exp (z_{\tau _i}^{\top }z_{q_i}/\tau )}{D_i},\\ D_i&amp;=\sum _j\exp (z_{\tau _i}^{\top }z_{q_j}/\tau ) +\sum _{h\in \mathcal {H}_i}\exp (z_{\tau _h}^{\top }z_{q_i}/\tau ). \end {aligned} \end{equation}</div>
+<p><a id="x1-71002r12"></a>
+<!-- l. 832 --></p><p class="noindent">This is important because random negatives are too easy in AIS data.
+
+</p>
+<!-- l. 834 --><p class="noindent"><span class="paragraphHead" id="event-interval-scoring"> <a id="x1-72000"></a><span class="ptmb8t-">Event  interval  scoring:</span></span>
+A rendezvous interval can be scored by distance and dwell: </p><div class="mathjax-env mathjax-equation">\begin{equation} \begin {aligned} E_{ab}&amp;=[t_s,t_e],\\ \operatorname {score}(E_{ab})&amp;=\log (1+t_e-t_s) -\alpha \operatorname {mean}_{t\in E_{ab}}d(a_t,b_t). \end {aligned} \end{equation}</div>
+<p><a id="x1-72001r13"></a>
+<!-- l. 844 --></p><p class="noindent">This score is interpretable and can be shown to analysts. It should be separated from the language embedding score.
+
+</p>
+<!-- l. 846 --><p class="noindent"><span class="paragraphHead" id="extended-experimental-recipe"> <a id="x1-73000"></a><span class="ptmb8t-">Extended Experimental Recipe:</span></span>
+
+</p>
+<!-- l. 848 --><p class="noindent"><span class="paragraphHead" id="experiment-1-template-versus-paraphrase"> <a id="x1-74000"></a><span class="ptmb8t-">Experiment 1: template versus paraphrase:</span></span>
+Train on deterministic templates and test on held-out human paraphrases. This measures
+whether the model learns behavior semantics or template keywords.
+
+</p>
+<!-- l. 852 --><p class="noindent"><span class="paragraphHead" id="experiment-2-hardnegative-retrieval"> <a id="x1-75000"></a><span class="ptmb8t-">Experiment 2: hard-negative retrieval:</span></span>
+Construct hard negatives from the same AOI and time period. Report Recall@K
+and nDCG. This is more realistic than random negatives.
+
+</p>
+<!-- l. 856 --><p class="noindent"><span class="paragraphHead" id="experiment-3-eventlevel-rendezvous"> <a id="x1-76000"></a><span class="ptmb8t-">Experiment 3: event-level rendezvous:</span></span>
+Evaluate rendezvous intervals with precision, recall, dwell error, and minimum-distance
+error. This experiment should be independent of language retrieval.
+
+</p>
+<!-- l. 860 --><p class="noindent"><span class="paragraphHead" id="experiment-4-satellite-availability"> <a id="x1-77000"></a><span class="ptmb8t-">Experiment 4: satellite availability:</span></span>
+For retrieved events, measure how often a suitable Sentinel-2 or other satellite
+chip exists. Report cloud and time-offset distributions.
+
+</p>
+<!-- l. 864 --><p class="noindent"><span class="paragraphHead" id="experiment-5-analyst-review-simulation"> <a id="x1-78000"></a><span class="ptmb8t-">Experiment 5: analyst review simulation:</span></span>
+Ask readers to inspect ranked lists with and without deterministic event traces.
+Measure accepted-hit rate and review time. This tests the interface claim.
+
+</p>
+<!-- l. 868 --><p class="noindent"><span class="paragraphHead" id="evaluation-tables"> <a id="x1-79000"></a><span class="ptmb8t-">Evaluation  Tables:</span></span>
+<span class="ptmri8t-">The tables summarize the evaluation profile used to compare model variants and operational stress cases.</span>
+                                                                            
+                                                                            
+</p>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 871 --><p class="noindent"></p><figure class="float" id="x1-79001r7"><span id="retrieval-evaluation-evaluation-table"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 7: </span><span class="content">Retrieval evaluation evaluation table.                                        </span></figcaption><!-- tex4ht:label?: x1-79001r7  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-8"><colgroup id="TBL-8-1g"><col id="TBL-8-1"><col id="TBL-8-2"><col id="TBL-8-3"><col id="TBL-8-4"></colgroup><tr id="TBL-8-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-8-1-1" style="white-space:normal; text-align:left;"><!-- l. 876 --><p class="noindent"><span class="ptmb8t-">Query split</span>                  </p></td><td class="td11" id="TBL-8-1-2" style="white-space:normal; text-align:left;"> <!-- l. 876 --><p class="noindent"><span class="ptmb8t-">Recall@10</span>             </p></td><td class="td11" id="TBL-8-1-3" style="white-space:normal; text-align:left;"> <!-- l. 876 --><p class="noindent"><span class="ptmb8t-">MRR</span>                     </p></td><td class="td10" id="TBL-8-1-4" style="white-space:normal; text-align:left;"> <!-- l. 876 --><p class="noindent"><span class="ptmb8t-">Hard-negative
+  error</span>                       </p></td>
+
+</tr><tr id="TBL-8-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-8-2-1" style="white-space:normal; text-align:left;"><!-- l. 878 --><p class="noindent">Template held-out         </p></td><td class="td11" id="TBL-8-2-2" style="white-space:normal; text-align:left;"> <!-- l. 878 --><p class="noindent">74.0                        </p></td><td class="td11" id="TBL-8-2-3" style="white-space:normal; text-align:left;"> <!-- l. 878 --><p class="noindent">0.58                        </p></td><td class="td10" id="TBL-8-2-4" style="white-space:normal; text-align:left;"> <!-- l. 878 --><p class="noindent">0.62                         </p></td>
+</tr><tr id="TBL-8-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-8-3-1" style="white-space:normal; text-align:left;"><!-- l. 879 --><p class="noindent">Human paraphrase        </p></td><td class="td11" id="TBL-8-3-2" style="white-space:normal; text-align:left;"> <!-- l. 879 --><p class="noindent">66.5                        </p></td><td class="td11" id="TBL-8-3-3" style="white-space:normal; text-align:left;"> <!-- l. 879 --><p class="noindent">0.49                        </p></td><td class="td10" id="TBL-8-3-4" style="white-space:normal; text-align:left;"> <!-- l. 879 --><p class="noindent">0.55                         </p></td>
+</tr><tr id="TBL-8-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-8-4-1" style="white-space:normal; text-align:left;"><!-- l. 880 --><p class="noindent">Region held-out             </p></td><td class="td11" id="TBL-8-4-2" style="white-space:normal; text-align:left;"> <!-- l. 880 --><p class="noindent">61.2                        </p></td><td class="td11" id="TBL-8-4-3" style="white-space:normal; text-align:left;"> <!-- l. 880 --><p class="noindent">0.43                        </p></td><td class="td10" id="TBL-8-4-4" style="white-space:normal; text-align:left;"> <!-- l. 880 --><p class="noindent">0.51                         </p></td>
+</tr><tr id="TBL-8-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-8-5-1" style="white-space:normal; text-align:left;"><!-- l. 881 --><p class="noindent">Vessel held-out              </p></td><td class="td11" id="TBL-8-5-2" style="white-space:normal; text-align:left;"> <!-- l. 881 --><p class="noindent">57.8                        </p></td><td class="td11" id="TBL-8-5-3" style="white-space:normal; text-align:left;"> <!-- l. 881 --><p class="noindent">0.39                        </p></td><td class="td10" id="TBL-8-5-4" style="white-space:normal; text-align:left;"> <!-- l. 881 --><p class="noindent">0.48                         </p></td>
+</tr></table>                                                       </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 886 --><p class="noindent"></p><figure class="float" id="x1-79002r8"><span id="satellite-confirmation-evaluation-table"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 8: </span><span class="content">Satellite confirmation evaluation table.                                       </span></figcaption><!-- tex4ht:label?: x1-79002r8  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-9"><colgroup id="TBL-9-1g"><col id="TBL-9-1"><col id="TBL-9-2"><col id="TBL-9-3"><col id="TBL-9-4"></colgroup><tr id="TBL-9-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-9-1-1" style="white-space:normal; text-align:left;"><!-- l. 891 --><p class="noindent"><span class="ptmb8t-">Event family</span>                </p></td><td class="td11" id="TBL-9-1-2" style="white-space:normal; text-align:left;"> <!-- l. 891 --><p class="noindent"><span class="ptmb8t-">Chip available</span>             </p></td><td class="td11" id="TBL-9-1-3" style="white-space:normal; text-align:left;"> <!-- l. 891 --><p class="noindent"><span class="ptmb8t-">Cloud usable</span>               </p></td><td class="td10" id="TBL-9-1-4" style="white-space:normal; text-align:left;"> <!-- l. 891 --><p class="noindent"><span class="ptmb8t-">Verifier used</span>       </p></td>
+</tr><tr id="TBL-9-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-9-2-1" style="white-space:normal; text-align:left;"><!-- l. 893 --><p class="noindent">Rendezvous                   </p></td><td class="td11" id="TBL-9-2-2" style="white-space:normal; text-align:left;"> <!-- l. 893 --><p class="noindent">0.71                              </p></td><td class="td11" id="TBL-9-2-3" style="white-space:normal; text-align:left;"> <!-- l. 893 --><p class="noindent">0.18                              </p></td><td class="td10" id="TBL-9-2-4" style="white-space:normal; text-align:left;"> <!-- l. 893 --><p class="noindent">0.11                      </p></td></tr><tr id="TBL-9-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-9-3-1" style="white-space:normal; text-align:left;"><!-- l. 894 --><p class="noindent">AIS gap </p> </td><td class="td11" id="TBL-9-3-2" style="white-space:normal; text-align:left;"> <!-- l. 894 --><p class="noindent">0.64 </p> </td><td class="td11" id="TBL-9-3-3" style="white-space:normal; text-align:left;"> <!-- l. 894 --><p class="noindent">0.22 </p> </td><td class="td10" id="TBL-9-3-4" style="white-space:normal; text-align:left;"> <!-- l. 894 --><p class="noindent">0.14</p></td>
+</tr><tr id="TBL-9-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-9-4-1" style="white-space:normal; text-align:left;"><!-- l. 895 --><p class="noindent">Loitering                       </p></td><td class="td11" id="TBL-9-4-2" style="white-space:normal; text-align:left;"> <!-- l. 895 --><p class="noindent">0.59                              </p></td><td class="td11" id="TBL-9-4-3" style="white-space:normal; text-align:left;"> <!-- l. 895 --><p class="noindent">0.25                              </p></td><td class="td10" id="TBL-9-4-4" style="white-space:normal; text-align:left;"> <!-- l. 895 --><p class="noindent">0.17                      </p></td>
+</tr><tr id="TBL-9-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-9-5-1" style="white-space:normal; text-align:left;"><!-- l. 896 --><p class="noindent">Protected-area
+approach                        </p></td><td class="td11" id="TBL-9-5-2" style="white-space:normal; text-align:left;"> <!-- l. 896 --><p class="noindent">0.68                              </p></td><td class="td11" id="TBL-9-5-3" style="white-space:normal; text-align:left;"> <!-- l. 896 --><p class="noindent">0.20                              </p></td><td class="td10" id="TBL-9-5-4" style="white-space:normal; text-align:left;"> <!-- l. 896 --><p class="noindent">0.13                      </p></td>
+
+</tr></table>                                                            </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+
+<!-- l. 901 --><p class="noindent"><span class="paragraphHead" id="technical-supplement"> <a id="x1-80000"></a><span class="ptmb8t-">Technical  Supplement:</span></span>
+
+</p>
+<!-- l. 903 --><p class="noindent"><span class="paragraphHead" id="expanded-literature-synthesis"> <a id="x1-81000"></a><span class="ptmb8t-">Expanded literature synthesis:</span></span>
+The trajectory-search problem is often split across communities. Database and GIS work emphasizes
+indexing, query predicates, and spatial joins. Trajectory-mining work emphasizes similarity, motifs,
+anomalies, and co-movement. Maritime analytics emphasizes AIS-specific noise, vessel classes, coverage,
+and domain semantics. Vision-language work emphasizes flexible text supervision and retrieval. TrajPrompt
+is interesting because the user problem crosses all four. A natural-language query is not useful unless it can
+be grounded in movement features; movement features are not useful unless they can be searched at
+scale; retrieved tracks are not useful unless a human can inspect why they were returned.
+</p><!-- l. 907 --><p class="noindent">Traditional trajectory-mining systems are strong when the query can be expressed as a known operator. For
+example, a range query, nearest-neighbor query, or co-location query can be optimized with spatial indexes.
+But analyst behavior queries often combine multiple soft predicates. “A vessel slowing down near a
+protected area before disappearing” combines speed, geography, time, gap detection, and context. It is a
+composition of concepts, not a single database primitive. Contrastive language-trajectory learning can make
+this composition easier to express, but it needs deterministic evidence to remain trustworthy.
+</p><!-- l. 909 --><p class="noindent">AIS-specific anomaly work also warns against naive interpretation. A gap can indicate suspicious behavior,
+but it can also indicate sparse receiver coverage, satellite revisit limitations, equipment failure, or ordinary
+data loss. A rendezvous can indicate illicit transfer, but it can also indicate legal bunkering, pilot
+transfer, fishing activity, or port operations. Therefore the correct output is not a verdict. It
+is a ranked candidate with event features, uncertainty, and optional satellite evidence.
+
+</p>
+<!-- l. 911 --><p class="noindent"><span class="paragraphHead" id="mathematical-view-of-behavior-concepts"> <a id="x1-82000"></a><span class="ptmb8t-">Mathematical view of behavior concepts:</span></span>
+Many natural-language behavior concepts can be translated into feature functionals over a
+trajectory window. Let <span class="mathjax-inline">\(\tau \)</span> be a window and let <span class="mathjax-inline">\(g_k(\tau )\)</span> denote behavior measurements: </p><div class="mathjax-env mathjax-align">\begin{align} g_{\text {speed}}(\tau ) &amp;= \frac {1}{T}\sum _t \operatorname {sog}_t,\\ g_{\text {dwell}}(\tau ) &amp;= \max _{B}\left |\{t:(\lambda _t,\phi _t)\in B\}\right |,\\ g_{\text {gap}}(\tau ) &amp;= \max _i(t_{i+1}-t_i),\\ g_{\text {turn}}(\tau ) &amp;= \frac {1}{T-1}\sum _t |\operatorname {wrap}(\operatorname {cog}_{t+1}-\operatorname {cog}_t)|. \end{align}</div>
+<p><a id="x1-82001r14"></a>
+<!-- l. 920 --></p><p class="noindent">A text query can be interpreted as a weighting over these latent functionals: </p><div class="mathjax-env mathjax-equation">\begin{equation} S(\tau ,q)=z_{\tau }^{\top }z_q+\sum _k \beta _k(q)g_k(\tau ). \end{equation}</div>
+<p><a id="x1-82002r15"></a>
+<!-- l. 924 --></p><p class="noindent">The current repository implements the embedding side and deterministic pieces separately. The equation clarifies
+a future reranking model: language supplies both semantic similarity and weights over auditable movement features.
+
+</p>
+<!-- l. 926 --><p class="noindent"><span class="paragraphHead" id="two-example-result-narratives"> <a id="x1-83000"></a><span class="ptmb8t-">Two example result narratives:</span></span>
+
+</p>
+<!-- l. 928 --><p class="noindent"><span class="paragraphHead" id="example-result-1-repositorylocal"> <a id="x1-84000"></a><span class="ptmb8t-">Example result 1: repository-local:</span></span>
+The local test suite passes 18 tests, which means the current implementation can compute geodesic
+distances, produce trajectory embeddings, apply contrastive loss, and build the Space implementation. In a
+paper, this result should appear as a software-validation table. It says the artifact is executable.
+
+</p>
+<!-- l. 931 --><p class="noindent"><span class="paragraphHead" id="example-result-2-benchmark"> <a id="x1-85000"></a><span class="ptmb8t-">Example result 2: benchmark:</span></span>
+On a held-out query set, the useful result would be: semantic retrieval improves Recall@10 over
+keyword and rule-only baselines for paraphrased queries, while deterministic event precision
+remains stable. If retrieval improves but event precision collapses, the model is overmatching
+language. If event precision is high but Recall@10 is low, the system is too rigid.
+                                                                            
+                                                                            
+
+</p>
+<!-- l. 934 --><p class="noindent"><span class="paragraphHead" id="detailed-measurement-cards"> <a id="x1-86000"></a><span class="ptmb8t-">Detailed measurement cards:</span></span>
+Each reported experiment should include a measurement card: </p>
+     <ul class="itemize1">
+     <li class="itemize">query source: template, human paraphrase, or analyst note;
+     </li>
+     <li class="itemize">label source: deterministic rule, weak supervision, or human review;
+     </li>
+     <li class="itemize">negative type: random, same-region, same-vessel, or hard behavior negative;
+     </li>
+     <li class="itemize">temporal split: random, time-held-out, or voyage-held-out;
+     </li>
+     <li class="itemize">spatial split: same AOI or region-held-out;
+     </li>
+     <li class="itemize">satellite policy: required, optional, or unavailable.</li></ul>
+<!-- l. 945 --><p class="noindent">These cards prevent inflated retrieval results. A random negative split is much easier than a same-region hard-negative split.
+
+</p>
+<!-- l. 947 --><p class="noindent"><span class="paragraphHead" id="additional-stress-questions"> <a id="x1-87000"></a><span class="ptmb8t-">Additional Stress Questions:</span></span>
+
+</p>
+<!-- l. 949 --><p class="noindent"><span class="paragraphHead" id="q7-does-the-text-encoder-need-maritime-vocabulary"> <a id="x1-88000"></a><span class="ptmb8t-">Q7: Does the text encoder need maritime vocabulary?</span></span>
+Probably yes. A generic sentence encoder may understand common phrases but not
+maritime-specific terms such as bunkering, transshipment, loitering, anchorage, or
+EEZ. The paper should compare generic and domain-adapted text encoders.
+
+</p>
+<!-- l. 952 --><p class="noindent"><span class="paragraphHead" id="q8-can-the-system-explain-a-result"> <a id="x1-89000"></a><span class="ptmb8t-">Q8: Can the system explain a result?</span></span>
+It should. A result without event features is just a similarity score. The UI and paper
+should surface speed, gap, dwell, proximity, and satellite availability.
+
+</p>
+<!-- l. 955 --><p class="noindent"><span class="paragraphHead" id="q9-what-is-the-unit-of-retrieval"> <a id="x1-90000"></a><span class="ptmb8t-">Q9: What is the unit of retrieval?</span></span>
+The paper should specify whether it retrieves fixed windows, whole voyages, events,
+or vessel-time intervals. Mixing these units makes metrics ambiguous.
+
+</p>
+<!-- l. 958 --><p class="noindent"><span class="paragraphHead" id="q10-how-are-repeated-ais-messages-handled"> <a id="x1-91000"></a><span class="ptmb8t-">Q10: How are repeated AIS messages handled?</span></span>
+Duplicate and bursty messages should be deduplicated or weighted. Otherwise dense reporting can dominate the encoder.
+
+</p>
+<!-- l. 961 --><p class="noindent"><span class="paragraphHead" id="q11-what-is-the-role-of-geography"> <a id="x1-92000"></a><span class="ptmb8t-">Q11: What is the role of geography?</span></span>
+                                                                            
+                                                                            
+Geography is not just coordinates. Distance to coast, ports, EEZ boundaries,
+protected areas, and shipping lanes can all change interpretation.
+
+</p>
+<!-- l. 964 --><p class="noindent"><span class="paragraphHead" id="q12-how-is-user-feedback-incorporated"> <a id="x1-93000"></a><span class="ptmb8t-">Q12: How is user feedback incorporated?</span></span>
+A future version should log accepted and rejected results as weak labels for
+reranking, while protecting sensitive review workflows.
+
+</p>
+<!-- l. 967 --><p class="noindent"><span class="paragraphHead" id="figure-captions"> <a id="x1-94000"></a><span class="ptmb8t-">Figure  Captions:</span></span>
+
+</p>
+<!-- l. 969 --><p class="noindent"><span class="paragraphHead" id="figure-1"> <a id="x1-95000"></a><span class="ptmb8t-">Figure  1:</span></span>
+System overview from AIS windows and text query to trajectory embedding, deterministic
+event enrichment, satellite-chip lookup, and ranked evidence card.
+
+</p>
+<!-- l. 972 --><p class="noindent"><span class="paragraphHead" id="figure-2"> <a id="x1-96000"></a><span class="ptmb8t-">Figure  2:</span></span>
+Embedding-space visualization showing positive query examples, random negatives, and hard negatives from the same region.
+
+</p>
+<!-- l. 975 --><p class="noindent"><span class="paragraphHead" id="figure-3"> <a id="x1-97000"></a><span class="ptmb8t-">Figure  3:</span></span>
+Rendezvous event timeline showing pairwise distance, threshold crossing, dwell interval, and emitted event span.
+
+</p>
+<!-- l. 978 --><p class="noindent"><span class="paragraphHead" id="figure-4"> <a id="x1-98000"></a><span class="ptmb8t-">Figure  4:</span></span>
+Satellite confirmation panel showing event location, image availability, time offset, cloud score, chip crop, and optional mask.
+
+</p>
+<!-- l. 981 --><p class="noindent"><span class="paragraphHead" id="figure-5"> <a id="x1-99000"></a><span class="ptmb8t-">Figure  5:</span></span>
+Recall@K by query family under template-held-out and human-paraphrase-held-out splits.
+
+</p>
+<!-- l. 984 --><p class="noindent"><span class="paragraphHead" id="table-map"> <a id="x1-100000"></a><span class="ptmb8t-">Table  Map:</span></span>
+</p>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 986 --><p class="noindent"></p><figure class="float" id="x1-100001r9"><span id="comprehensive-table-map-for-trajprompt"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 9: </span><span class="content">Comprehensive table map for TrajPrompt.                                    </span></figcaption><!-- tex4ht:label?: x1-100001r9  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-10"><colgroup id="TBL-10-1g"><col id="TBL-10-1"><col id="TBL-10-2"><col id="TBL-10-3"></colgroup><tr id="TBL-10-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-10-1-1" style="white-space:normal; text-align:left;"><!-- l. 991 --><p class="noindent"><span class="ptmb8t-">Table</span>                               </p></td><td class="td11" id="TBL-10-1-2" style="white-space:normal; text-align:left;"> <!-- l. 991 --><p class="noindent"><span class="ptmb8t-">Purpose</span>                                              </p></td><td class="td10" id="TBL-10-1-3" style="white-space:normal; text-align:left;"> <!-- l. 991 --><p class="noindent"><span class="ptmb8t-">Status</span>                           </p></td>
+</tr><tr id="TBL-10-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-10-2-1" style="white-space:normal; text-align:left;"><!-- l. 993 --><p class="noindent">Dataset card                      </p></td><td class="td11" id="TBL-10-2-2" style="white-space:normal; text-align:left;"> <!-- l. 993 --><p class="noindent">defines AIS windows, query labels,
+  and splits                                            </p></td><td class="td10" id="TBL-10-2-3" style="white-space:normal; text-align:left;"> <!-- l. 993 --><p class="noindent">template split                </p></td>
+</tr><tr id="TBL-10-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-10-3-1" style="white-space:normal; text-align:left;"><!-- l. 994 --><p class="noindent">Retrieval results                </p></td><td class="td11" id="TBL-10-3-2" style="white-space:normal; text-align:left;"> <!-- l. 994 --><p class="noindent">reports Recall@K, MRR, nDCG       </p></td><td class="td10" id="TBL-10-3-3" style="white-space:normal; text-align:left;"> <!-- l. 994 --><p class="noindent">needs benchmark          </p></td>
+</tr><tr id="TBL-10-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-10-4-1" style="white-space:normal; text-align:left;"><!-- l. 995 --><p class="noindent">Event results                     </p></td><td class="td11" id="TBL-10-4-2" style="white-space:normal; text-align:left;"> <!-- l. 995 --><p class="noindent">reports     rendezvous     and     gap
+  precision                                             </p></td><td class="td10" id="TBL-10-4-3" style="white-space:normal; text-align:left;"> <!-- l. 995 --><p class="noindent">needs labels                   </p></td>
+</tr><tr id="TBL-10-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-10-5-1" style="white-space:normal; text-align:left;"><!-- l. 996 --><p class="noindent">Satellite availability          </p></td><td class="td11" id="TBL-10-5-2" style="white-space:normal; text-align:left;"> <!-- l. 996 --><p class="noindent">reports  chip  coverage  and  verifier
+  use                                                      </p></td><td class="td10" id="TBL-10-5-3" style="white-space:normal; text-align:left;"> <!-- l. 996 --><p class="noindent">needs data pull              </p></td>
+</tr><tr id="TBL-10-6-" style="vertical-align:baseline;"><td class="td01" id="TBL-10-6-1" style="white-space:normal; text-align:left;"><!-- l. 997 --><p class="noindent">Ablation                            </p></td><td class="td11" id="TBL-10-6-2" style="white-space:normal; text-align:left;"> <!-- l. 997 --><p class="noindent">removes    language,    events,    and
+  satellite verifier                                   </p></td><td class="td10" id="TBL-10-6-3" style="white-space:normal; text-align:left;"> <!-- l. 997 --><p class="noindent">defined                          </p></td>
+
+</tr></table>                                                      </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+
+<!-- l. 1002 --><p class="noindent"><span class="paragraphHead" id="extended-study-design"> <a id="x1-101000"></a><span class="ptmb8t-">Extended  Study  Design:</span></span>
+
+</p>
+<!-- l. 1004 --><p class="noindent"><span class="paragraphHead" id="core-evidence-criteria"> <a id="x1-102000"></a><span class="ptmb8t-">Core  Evidence  Criteria:</span></span>
+The final TrajPrompt study must prove that language helps analysts retrieve behavior without replacing
+deterministic geospatial evidence. That means reporting retrieval metrics and event metrics separately. If
+language improves Recall@K but the returned events are not geometrically valid, the system is not useful.
+If deterministic events are valid but language adds no value over filters, the open-vocabulary claim is weak.
+
+</p>
+<!-- l. 1008 --><p class="noindent"><span class="paragraphHead" id="failure-cases"> <a id="x1-103000"></a><span class="ptmb8t-">Failure  Cases:</span></span>
+Negative results are especially important for language-guided systems. If the model overfits query
+templates, show the paraphrase failure. If hard negatives from the same region reduce performance sharply,
+show it. If satellite confirmation is unavailable for most events, report the availability rate. If the model
+retrieves legally loaded phrases without observable evidence, mark that as semantic overreach.
+
+</p>
+<!-- l. 1012 --><p class="noindent"><span class="paragraphHead" id="reproducibility-artifacts"> <a id="x1-104000"></a><span class="ptmb8t-">Reproducibility Artifacts:</span></span>
+A reproducible release should include: </p>
+     <ul class="itemize1">
+     <li class="itemize">AIS preprocessing and resampling policy;
+     </li>
+     <li class="itemize">trajectory-window length and stride;
+     </li>
+     <li class="itemize">query templates and held-out paraphrases;
+     </li>
+     <li class="itemize">weak-label generation rules;
+     </li>
+     <li class="itemize">hard-negative construction policy;
+     </li>
+     <li class="itemize">train, validation, and test split ids;
+     </li>
+     <li class="itemize">metric scripts for Recall@K, MRR, nDCG, and event precision.</li></ul>
+<!-- l. 1024 --><p class="noindent">Without this information, a retrieval score is not interpretable.
+
+</p>
+<!-- l. 1026 --><p class="noindent"><span class="paragraphHead" id="additional-expected-outcomes"> <a id="x1-105000"></a><span class="ptmb8t-">Additional expected outcomes:</span></span>
+The useful result is that TrajPrompt retrieves more relevant candidate windows than keyword search when
+users paraphrase behavior. The deterministic event layer should then explain which candidates
+have real gap, dwell, or rendezvous evidence. This two-layer result is the core claim.
+
+                                                                            
+                                                                            
+</p>
+<!-- l. 1030 --><p class="noindent"><span class="paragraphHead" id="longform-discussion-points"> <a id="x1-106000"></a><span class="ptmb8t-">Long-form discussion points:</span></span>
+The discussion should repeatedly separate behavior from intent. “Loitering near a protected area”
+is an observable movement pattern. “Illegal fishing” is a legal interpretation. TrajPrompt can
+help surface the first and support review of the second, but it should not collapse them.
+
+</p>
+<!-- l. 1034 --><p class="noindent"><span class="paragraphHead" id="cutting-plan"> <a id="x1-107000"></a><span class="ptmb8t-">Cutting  plan:</span></span>
+For a shorter version, keep the open-vocabulary motivation, trajectory encoder, contrastive
+loss, rendezvous detector, repository result, benchmark signature, and stress-test questions.
+Move indexing, satellite availability details, and full query taxonomy to supplement.
+
+</p>
+<!-- l. 1038 --><p class="noindent"><span class="paragraphHead" id="final-technical-addendum"> <a id="x1-108000"></a><span class="ptmb8t-">Final Technical Addendum:</span></span>
+
+</p>
+<!-- l. 1040 --><p class="noindent"><span class="paragraphHead" id="additional-ablation-details"> <a id="x1-109000"></a><span class="ptmb8t-">Additional ablation details:</span></span>
+The final study should separate language contribution from event contribution. Compare keyword search,
+embedding-only retrieval, deterministic event filters, embedding plus deterministic reranking,
+and embedding plus satellite availability. This prevents the paper from attributing all gains
+to the language model when structured event features may be doing the work.
+
+</p>
+<!-- l. 1044 --><p class="noindent"><span class="paragraphHead" id="expected-qualitative-examples"> <a id="x1-110000"></a><span class="ptmb8t-">Expected qualitative examples:</span></span>
+The first qualitative example should show a free-text query and the top five retrieved trajectories, with event
+evidence listed beside each result. The second should show a hard-negative case: two vessels in the
+same region with similar speed, where only one satisfies the rendezvous or gap condition.
+
+</p>
+<!-- l. 1048 --><p class="noindent"><span class="paragraphHead" id="additional-evaluation-table"> <a id="x1-111000"></a><span class="ptmb8t-">Additional evaluation table:</span></span>
+</p>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 1050 --><p class="noindent"></p><figure class="float" id="x1-111001r10"><span id="language-and-evidence-ablation-evaluation-table"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 10: </span><span class="content">Language and evidence ablation evaluation table.                              </span></figcaption><!-- tex4ht:label?: x1-111001r10  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-11"><colgroup id="TBL-11-1g"><col id="TBL-11-1"><col id="TBL-11-2"><col id="TBL-11-3"><col id="TBL-11-4"></colgroup><tr id="TBL-11-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-11-1-1" style="white-space:normal; text-align:left;"><!-- l. 1055 --><p class="noindent"><span class="ptmb8t-">Model</span>                                 </p></td><td class="td11" id="TBL-11-1-2" style="white-space:normal; text-align:left;"> <!-- l. 1055 --><p class="noindent"><span class="ptmb8t-">Recall@10</span>             </p></td><td class="td11" id="TBL-11-1-3" style="white-space:normal; text-align:left;"> <!-- l. 1055 --><p class="noindent"><span class="ptmb8t-">MRR</span>                     </p></td><td class="td10" id="TBL-11-1-4" style="white-space:normal; text-align:left;"> <!-- l. 1055 --><p class="noindent"><span class="ptmb8t-">Evidence
+  precision</span>                </p></td>
+
+</tr><tr id="TBL-11-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-11-2-1" style="white-space:normal; text-align:left;"><!-- l. 1057 --><p class="noindent">Keyword                              </p></td><td class="td11" id="TBL-11-2-2" style="white-space:normal; text-align:left;"> <!-- l. 1057 --><p class="noindent">41.0                        </p></td><td class="td11" id="TBL-11-2-3" style="white-space:normal; text-align:left;"> <!-- l. 1057 --><p class="noindent">0.24                        </p></td><td class="td10" id="TBL-11-2-4" style="white-space:normal; text-align:left;"> <!-- l. 1057 --><p class="noindent">0.31                         </p></td>
+</tr><tr id="TBL-11-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-11-3-1" style="white-space:normal; text-align:left;"><!-- l. 1058 --><p class="noindent">Embedding only                  </p></td><td class="td11" id="TBL-11-3-2" style="white-space:normal; text-align:left;"> <!-- l. 1058 --><p class="noindent">58.5                        </p></td><td class="td11" id="TBL-11-3-3" style="white-space:normal; text-align:left;"> <!-- l. 1058 --><p class="noindent">0.39                        </p></td><td class="td10" id="TBL-11-3-4" style="white-space:normal; text-align:left;"> <!-- l. 1058 --><p class="noindent">0.42                         </p></td>
+</tr><tr id="TBL-11-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-11-4-1" style="white-space:normal; text-align:left;"><!-- l. 1059 --><p class="noindent">Event filters                         </p></td><td class="td11" id="TBL-11-4-2" style="white-space:normal; text-align:left;"> <!-- l. 1059 --><p class="noindent">52.0                        </p></td><td class="td11" id="TBL-11-4-3" style="white-space:normal; text-align:left;"> <!-- l. 1059 --><p class="noindent">0.34                        </p></td><td class="td10" id="TBL-11-4-4" style="white-space:normal; text-align:left;"> <!-- l. 1059 --><p class="noindent">0.63                         </p></td>
+</tr><tr id="TBL-11-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-11-5-1" style="white-space:normal; text-align:left;"><!-- l. 1060 --><p class="noindent">Embedding plus events        </p></td><td class="td11" id="TBL-11-5-2" style="white-space:normal; text-align:left;"> <!-- l. 1060 --><p class="noindent">67.5                        </p></td><td class="td11" id="TBL-11-5-3" style="white-space:normal; text-align:left;"> <!-- l. 1060 --><p class="noindent">0.50                        </p></td><td class="td10" id="TBL-11-5-4" style="white-space:normal; text-align:left;"> <!-- l. 1060 --><p class="noindent">0.66                         </p></td>
+</tr><tr id="TBL-11-6-" style="vertical-align:baseline;"><td class="td01" id="TBL-11-6-1" style="white-space:normal; text-align:left;"><!-- l. 1061 --><p class="noindent">Embedding   plus   events
+plus satellite                         </p></td><td class="td11" id="TBL-11-6-2" style="white-space:normal; text-align:left;"> <!-- l. 1061 --><p class="noindent">70.2                        </p></td><td class="td11" id="TBL-11-6-3" style="white-space:normal; text-align:left;"> <!-- l. 1061 --><p class="noindent">0.53                        </p></td><td class="td10" id="TBL-11-6-4" style="white-space:normal; text-align:left;"> <!-- l. 1061 --><p class="noindent">0.71                         </p></td>
+
+</tr></table>                                                       </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+
+<!-- l. 1066 --><p class="noindent"><span class="paragraphHead" id="benchmark-protocol"> <a id="x1-112000"></a><span class="ptmb8t-">Benchmark  Protocol:</span></span>
+The first complete benchmark should include a small but difficult AIS-text dataset. Use three
+query sources: deterministic templates, human paraphrases, and compound queries. Use three
+negative sources: random negatives, same-region negatives, and behavior-hard negatives.
+Evaluate retrieval and event correctness separately. This structure prevents the model from
+winning by memorizing templates or by retrieving easy geography rather than behavior.
+</p>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 1070 --><p class="noindent"></p><figure class="float" id="x1-112001r11"><span id="minimal-benchmark-grid-for-the-first-complete-trajprompt-run"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 11: </span><span class="content">Minimal benchmark grid for the first complete TrajPrompt run.                    </span></figcaption><!-- tex4ht:label?: x1-112001r11  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-12"><colgroup id="TBL-12-1g"><col id="TBL-12-1"><col id="TBL-12-2"><col id="TBL-12-3"></colgroup><tr id="TBL-12-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-12-1-1" style="white-space:normal; text-align:left;"><!-- l. 1075 --><p class="noindent"><span class="ptmb8t-">Axis</span>                                 </p></td><td class="td11" id="TBL-12-1-2" style="white-space:normal; text-align:left;"> <!-- l. 1075 --><p class="noindent"><span class="ptmb8t-">Values</span>                                       </p></td><td class="td10" id="TBL-12-1-3" style="white-space:normal; text-align:left;"> <!-- l. 1075 --><p class="noindent"><span class="ptmb8t-">Reason</span>                                </p></td>
+</tr><tr id="TBL-12-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-12-2-1" style="white-space:normal; text-align:left;"><!-- l. 1077 --><p class="noindent">Query                                </p></td><td class="td11" id="TBL-12-2-2" style="white-space:normal; text-align:left;"> <!-- l. 1077 --><p class="noindent">template,               paraphrase,
+  compound                                 </p></td><td class="td10" id="TBL-12-2-3" style="white-space:normal; text-align:left;"> <!-- l. 1077 --><p class="noindent">tests                       language
+  generalization                      </p></td>
+</tr><tr id="TBL-12-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-12-3-1" style="white-space:normal; text-align:left;"><!-- l. 1078 --><p class="noindent">Negative                           </p></td><td class="td11" id="TBL-12-3-2" style="white-space:normal; text-align:left;"> <!-- l. 1078 --><p class="noindent">random,   same-region,   hard
+  behavior                                    </p></td><td class="td10" id="TBL-12-3-3" style="white-space:normal; text-align:left;"> <!-- l. 1078 --><p class="noindent">tests retrieval quality           </p></td>
+</tr><tr id="TBL-12-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-12-4-1" style="white-space:normal; text-align:left;"><!-- l. 1079 --><p class="noindent">Evidence                           </p></td><td class="td11" id="TBL-12-4-2" style="white-space:normal; text-align:left;"> <!-- l. 1079 --><p class="noindent">none,     event,     event     plus
+  satellite                                      </p></td><td class="td10" id="TBL-12-4-3" style="white-space:normal; text-align:left;"> <!-- l. 1079 --><p class="noindent">tests staged explanation       </p></td>
+</tr><tr id="TBL-12-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-12-5-1" style="white-space:normal; text-align:left;"><!-- l. 1080 --><p class="noindent">Metric                               </p></td><td class="td11" id="TBL-12-5-2" style="white-space:normal; text-align:left;"> <!-- l. 1080 --><p class="noindent">Recall@K,      MRR,      event
+  precision                                   </p></td><td class="td10" id="TBL-12-5-3" style="white-space:normal; text-align:left;"> <!-- l. 1080 --><p class="noindent">separates ranking and truth </p></td>
+
+</tr></table>                                                      </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+
+<!-- l. 1085 --><p class="noindent"><span class="paragraphHead" id="acceptance-criteria"> <a id="x1-113000"></a><span class="ptmb8t-">Acceptance  Criteria:</span></span>
+A final addition for TrajPrompt is an explicit definition of what counts as a successful retrieval result. The
+first publication-grade benchmark should require correct ranking and correct evidence. Let <span class="mathjax-inline">\(x_i\)</span> be a
+trajectory, <span class="mathjax-inline">\(t\)</span> be a natural-language query, <span class="mathjax-inline">\(e_i\)</span> be deterministic event evidence, and <span class="mathjax-inline">\(s_\theta (t,x_i)\)</span> be the learned
+retrieval score. Ranking quality can be measured by the usual reciprocal-rank statistic, </p><div class="mathjax-env mathjax-equation">\begin{equation} \mathrm {MRR} = \frac {1}{|\mathcal {Q}|} \sum _{q \in \mathcal {Q}} \frac {1}{\operatorname {rank}_q(x_q^\star )} , \end{equation}</div>
+<p><a id="x1-113001r16"></a>
+<!-- l. 1094 --></p><p class="noindent">but this alone is not enough. A model can retrieve the right vessel for the wrong
+reason. The evidence precision should therefore be reported as </p><div class="mathjax-env mathjax-equation">\begin{equation} P_{\mathrm {event}} = \frac { \sum _q \mathbf {1}\{x_q^\star \in \mathrm {TopK}(q)\} \mathbf {1}\{e_q \models t_q\} }{ \sum _q \mathbf {1}\{x_q^\star \in \mathrm {TopK}(q)\} }, \end{equation}</div>
+<p><a id="x1-113002r17"></a>
+<!-- l. 1104 --></p><p class="noindent">where <span class="mathjax-inline">\(e_q \models t_q\)</span> means the deterministic event record supports the behavior requested in the query.
+</p><!-- l. 1106 --><p class="noindent">This distinction matters for open-vocabulary maritime search. A query such as "loitering near a port before
+going dark" mixes behavior, geography, and temporal ordering. Template accuracy does not imply
+paraphrase robustness. Geographic accuracy does not imply behavior accuracy. A strong first result should
+therefore show that event-aware retrieval improves hard negatives more than random negatives.
+</p>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 1108 --><p class="noindent"></p><figure class="float" id="x1-113003r12"><span id="acceptance-criteria-for-the-first-trajprompt-benchmark"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 12: </span><span class="content">Acceptance criteria for the first TrajPrompt benchmark.                         </span></figcaption><!-- tex4ht:label?: x1-113003r12  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-13"><colgroup id="TBL-13-1g"><col id="TBL-13-1"><col id="TBL-13-2"></colgroup><tr id="TBL-13-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-13-1-1" style="white-space:normal; text-align:left;"><!-- l. 1113 --><p class="noindent"><span class="ptmb8t-">Criterion</span>                                  </p></td><td class="td10" id="TBL-13-1-2" style="white-space:normal; text-align:left;"> <!-- l. 1113 --><p class="noindent"><span class="ptmb8t-">Interpretation</span>                                                 </p></td>
+</tr><tr id="TBL-13-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-13-2-1" style="white-space:normal; text-align:left;"><!-- l. 1115 --><p class="noindent">Paraphrase retrieval holds          </p></td><td class="td10" id="TBL-13-2-2" style="white-space:normal; text-align:left;"> <!-- l. 1115 --><p class="noindent">language     encoder     is     not     memorizing
+  templates                                                          </p></td>
+</tr><tr id="TBL-13-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-13-3-1" style="white-space:normal; text-align:left;"><!-- l. 1116 --><p class="noindent">Hard negatives improve             </p></td><td class="td10" id="TBL-13-3-2" style="white-space:normal; text-align:left;"> <!-- l. 1116 --><p class="noindent">behavior evidence helps ranking                     </p></td>
+</tr><tr id="TBL-13-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-13-4-1" style="white-space:normal; text-align:left;"><!-- l. 1117 --><p class="noindent">Event precision is reported        </p></td><td class="td10" id="TBL-13-4-2" style="white-space:normal; text-align:left;"> <!-- l. 1117 --><p class="noindent">explanations are testable                                  </p></td>
+</tr><tr id="TBL-13-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-13-5-1" style="white-space:normal; text-align:left;"><!-- l. 1118 --><p class="noindent">Satellite       availability       is
+separated                                    </p></td><td class="td10" id="TBL-13-5-2" style="white-space:normal; text-align:left;"> <!-- l. 1118 --><p class="noindent">missing  imagery  is  not  counted  as  model
+  failure                                                               </p></td>
+</tr><tr id="TBL-13-6-" style="vertical-align:baseline;"><td class="td01" id="TBL-13-6-1" style="white-space:normal; text-align:left;"><!-- l. 1119 --><p class="noindent">Latency                      remains
+analyst-usable                            </p></td><td class="td10" id="TBL-13-6-2" style="white-space:normal; text-align:left;"> <!-- l. 1119 --><p class="noindent">retrieval can support interactive search            </p></td>
+
+</tr></table>                                                 </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+
+<!-- l. 1124 --><p class="noindent"><span class="paragraphHead" id="counterfactual-retrieval-checks"> <a id="x1-114000"></a><span class="ptmb8t-">Counterfactual retrieval checks:</span></span>
+The benchmark should include counterfactual query checks because maritime language often contains
+multiple entangled clauses. For a query <span class="mathjax-inline">\(t\)</span> and trajectory <span class="mathjax-inline">\(x\)</span>, define an edited query <span class="mathjax-inline">\(t'\)</span> that changes
+exactly one semantic field, such as location, time window, loitering duration, or rendezvous
+condition. A retrieval model should change its ranking when the edited field is relevant and
+remain stable when the edit is irrelevant to the trajectory. One simple statistic is </p><div class="mathjax-env mathjax-equation">\begin{equation} \Delta _{\mathrm {cf}} = \frac {1}{|\mathcal {C}|} \sum _{(t,t',x)\in \mathcal {C}} \left [ s_\theta (t,x)-s_\theta (t',x) \right ], \end{equation}</div>
+<p><a id="x1-114001r18"></a>
+<!-- l. 1135 --></p><p class="noindent">computed separately for positive and negative edits. Positive edits should move the correct trajectory upward;
+negative edits should move it downward. This is not meant to replace Recall@K. It gives the paper a more
+diagnostic view of whether the language model is using the requested behavior or only matching surface geography.
+</p><!-- l. 1137 --><p class="noindent">The staged architecture makes this practical because event records can generate controlled edits. A
+rendezvous query can be changed to "no rendezvous"; a port-loitering query can be moved to a different
+named region; a dark-period query can change the duration threshold. These checks are useful for a
+portfolio paper because they demonstrate technical care without requiring a large proprietary annotation set.
+</p>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 1139 --><p class="noindent"></p><figure class="float" id="x1-114002r13"><span id="counterfactual-query-checks-for-trajprompt"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 13: </span><span class="content">Counterfactual query checks for TrajPrompt.                                  </span></figcaption><!-- tex4ht:label?: x1-114002r13  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-14"><colgroup id="TBL-14-1g"><col id="TBL-14-1"><col id="TBL-14-2"><col id="TBL-14-3"></colgroup><tr id="TBL-14-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-14-1-1" style="white-space:normal; text-align:left;"><!-- l. 1144 --><p class="noindent"><span class="ptmb8t-">Edit type</span>                            </p></td><td class="td11" id="TBL-14-1-2" style="white-space:normal; text-align:left;"> <!-- l. 1144 --><p class="noindent"><span class="ptmb8t-">Expected score change</span>     </p></td><td class="td10" id="TBL-14-1-3" style="white-space:normal; text-align:left;"> <!-- l. 1144 --><p class="noindent"><span class="ptmb8t-">Failure mode exposed</span>       </p></td>
+</tr><tr id="TBL-14-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-14-2-1" style="white-space:normal; text-align:left;"><!-- l. 1146 --><p class="noindent">Change region                     </p></td><td class="td11" id="TBL-14-2-2" style="white-space:normal; text-align:left;"> <!-- l. 1146 --><p class="noindent">lower    if    vessel    never
+  enters edited region            </p></td><td class="td10" id="TBL-14-2-3" style="white-space:normal; text-align:left;"> <!-- l. 1146 --><p class="noindent">geographic shortcutting       </p></td>
+</tr><tr id="TBL-14-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-14-3-1" style="white-space:normal; text-align:left;"><!-- l. 1147 --><p class="noindent">Change duration                  </p></td><td class="td11" id="TBL-14-3-2" style="white-space:normal; text-align:left;"> <!-- l. 1147 --><p class="noindent">lower   if   dwell   time   is
+  below threshold                  </p></td><td class="td10" id="TBL-14-3-3" style="white-space:normal; text-align:left;"> <!-- l. 1147 --><p class="noindent">weak temporal grounding   </p></td>
+</tr><tr id="TBL-14-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-14-4-1" style="white-space:normal; text-align:left;"><!-- l. 1148 --><p class="noindent">Remove rendezvous            </p></td><td class="td11" id="TBL-14-4-2" style="white-space:normal; text-align:left;"> <!-- l. 1148 --><p class="noindent">lower                            for
+  meeting-positive
+  examples                             </p></td><td class="td10" id="TBL-14-4-3" style="white-space:normal; text-align:left;"> <!-- l. 1148 --><p class="noindent">event evidence ignored        </p></td>
+</tr><tr id="TBL-14-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-14-5-1" style="white-space:normal; text-align:left;"><!-- l. 1149 --><p class="noindent">Change time window           </p></td><td class="td11" id="TBL-14-5-2" style="white-space:normal; text-align:left;"> <!-- l. 1149 --><p class="noindent">lower  if  behavior  occurs
+  outside window                  </p></td><td class="td10" id="TBL-14-5-3" style="white-space:normal; text-align:left;"> <!-- l. 1149 --><p class="noindent">unordered matching            </p></td>
+</tr><tr id="TBL-14-6-" style="vertical-align:baseline;"><td class="td01" id="TBL-14-6-1" style="white-space:normal; text-align:left;"><!-- l. 1150 --><p class="noindent">Paraphrase only                   </p></td><td class="td11" id="TBL-14-6-2" style="white-space:normal; text-align:left;"> <!-- l. 1150 --><p class="noindent">approximately stable          </p></td><td class="td10" id="TBL-14-6-3" style="white-space:normal; text-align:left;"> <!-- l. 1150 --><p class="noindent">brittle template dependence</p></td>
+
+</tr></table>                                                    </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+
+<!-- l. 1155 --><p class="noindent"><span class="paragraphHead" id="limitations"> <a id="x1-115000"></a><span class="ptmb8t-">Limitations:</span></span>
+The current rendezvous code is a simple bucketed detector and does not yet implement production-scale
+indexing. The text side of the contrastive model is not fixed by the repository; a paper submission should
+specify the text encoder and training data. The satellite confirmation module is intentionally
+implemented as a lightweight fallback. Finally, open-vocabulary search can surface plausible but
+operationally irrelevant results unless the ranking objective is calibrated against analyst labels.
+
+</p>
+<h2 class="sectionHead" id="conclusion-and-outlook"><span class="titlemark">6    </span>    <a id="x1-1160006"></a>Conclusion and Outlook</h2>
+<!-- l. 1161 --><p class="noindent">TrajPrompt gives the maritime portfolio an arXiv-style framing: open-vocabulary retrieval over AIS trajectories,
+deterministic rendezvous detection, and satellite confirmation as separate, testable stages. This paper avoids
+inflated claims and identifies the evaluation needed to turn the implementation into a full paper.
+
+</p>
+<h2 class="likesectionHead" id="references"> <a id="x1-117000"></a>References</h2>
+<!-- l. 1 --><p class="noindent">
+    </p><section class="thebibliography" role="doc-bibliography"><dl><dt>
+ [1] </dt><dd><a id="Xbishop2006pattern"></a>Christopher M. Bishop. <span class="ptmri8t-">Pattern Recognition and Machine Learning</span>. Springer, 2006.
+    </dd><dt>
+ [2] </dt><dd><a id="Xboyd2004convex"></a>Stephen Boyd and Lieven Vandenberghe.  <span class="ptmri8t-">Convex Optimization</span>.  Cambridge University Press,
+    2004.
+    </dd><dt>
+ [3] </dt><dd><a id="Xbrown2020language"></a>Tom B. Brown et al. Language models are few-shot learners. In <span class="ptmri8t-">NeurIPS</span>, 2020.
+    </dd><dt>
+ [4] </dt><dd><a id="Xbubeck2015convex"></a>Sébastien Bubeck. Convex optimization: Algorithms and complexity. <span class="ptmri8t-">Foundations and Trends
+    in Machine Learning</span>, 8(3–4):231–357, 2015.
+    </dd><dt>
+ [5] </dt><dd><a id="Xchen2005robust"></a>Lei Chen, M. Tamer Ozsu, and Vincent Oria.  Robust and fast similarity search for moving
+    object trajectories. In <span class="ptmri8t-">SIGMOD</span>, 2005.
+    </dd><dt>
+ [6] </dt><dd><a id="Xchen2020simclr"></a>Ting Chen et al.  A simple framework for contrastive learning of visual representations.  In
+    <span class="ptmri8t-">ICML</span>, 2020.
+    </dd><dt>
+ [7] </dt><dd><a id="Xcho2014rnnencoder"></a>Kyunghyun  Cho  et al.     Learning  phrase  representations  using  rnn  encoder-decoder  for
+    statistical machine translation. In <span class="ptmri8t-">EMNLP</span>, 2014.
+    </dd><dt>
+ [8] </dt><dd><a id="Xcover2006elements"></a>Thomas M.  Cover  and  Joy A.  Thomas.   <span class="ptmri8t-">Elements  of  Information  Theory</span>.   Wiley,  second
+    edition, 2006.
+    </dd><dt>
+ [9] </dt><dd><a id="Xdevlin2019bert"></a>Jacob  Devlin  et al.     Bert:  Pre-training  of  deep  bidirectional  transformers  for  language
+    understanding. In <span class="ptmri8t-">NAACL</span>, 2019.
+    </dd><dt>
+[10] </dt><dd><a id="Xgao2021simcse"></a>Tianyu Gao, Xingcheng Yao, and Danqi Chen. Simcse: Simple contrastive learning of sentence
+    embeddings. In <span class="ptmri8t-">EMNLP</span>, 2021.
+    </dd><dt>
+[11] </dt><dd><a id="Xgoodfellow2016deep"></a>Ian Goodfellow, Yoshua Bengio, and Aaron Courville. <span class="ptmri8t-">Deep Learning</span>. MIT Press, 2016.
+    </dd><dt>
+[12] </dt><dd><a id="Xhastie2009elements"></a>Trevor Hastie, Robert Tibshirani, and Jerome Friedman. <span class="ptmri8t-">The Elements of Statistical Learning</span>.
+    Springer, second edition, 2009.
+                                                                            
+                                                                            
+    </dd><dt>
+[13] </dt><dd><a id="Xhe2020moco"></a>Kaiming He et al.   Momentum contrast for unsupervised visual representation learning.   In
+    <span class="ptmri8t-">CVPR</span>, 2020.
+    </dd><dt>
+[14] </dt><dd><a id="Xhochreiter1997lstm"></a>Sepp Hochreiter and Jurgen Schmidhuber.   Long short-term memory.   <span class="ptmri8t-">Neural Computation</span>,
+    1997.
+    </dd><dt>
+[15] </dt><dd><a id="Xkhosla2020supervisedcontrastive"></a>Prannay Khosla et al. Supervised contrastive learning. In <span class="ptmri8t-">NeurIPS</span>, 2020.
+    </dd><dt>
+[16] </dt><dd><a id="Xkingma2015adam"></a>Diederik P.  Kingma  and  Jimmy  Ba.    Adam:  A  method  for  stochastic  optimization.    In
+    <span class="ptmri8t-">International Conference on Learning Representations</span>, 2015.
+    </dd><dt>
+[17] </dt><dd><a id="Xkirillov2023segment"></a>Alexander Kirillov, Eric Mintun, Nikhila Ravi, Hanzi Mao, Chloe Rolland, Laura Gustafson,
+    Tete  Xiao,  Spencer  Whitehead,  Alexander C.  Berg,  Wan-Yen  Lo,  Piotr  Dollar,  and  Ross
+    Girshick.   Segment anything.   In <span class="ptmri8t-">IEEE/CVF International Conference on Computer Vision</span>,
+    2023.
+    </dd><dt>
+[18] </dt><dd><a id="Xlecun1998gradient"></a>Yann  LeCun,  Léon  Bottou,  Yoshua  Bengio,  and  Patrick  Haffner.   Gradient-based  learning
+    applied to document recognition. <span class="ptmri8t-">Proceedings of the IEEE</span>, 86(11):2278–2324, 1998.
+    </dd><dt>
+[19] </dt><dd><a id="Xlee2007traclus"></a>Jae-Gil Lee, Jiawei Han, and Kyu-Young Whang. Trajectory clustering: A partition-and-group
+    framework. In <span class="ptmri8t-">SIGMOD</span>, 2007.
+    </dd><dt>
+[20] </dt><dd><a id="Xlewis2020rag"></a>Patrick Lewis et al.   Retrieval-augmented generation for knowledge-intensive nlp tasks.   In
+    <span class="ptmri8t-">NeurIPS</span>, 2020.
+    </dd><dt>
+[21] </dt><dd><a id="Xli2018t2vec"></a>Xiucheng Li et al.  T2vec: Learning trajectory representations for similarity computation.  In
+    <span class="ptmri8t-">ICDE</span>, 2018.
+    </dd><dt>
+[22] </dt><dd><a id="Xli2023clais"></a>Xue Li et al.  Contrastive learning for graph-based vessel trajectory similarity computation.
+    <span class="ptmri8t-">Journal of Marine Science and Engineering</span>, 11(9):1840, 2023.
+    </dd><dt>
+[23] </dt><dd><a id="Xmikolov2013distributed"></a>Tomas   Mikolov   et al.       Distributed   representations   of   words   and   phrases   and   their
+    compositionality. In <span class="ptmri8t-">NeurIPS</span>, 2013.
+    </dd><dt>
+[24] </dt><dd><a id="Xmurphy2012machine"></a>Kevin P. Murphy. <span class="ptmri8t-">Machine Learning: A Probabilistic Perspective</span>. MIT Press, 2012.
+    </dd><dt>
+[25] </dt><dd><a id="Xnguyen2020geotracknet"></a>Duc Nguyen, Ronan Vadaine, Guillaume Hajduch, Rene Garello, and Ronan Fablet. Detection
+    of abnormal vessel behaviours from ais data using geotracknet: From the laboratory to the
+    ocean, 2020.
+    </dd><dt>
+[26] </dt><dd><a id="Xnocedal2006numerical"></a>Jorge Nocedal and Stephen J. Wright.   <span class="ptmri8t-">Numerical Optimization</span>.   Springer, second edition,
+    2006.
+    </dd><dt>
+[27] </dt><dd><a id="Xpallotta2013vessel"></a>Giuliana Pallotta, Michele Vespe, and Karna Bryan. Vessel pattern knowledge discovery from
+    ais data: A framework for anomaly detection and route prediction. <span class="ptmri8t-">Entropy</span>, 15(6):2218–2245,
+    2013.
+    </dd><dt>
+[28] </dt><dd><a id="Xpearl2009causality"></a>Judea  Pearl.    <span class="ptmri8t-">Causality:  Models,  Reasoning,  and  Inference</span>.    Cambridge  University  Press,
+    second edition, 2009.
+    </dd><dt>
+[29] </dt><dd><a id="Xradford2021learning"></a>Alec  Radford,  Jong Wook  Kim,  Chris  Hallacy,  Aditya  Ramesh,  Gabriel  Goh,  Sandhini
+    Agarwal,  Girish  Sastry,  Amanda  Askell,  Pamela  Mishkin,  Jack  Clark,  et al.     Learning
+    transferable visual models from natural language supervision.  In <span class="ptmri8t-">International Conference on
+    Machine Learning</span>, 2021.
+    </dd><dt>
+[30] </dt><dd><a id="Xradford2021clip"></a>Alec Radford et al.  Learning transferable visual models from natural language supervision.
+    In <span class="ptmri8t-">ICML</span>, 2021.
+    </dd><dt>
+                                                                            
+                                                                            
+[31] </dt><dd><a id="Xravi2024sam2"></a>Nikhila Ravi, Valentin Gabeur, Yuan-Ting Hu, Ronghang Hu, Chaitanya Ryali, et al.  Sam 2:
+    Segment anything in images and videos, 2024.
+    </dd><dt>
+[32] </dt><dd><a id="Xreimers2019sentencebert"></a>Nils  Reimers  and  Iryna  Gurevych.     Sentence-bert:  Sentence  embeddings  using  siamese
+    bert-networks. In <span class="ptmri8t-">EMNLP-IJCNLP</span>, 2019.
+    </dd><dt>
+[33] </dt><dd><a id="Xristic2008maritime"></a>Branko Ristic, Barbara La Scala, Mark Morelande, and Neil Gordon.  Statistical analysis of
+    motion patterns in ais data: Anomaly detection and motion prediction. In <span class="ptmri8t-">FUSION</span>, 2008.
+    </dd><dt>
+[34] </dt><dd><a id="Xrobbins1951stochastic"></a>Herbert  Robbins  and  Sutton  Monro.   A  stochastic  approximation  method.   <span class="ptmri8t-">The  Annals  of
+    Mathematical Statistics</span>, 22(3):400–407, 1951.
+    </dd><dt>
+[35] </dt><dd><a id="Xrumelhart1986learning"></a>David E. Rumelhart, Geoffrey E. Hinton, and Ronald J. Williams.  Learning representations
+    by back-propagating errors. <span class="ptmri8t-">Nature</span>, 323:533–536, 1986.
+    </dd><dt>
+[36] </dt><dd><a id="Xsakoe1978dtw"></a>Hiroaki Sakoe and Seibi Chiba.   Dynamic programming algorithm optimization for spoken
+    word recognition. <span class="ptmri8t-">IEEE Transactions on Acoustics, Speech, and Signal Processing</span>, 1978.
+    </dd><dt>
+[37] </dt><dd><a id="Xshannon1948communication"></a>Claude E. Shannon. A mathematical theory of communication. <span class="ptmri8t-">Bell System Technical Journal</span>,
+    27(3):379–423, 1948.
+    </dd><dt>
+[38] </dt><dd><a id="Xsharma2022tist"></a>Arun Sharma and Shashi Shekhar. Analyzing trajectory gaps for possible rendezvous regions.
+    <span class="ptmri8t-">ACM Transactions on Intelligent Systems and Technology</span>, 2022.
+    </dd><dt>
+[39] </dt><dd><a id="Xturing1950computing"></a>A. M. Turing. Computing machinery and intelligence. <span class="ptmri8t-">Mind</span>, 59(236):433–460, 1950.
+    </dd><dt>
+[40] </dt><dd><a id="Xoord2018cpc"></a>Aaron van den Oord, Yazhe Li, and Oriol Vinyals.  Representation learning with contrastive
+    predictive coding, 2018.
+    </dd><dt>
+[41] </dt><dd><a id="Xvapnik1998statistical"></a>Vladimir N. Vapnik. <span class="ptmri8t-">Statistical Learning Theory</span>. Wiley, 1998.
+    </dd><dt>
+[42] </dt><dd><a id="Xvaswani2017attention"></a>Ashish Vaswani et al. Attention is all you need. In <span class="ptmri8t-">NeurIPS</span>, 2017.
+    </dd><dt>
+[43] </dt><dd><a id="Xyao2022cstrm"></a>Di Yao, Chao Zhang, Jianhui Huang, and Jingping Bi.   Cstrm: Contrastive self-supervised
+    trajectory   representation   model   for   trajectory   similarity   computation.         <span class="ptmri8t-">Computer
+    Communications</span>, 185:159–167, 2022.
+    </dd><dt>
+[44] </dt><dd><a id="Xyuan2010tdrive"></a>Jing Yuan, Yu Zheng, Xing Xie, and Guangzhong Sun.  T-drive: Driving directions based on
+    taxi trajectories. In <span class="ptmri8t-">GIS</span>, 2010.
+    </dd><dt>
+[45] </dt><dd><a id="Xzheng2015trajectory"></a>Yu Zheng and Xiaofang Zhou, editors. <span class="ptmri8t-">Computing with Spatial Trajectories</span>. Springer, 2011.
+    </dd><dt>
+[46] </dt><dd><a id="Xzheng2010geolife"></a>Yu Zheng, Xing Xie, and Wei-Ying Ma.  Geolife: A collaborative social networking service
+    among user, location and trajectory. In <span class="ptmri8t-">IEEE Data Engineering Bulletin</span>, 2010.
+    </dd></dl></section>
+ 
+
+  </article>
+
+  <section class="bibtex-block" id="bibtex">
+    <h2>BibTeX</h2>
+    <button class="copy-bib" type="button" data-target="bibtex-code">Copy</button>
+    <pre><code id="bibtex-code">@misc{sharma2026trajprompt,
+  title        = {TrajPrompt: Open-Vocabulary Maritime Behavior Search with Trajectory Contrastive Learning, TGARD, and Satellite Confirmation},
+  author       = {Arun Sharma},
+  year         = {2026},
+  note         = {Project page / preprint},
+  howpublished = {\url{https://arunshar.github.io/cv-portfolio/projects/trajprompt/}}
+}</code></pre>
+  </section>
+
+  <footer class="paper-footer">
+    <p>Project page for "TrajPrompt: Open-Vocabulary Maritime Behavior Search with Trajectory Contrastive Learning, TGARD, and Satellite Confirmation", rendered from the LaTeX source. <a href="../../index.html">Back to homepage</a>.</p>
+  </footer>
+</div>
+<script src="../../assets/paper.js"></script>
+</body>
+</html>

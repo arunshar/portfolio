@@ -1,0 +1,1450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pin Infrastructure Service: A Constraint-First Microservice for Autonomous Ride-Hail Pickup and Drop-Off Selection - Arun Sharma</title>
+<meta name="description" content="Production gRPC service for map-constrained pickup and drop-off pin selection in autonomous ride-hail.">
+<link rel="stylesheet" href="paper.gen.css">
+<link rel="stylesheet" href="../../assets/paper.css">
+<script>window.MathJax = { tex: { tags: "ams" } };</script>
+<script async id="MathJax-script" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js"></script>
+</head>
+<body class="project-page">
+<div class="wrap">
+  <nav class="topnav"><a href="../../index.html">Arun Sharma</a> <span aria-hidden="true">/</span> <a href="../../index.html#projects">Selected Projects</a></nav>
+
+  <header class="paper-header">
+    <h1>Pin Infrastructure Service: A Constraint-First Microservice for Autonomous Ride-Hail Pickup and Drop-Off Selection</h1>
+    <p class="authors">Arun Sharma</p>
+    <p class="affiliation">University of Minnesota, Twin Cities</p>
+    <p class="venue">Systems preprint</p>
+    <div class="buttons"><a class="btn" href="../../assets/papers/pin-service.pdf">Paper (PDF)</a>
+      <a class="btn" href="https://github.com/arunshar/pin-service" target="_blank" rel="noopener">Code</a>
+      <a class="btn" href="https://huggingface.co/spaces/Arun0808/pin-service" target="_blank" rel="noopener">Demo</a>
+      <a class="btn" href="paper.md">Markdown</a>
+      <a class="btn" href="#bibtex">BibTeX</a></div>
+  </header>
+
+  <figure class="teaser">
+    <img src="figures/main-893a66f6155a0e0e70fd34efa309250f.svg" alt="Pin Infrastructure Service: A Constraint-First Microservice for Autonomous Ride-Hail Pickup and Drop-Off Selection overview" loading="lazy">
+  </figure>
+
+  <nav class="toc" aria-label="Contents">
+    <h2>Contents</h2>
+    <ol>
+      <li><a href="#introduction">Introduction</a></li>
+      <li><a href="#related-work">Related Work</a></li>
+      <li><a href="#method-and-architecture">Method and Architecture</a></li>
+      <li><a href="#evaluation">Evaluation</a></li>
+      <li><a href="#discussion-and-limitations">Discussion and Limitations</a></li>
+      <li><a href="#conclusion-and-outlook">Conclusion and Outlook</a></li>
+      <li><a href="#references">References</a></li>
+    </ol>
+  </nav>
+
+  <article class="paper-body">
+<section class="abstract" role="doc-abstract"> 
+
+<div class="centerline">                                  <span class="ptmb8t-x-x-120">Abstract</span>                                  </div>
+     <blockquote class="quote">
+     <!-- l. 254 --><p class="noindent">Autonomous ride-hail systems cannot assign pickup and drop-off locations by choosing
+     the nearest latitude-longitude point to the rider. A usable pin must be legally stoppable,
+     reachable  by  the  vehicle,  walkable  for  the  rider,  and  robust  under  crowd  pressure.
+     The  Pin  Infrastructure  Service  is  a  reference  implementation  of  this  serving  path:
+     H3 candidate generation, HD-map hard-constraint filtering, machine-learning scoring,
+     congestion-aware  reranking,  load  shedding,  gRPC  serving,  Prometheus  metrics,  and
+     OpenTelemetry tracing. This paper documents the repository as an arXiv-style systems
+     paper.  It  emphasizes  the  core  invariant  that  machine  learning  ranks  only  feasible
+     candidates  and  never  overrides  hard  constraints.  The  implementation  evidence  is
+     software-grounded:  unit  tests  cover  candidate  generation,  constraint  filtering,  scorer
+     behavior, and congestion control; load testing and production latency are handled by
+     the serving benchmark protocol.
+</p>
+     </blockquote>
+</section>
+
+<h2 class="sectionHead" id="introduction"><span class="titlemark">1    </span>    <a id="x1-10001"></a>Introduction</h2>
+<!-- l. 259 --><p class="noindent">Pickup and drop-off (PUDO) selection is a small interface with large system consequences. In
+a human-driven service, a driver may improvise around an awkward pin. In an autonomous
+fleet, the selected point must be compatible with maps, driving policy, rider walking distance,
+curb legality, congestion, and service-level objectives. A naive nearest-point rule creates unsafe
+stops, rider confusion, and hotspots near stadiums, airports, schools, and transit hubs.
+</p><!-- l. 261 --><p class="noindent">The Pin Infrastructure Service is a minimal but realistic microservice for this problem. It exposes a
+gRPC <span class="pcrr8t-">SelectPin </span>endpoint. The handler generates candidate curb cells around the rider,
+filters candidates through HD-map constraints, scores feasible candidates with an offline-trained
+gradient-boosted model, penalizes congested cells, records the assignment, and returns a traceable
+response. The service also exports Prometheus metrics and OpenTelemetry spans.
+</p><!-- l. 263 --><p class="noindent">This paper turns the project into a paper artifact. It avoids claiming fleet-scale performance. Instead it
+specifies the system contract and identifies the validation needed for a full systems paper.
+
+</p>
+<!-- l. 265 --><p class="noindent"><span class="paragraphHead" id="contributions"> <a id="x1-2000"></a><span class="ptmb8t-">Contributions:</span></span>
+     </p><dl class="enumerate-enumitem"><dt class="enumerate-enumitem">
+  1. </dt><dd class="enumerate-enumitem">A  constraint-first  PUDO  serving  architecture  where  ML  scoring  is  downstream  of  hard
+     feasibility checks.
+     </dd><dt class="enumerate-enumitem">
+  2. </dt><dd class="enumerate-enumitem">A deterministic H3 candidate generation path that is stable under repeated requests and load
+     tests.
+     </dd><dt class="enumerate-enumitem">
+  3. </dt><dd class="enumerate-enumitem">A  congestion-aware  reranking  layer  with  sliding-window  assignment  counts  and  load
+     shedding.
+     </dd><dt class="enumerate-enumitem">
+  4. </dt><dd class="enumerate-enumitem">A  reproducible  microservice  implementation  with  gRPC,  observability,  Docker  compose,
+     load-test hooks, and unit tests.</dd></dl>
+<figure class="figure"> 
+
+                                                                            
+                                                                            
+                                                                            
+                                                                            
+<!-- l. 279 --><p class="noindent" id="detailed-pinservice-architecture-the-figure-makes-the-system-invariant-explicit-hard-map-constraints-produce-the-feasible-set-before-the-scorer-runs-the-serving-decoder-exposes-fallback-load-shedding-and-trace-outputs-while-the-evaluation-heads-target-violation-rate-rider-burden-tail-latency-and-degradation-behavior"><img alt="Figure" src="figures/main-893a66f6155a0e0e70fd34efa309250f.svg" loading="lazy">
+<a id="x1-2005r1"></a>
+</p>
+<figcaption class="caption"><span class="id">Figure 1: </span><span class="content">Detailed Pin-Service architecture. The figure makes the system invariant explicit: hard
+map  constraints  produce  the  feasible  set  before  the  scorer  runs.  The  serving  decoder  exposes
+fallback, load shedding, and trace outputs, while the evaluation heads target violation rate, rider
+burden, tail latency, and degradation behavior.
+</span></figcaption><!-- tex4ht:label?: x1-2005r1  -->
+                                                                            
+                                                                            
+</figure>
+
+<!-- l. 342 --><p class="noindent"><span class="paragraphHead" id="scope"> <a id="x1-3000"></a><span class="ptmb8t-">Scope:</span></span>
+Pickup and drop-off selection looks like a small ranking problem until it is placed inside an autonomous fleet. A
+human driver can negotiate an awkward location, infer a better curb, or call the rider. An autonomous
+service needs the pin selection system to encode safety, legality, rider access, vehicle reachability, and
+operational load before the vehicle arrives. That turns a point-selection feature into infrastructure.
+</p><!-- l. 346 --><p class="noindent">The main research claim of this project is not that gradient boosting is novel, nor that H3 is novel, nor that
+gRPC is novel. The claim is architectural: feasibility must precede preference. A machine-learning model
+can be useful for ranking candidate pins, but it should not be able to override hard constraints.
+This is a practical systems principle that applies beyond ride hail: in safety-adjacent spatial
+services, learned scoring belongs downstream of map policy and upstream of observability.
+</p><!-- l. 348 --><p class="noindent">The paper also frames PUDO as an online coupled decision problem. During normal traffic, requests
+can be handled independently. During venue surges, school pickup, or airport congestion, one
+assignment changes the quality of nearby future assignments. The congestion penalty in the
+current repository is a small approximation to this coupling. It is intentionally simple, but it
+creates a path from a stateless nearest-point baseline to an operationally aware service.
+</p><!-- l. 350 --><p class="noindent">The expanded paper therefore reads as a systems paper. It includes the constrained
+ranking formulation, spatial indexing background, observability requirements, load
+testing plan, failure injection protocol, implementation-grounded results, and reader
+questions. These are the ingredients needed for a credible infrastructure paper.
+
+</p>
+<!-- l. 352 --><p class="noindent"><span class="paragraphHead" id="expanded-contributions"> <a id="x1-4000"></a><span class="ptmb8t-">Expanded  contributions:</span></span>
+Beyond the code artifact, the paper contributes a feasibility-first decision model, a staged evaluation
+protocol, a map-policy extension plan, and an explicit distinction between hard constraints,
+soft preferences, and telemetry. This distinction is the conceptual core of the project.
+
+</p>
+<h2 class="sectionHead" id="related-work"><span class="titlemark">2    </span>    <a id="x1-50002"></a>Related  Work</h2>
+
+<!-- l. 357 --><p class="noindent"><span class="paragraphHead" id="expanded-citation-map"> <a id="x1-6000"></a><span class="ptmb8t-">Expanded  Citation  Map:</span></span>
+The expanded references position Pin-Service between map matching, spatial indexing, mobility-on-demand,
+learning-to-rank, and production observability. HMM map matching, travel-time constrained matching,
+map-matching surveys, R-trees, R*-trees, H3, OSMnx, and OpenStreetMap anchor the geospatial substrate
+[<a href="#Xbeckmann1990rstar">2</a>, <a href="#Xboeing2017osmnx">4</a>, <a href="#Xbrakatsoulas2005mapmatching">6</a>, <a href="#Xguttman1984rtree">18</a>, <a href="#Xhaklay2008osm">19</a>, <a href="#Xkrumm2004travel">23</a>, <a href="#Xnewson2009hidden">29</a>, <a href="#Xh3">44</a>]. Dijkstra, A*, pickup-and-delivery, vehicle routing, dynamic ride-sharing,
+shareability networks, and robotic mobility-on-demand define the operational decision problem
+[<a href="#Xalonso2017ridesharing">1</a>, <a href="#Xdantzig1959truck">12</a>, <a href="#Xdijkstra1959">14</a>, <a href="#Xhart1968astar">20</a>, <a href="#Xlaporte2009fifty">24</a>, <a href="#Xzhang2016tshare">27</a>, <a href="#Xpavone2012robotic">32</a>, <a href="#Xsanti2014quantifying">38</a>, <a href="#Xsavelsbergh1995vehicle">39</a>, <a href="#Xspieser2014toward">42</a>]. Gradient boosting, XGBoost, LambdaMART, congestion
+pricing, surge-pricing analysis, PostGIS, OSRM, gRPC, OpenTelemetry, Prometheus, tail latency, and
+Dapper motivate the serving and observability boundary [<a href="#Xburges2010ranknet">8</a>–<a href="#Xchen2016xgboost">10</a>, <a href="#Xdean2013tail">13</a>, <a href="#Xfriedman2001greedy">15</a>, <a href="#Xgrpc">17</a>, <a href="#Xluxen2011osrm">26</a>, <a href="#Xopentelemetry">31</a>, <a href="#Xpostgis">34</a>, <a href="#Xprometheus">35</a>, <a href="#Xsigelman2010dapper">41</a>, <a href="#Xvickrey1969congestion">46</a>].
+</p><!-- l. 361 --><p class="noindent">The PUDO problem can be framed as constrained ranking. Given rider location
+<span class="mathjax-inline">\(r\)</span>, request context <span class="mathjax-inline">\(c\)</span>, and map state <span class="mathjax-inline">\(M\)</span>, we need a selected pin <span class="mathjax-inline">\(p^*\)</span>: </p><div class="mathjax-env mathjax-equation">\begin{equation} p^* = \arg \max _{p\in \mathcal {P}(r)} S(p,r,c) \quad \text {s.t.}\quad C_k(p,M,c)=1\ \forall k. \end{equation}</div>
+<p><a id="x1-6001r1"></a>
+<!-- l. 366 --></p><p class="noindent">The design principle is that the constraint indicator is evaluated before the score.
+A high predicted satisfaction score cannot legalize an illegal stop.
+</p><!-- l. 368 --><p class="noindent">The service optimizes for four properties: </p>
+     <ul class="itemize1">
+     <li class="itemize"><span class="ptmb8t-">Safety</span>: hard map constraints are not model suggestions.
+     </li>
+     <li class="itemize"><span class="ptmb8t-">Determinism</span>: the candidate set is reproducible for a fixed request.
+                                                                            
+                                                                            
+     </li>
+     <li class="itemize"><span class="ptmb8t-">Operability</span>: metrics, traces, and load shedding are first-class.
+     </li>
+     <li class="itemize"><span class="ptmb8t-">Portability</span>: the Python implementation is a readable reference path that can later be ported
+     to C++ or ONNX Runtime.</li></ul>
+<!-- l. 376 --><p class="noindent">This design sits at the intersection of map matching, spatial indexing, spatial databases, and real-time
+service engineering. Hidden-Markov map matching formalizes how noisy GPS observations
+can be associated with road networks [<a href="#Xnewson2009hidden">29</a>]. R-trees and related spatial indexes make spatial
+search practical in databases [<a href="#Xguttman1984rtree">18</a>]. H3 provides a hierarchical hexagonal grid useful for stable
+spatial bucketing [<a href="#Xh3">44</a>]. OpenStreetMap demonstrates the value and complexity of crowd-built
+road network data [<a href="#Xhaklay2008osm">19</a>]. The Pin Infrastructure Service borrows these ideas for a narrower task:
+produce a feasible curbside candidate and return it through an observable serving path.
+
+</p>
+<!-- l. 380 --><p class="noindent"><span class="paragraphHead" id="literature-synthesis"> <a id="x1-7000"></a><span class="ptmb8t-">Literature  synthesis:</span></span>
+Pin-Service draws from routing, map matching, ride-hailing, spatial indexing, and online service reliability.
+Classical shortest-path and vehicle-routing work provides the optimization background for feasible
+pickup and dropoff assignment [<a href="#Xdantzig1959truck">12</a>, <a href="#Xdijkstra1959">14</a>, <a href="#Xhart1968astar">20</a>, <a href="#Xlaporte2009fifty">24</a>, <a href="#Xsavelsbergh1995vehicle">39</a>]. Map-matching and road-network tooling
+define how raw geographic points become candidates on a usable mobility graph [<a href="#Xboeing2017osmnx">4</a>, <a href="#Xbrakatsoulas2005mapmatching">6</a>, <a href="#Xluxen2011osrm">26</a>, <a href="#Xnewson2009hidden">29</a>].
+Spatial databases and indexes, including R-trees, H3, and PostGIS, give the serving system a way
+to search nearby candidates without scanning the entire map [<a href="#Xbeckmann1990rstar">2</a>, <a href="#Xguttman1984rtree">18</a>, <a href="#Xpostgis">34</a>, <a href="#Xh3">44</a>].
+</p><!-- l. 383 --><p class="noindent">Ride-hailing and fleet-management papers add the operational objective. The system must balance walking
+burden, driver routing, curb legality, congestion, surge, and fallback behavior [<a href="#Xalonso2017ridesharing">1</a>, <a href="#Xcastillo2017surge">9</a>, <a href="#Xzhang2016tshare">27</a>, <a href="#Xsanti2014quantifying">38</a>, <a href="#Xspieser2014toward">42</a>].
+This makes Pin-Service different from a generic ranking model. A learned scorer is useful
+only after hard constraints define what is legal, reachable, and policy-compliant. The paper
+therefore places machine learning downstream of a deterministic feasibility layer.
+</p><!-- l. 385 --><p class="noindent">The systems literature further motivates the observability design. Tail latency, distributed tracing, and
+metric cardinality matter because dispatch decisions happen inside a real-time service path
+[<a href="#Xdean2013tail">13</a>, <a href="#Xgrpc">17</a>, <a href="#Xopentelemetry">31</a>, <a href="#Xprometheus">35</a>, <a href="#Xsigelman2010dapper">41</a>]. A method that improves mean utility but fails under overload is not a
+deployable PUDO system. Pin-Service consequently evaluates constraint violation, walking distance,
+p95/p99 latency, fallback success, and trace completeness as one coupled serving problem.
+
+</p>
+<!-- l. 387 --><p class="noindent"><span class="paragraphHead" id="foundational-reference-anchors"> <a id="x1-8000"></a><span class="ptmb8t-">Foundational reference anchors:</span></span>
+The bibliography also anchors the project-specific contribution in older and broader technical
+foundations: statistical learning and pattern recognition, deep learning, information theory, convex
+and numerical optimization, stochastic approximation, adaptive gradient methods, causality,
+and early AI framing [<a href="#Xbishop2006pattern">3</a>, <a href="#Xboyd2004convex">5</a>, <a href="#Xbubeck2015convex">7</a>, <a href="#Xcover2006elements">11</a>, <a href="#Xgoodfellow2016deep">16</a>, <a href="#Xhastie2009elements">21</a>, <a href="#Xkingma2015adam">22</a>, <a href="#Xlecun1998gradient">25</a>, <a href="#Xmurphy2012machine">28</a>, <a href="#Xnocedal2006numerical">30</a>, <a href="#Xpearl2009causality">33</a>, <a href="#Xrobbins1951stochastic">36</a>, <a href="#Xrumelhart1986learning">37</a>, <a href="#Xshannon1948communication">40</a>, <a href="#Xturing1950computing">43</a>, <a href="#Xvapnik1998statistical">45</a>].
+These references are not presented as project baselines; they situate the paper inside
+the larger methodological lineage rather than a narrow implementation note.
+
+</p>
+<h2 class="sectionHead" id="method-and-architecture"><span class="titlemark">3    </span>    <a id="x1-90003"></a>Method and Architecture</h2>
+<!-- l. 392 --><p class="noindent">The  request  path  is:
+     </p><dl class="enumerate-enumitem"><dt class="enumerate-enumitem">
+  1. </dt><dd class="enumerate-enumitem">validate request and check global backpressure,
+     </dd><dt class="enumerate-enumitem">
+  2. </dt><dd class="enumerate-enumitem">generate H3 candidates around the rider,
+     </dd><dt class="enumerate-enumitem">
+  3. </dt><dd class="enumerate-enumitem">filter candidates through HD-map polygons,
+     </dd><dt class="enumerate-enumitem">
+  4. </dt><dd class="enumerate-enumitem">score feasible candidates,
+                                                                            
+                                                                            
+     </dd><dt class="enumerate-enumitem">
+  5. </dt><dd class="enumerate-enumitem">subtract congestion penalties,
+     </dd><dt class="enumerate-enumitem">
+  6. </dt><dd class="enumerate-enumitem">record the selected cell and return response metadata.</dd></dl>
+
+<!-- l. 402 --><p class="noindent"><span class="paragraphHead" id="candidate-generation"> <a id="x1-10000"></a><span class="ptmb8t-">Candidate  generation:</span></span>
+Candidate generation uses H3 cells [<a href="#Xh3">44</a>]. Let <span class="mathjax-inline">\(h(r)\)</span> be the H3 cell containing the
+rider at resolution <span class="mathjax-inline">\(\rho \)</span>. The candidate set is the sorted grid disk </p><div class="mathjax-env mathjax-equation">\begin{equation} \mathcal {P}(r)=\{ \text {center}(h) : h\in \text {grid\_disk}(h(r),k)\}. \end{equation}</div>
+<p><a id="x1-10001r2"></a>
+<!-- l. 408 --></p><p class="noindent">The repository default is resolution 11 and <span class="mathjax-inline">\(k=2\)</span>, yielding a small local neighborhood suitable for
+dense urban curb selection. Sorting cells makes outputs deterministic for a fixed input.
+
+</p>
+<!-- l. 410 --><p class="noindent"><span class="paragraphHead" id="hardconstraint-filter"> <a id="x1-11000"></a><span class="ptmb8t-">Hard-constraint  filter:</span></span>
+The current HD-map view is a Shapely fixture with a drivable polygon and no-stop zones. A
+candidate passes if it lies inside the drivable area and outside every no-stop zone: </p><div class="mathjax-env mathjax-equation">\begin{equation} C(p)=\mathbb {1}[p\in D]\prod _z \mathbb {1}[p\notin Z_z]. \end{equation}</div>
+<p><a id="x1-11001r3"></a>
+<!-- l. 416 --></p><p class="noindent">Production implementations would replace this fixture with lane-level map services,
+time-of-day restrictions, curb-side validity, event closures, and vehicle reachability.
+
+</p>
+<!-- l. 418 --><p class="noindent"><span class="paragraphHead" id="machinelearning-scoring"> <a id="x1-12000"></a><span class="ptmb8t-">Machine-learning scoring:</span></span>
+The scoring model is loaded lazily from a serialized <span class="pcrr8t-">joblib </span>file. The feature vector contains
+walking distance, hour of day, historical success for the H3 cell, and local supply. The reference
+implementation uses a gradient-boosted regressor, following a long line of tree ensemble
+methods for tabular prediction [<a href="#Xfriedman2001greedy">15</a>]. This model only ranks feasible candidates.
+
+</p>
+<!-- l. 422 --><p class="noindent"><span class="paragraphHead" id="congestionaware-reranking"> <a id="x1-13000"></a><span class="ptmb8t-">Congestion-aware reranking:</span></span>
+PUDO assignment is not independent across riders. If many requests arrive near the same venue, a locally
+optimal curb becomes globally harmful. The service maintains a sliding-window counter per
+H3 cell. If the count exceeds a threshold, a fixed penalty is subtracted from the score: </p><div class="mathjax-env mathjax-equation">\begin{equation} S'(p)=S(p)-\lambda \mathbb {1}[n_{\text {window}}(h(p))&gt;\tau ]. \end{equation}</div>
+<p><a id="x1-13001r4"></a>
+<!-- l. 428 --></p><p class="noindent">A global cap triggers load shedding before expensive work begins. This makes backpressure
+explicit rather than allowing queueing latency to silently degrade.
+
+</p>
+<!-- l. 430 --><p class="noindent"><span class="paragraphHead" id="serving-and-observability"> <a id="x1-14000"></a><span class="ptmb8t-">Serving and Observability:</span></span>
+The service is implemented as a gRPC server with thread-pool workers [<a href="#Xgrpc">17</a>]. Each major
+stage runs inside an OpenTelemetry span [<a href="#Xopentelemetry">31</a>]; counters and histograms are exported
+through Prometheus [<a href="#Xprometheus">35</a>]. The response includes the selected pin, score, estimated walking
+distance, ETA baseline, candidate counts, server latency, and trace identifier.
+</p><!-- l. 434 --><p class="noindent">This observability design is part of the method. It gives operators a way to determine whether
+failures came from map constraints, scoring, congestion, model loading, or overload.
+
+</p>
+<h2 class="sectionHead" id="evaluation"><span class="titlemark">4    </span>    <a id="x1-150004"></a>Evaluation</h2>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 438 --><p class="noindent"></p><figure class="float" id="x1-15001r1"><span id="implementation-validation-in-pin-infrastructure-service"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 1: </span><span class="content">Implementation validation in Pin Infrastructure Service.                          </span></figcaption><!-- tex4ht:label?: x1-15001r1  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-2"><colgroup id="TBL-2-1g"><col id="TBL-2-1"><col id="TBL-2-2"><col id="TBL-2-3"></colgroup><tr id="TBL-2-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-2-1-1" style="white-space:normal; text-align:left;"><!-- l. 444 --><p class="noindent"><span class="ptmb8t-">Area</span>                                </p></td><td class="td11" id="TBL-2-1-2" style="white-space:normal; text-align:left;"> <!-- l. 444 --><p class="noindent"><span class="ptmb8t-">What is checked</span>                                                               </p></td><td class="td10" id="TBL-2-1-3" style="white-space:normal; text-align:left;"> <!-- l. 444 --><p class="noindent"><span class="ptmb8t-">Count</span>            </p></td>
+</tr><tr id="TBL-2-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-2-2-1" style="white-space:normal; text-align:left;"><!-- l. 446 --><p class="noindent">Candidate generation       </p></td><td class="td11" id="TBL-2-2-2" style="white-space:normal; text-align:left;"> <!-- l. 446 --><p class="noindent">deterministic      H3      candidate      construction      and
+  neighborhood behavior                                                      </p></td><td class="td10" id="TBL-2-2-3" style="white-space:normal; text-align:left;"> <!-- l. 446 --><p class="noindent">tests               </p></td>
+</tr><tr id="TBL-2-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-2-3-1" style="white-space:normal; text-align:left;"><!-- l. 447 --><p class="noindent">Constraints                       </p></td><td class="td11" id="TBL-2-3-2" style="white-space:normal; text-align:left;"> <!-- l. 447 --><p class="noindent">polygon inclusion and no-stop exclusion on the fixture
+  map                                                                                     </p></td><td class="td10" id="TBL-2-3-3" style="white-space:normal; text-align:left;"> <!-- l. 447 --><p class="noindent">tests               </p></td>
+</tr><tr id="TBL-2-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-2-4-1" style="white-space:normal; text-align:left;"><!-- l. 448 --><p class="noindent">Scoring                             </p></td><td class="td11" id="TBL-2-4-2" style="white-space:normal; text-align:left;"> <!-- l. 448 --><p class="noindent">feature extraction and model-backed ranking behavior     </p></td><td class="td10" id="TBL-2-4-3" style="white-space:normal; text-align:left;"> <!-- l. 448 --><p class="noindent">tests               </p></td>
+</tr><tr id="TBL-2-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-2-5-1" style="white-space:normal; text-align:left;"><!-- l. 449 --><p class="noindent">Congestion                       </p></td><td class="td11" id="TBL-2-5-2" style="white-space:normal; text-align:left;"> <!-- l. 449 --><p class="noindent">penalty     application,     assignment     recording,     and
+  load-shed signal                                                                 </p></td><td class="td10" id="TBL-2-5-3" style="white-space:normal; text-align:left;"> <!-- l. 449 --><p class="noindent">tests               </p></td>
+
+</tr></table>                                                             </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+<!-- l. 454 --><p class="noindent">The next empirical layer should run Locust against the gRPC endpoint and report throughput,
+p50/p95/p99 latency, feasible-candidate rate, score distribution, congestion penalty
+activation, load-shed rate, and trace completeness. A realistic paper should also compare
+nearest-point, score-only, constraint-first, and constraint-plus-congestion variants.
+
+</p>
+<!-- l. 456 --><p class="noindent"><span class="paragraphHead" id="theory-constraintfirst-ranking"> <a id="x1-16000"></a><span class="ptmb8t-">Theory: Constraint-First Ranking:</span></span>
+The central theoretical choice is to separate feasibility from desirability. A pin can be desirable but infeasible: it
+may be close to the rider, historically successful, and uncongested, while still lying in a no-stop zone. Conversely,
+a feasible pin may be less desirable but safe. The service therefore optimizes a lexicographic objective: </p><div class="mathjax-env mathjax-equation">\begin{equation} p^* = \arg \max _{p\in \mathcal {P}} \left (C(p), S(p)\right ), \end{equation}</div>
+<p><a id="x1-16001r5"></a>
+<!-- l. 462 --></p><p class="noindent">where <span class="mathjax-inline">\(C(p)\in \{0,1\}\)</span> is hard feasibility and <span class="mathjax-inline">\(S(p)\)</span> is a learned or hand-built score. Lexicographic ordering means no infeasible
+candidate can outrank a feasible one, regardless of score. In implementation, this is simpler: filter first, then score.
+
+</p>
+<!-- l. 464 --><p class="noindent"><span class="paragraphHead" id="candidateset-completeness"> <a id="x1-17000"></a><span class="ptmb8t-">Candidate-set completeness:</span></span>
+The service can only choose pins in <span class="mathjax-inline">\(\mathcal {P}(r)\)</span>. Candidate generation is therefore a recall problem. If the
+H3 disk is too small, the best curb point may be absent. If it is too large, scoring and filtering
+cost increase and the model may return a pin that is walkable in geometry but undesirable in
+practice. Candidate recall should be evaluated against a dense curb inventory: </p><div class="mathjax-env mathjax-equation">\begin{equation} \text {candidate recall}=\frac {|\mathcal {P}(r)\cap \mathcal {P}_{\text {valid}}(r)|}{|\mathcal {P}_{\text {valid}}(r)|}. \end{equation}</div>
+<p><a id="x1-17001r6"></a>
+<!-- l. 470 --></p><p class="noindent">The repository uses H3 centers as a compact reference path. A production system would
+likely generate candidates from lane or curb segments and use H3 only as an index.
+
+</p>
+<!-- l. 472 --><p class="noindent"><span class="paragraphHead" id="hard-constraints-as-safety-invariants"> <a id="x1-18000"></a><span class="ptmb8t-">Hard constraints as safety invariants:</span></span>
+Hard constraints should be deterministic, versioned, and testable. They may include
+stopping legality, vehicle reachability, rider walking access, curb side, school or emergency
+zones, event closures, and time-of-day restrictions. The map fixture in the repository
+models only drivable and no-stop polygons, but the architecture generalizes: </p><div class="mathjax-env mathjax-equation">\begin{equation} C(p,M,c)=\prod _{k=1}^{K}C_k(p,M,c). \end{equation}</div>
+<p><a id="x1-18001r7"></a>
+<!-- l. 478 --></p><p class="noindent">The product form makes the invariant explicit: any failed constraint rejects the candidate.
+
+</p>
+<!-- l. 480 --><p class="noindent"><span class="paragraphHead" id="scoring-as-preference-not-permission"> <a id="x1-19000"></a><span class="ptmb8t-">Scoring as preference, not permission:</span></span>
+The ML model estimates preference among feasible candidates. Features such as walking distance,
+historical success, local supply, and hour of day are useful, but they should not override map
+policy. This is the main engineering lesson of the project. It is safer to deploy a mediocre
+scorer behind correct constraints than a strong scorer that can legalize invalid stops.
+
+</p>
+<!-- l. 484 --><p class="noindent"><span class="paragraphHead" id="congestion-as-a-coupling-term"> <a id="x1-20000"></a><span class="ptmb8t-">Congestion as a coupling term:</span></span>
+If requests are independent, each can be optimized locally. PUDO is not independent
+under crowding. Repeatedly assigning the same cell increases dwell, confusion, and
+curb blockage. The congestion penalty approximates a coupling term: </p><div class="mathjax-env mathjax-equation">\begin{equation} \max _{\{p_j\}}\sum _j S(p_j,r_j,c_j)-\lambda \sum _h \max (0,n_h-\tau ), \end{equation}</div>
+<p><a id="x1-20001r8"></a>
+<!-- l. 490 --></p><p class="noindent">where <span class="mathjax-inline">\(n_h\)</span> is the number of assignments to cell <span class="mathjax-inline">\(h\)</span>. The repository implements a greedy online version. A full
+paper could compare greedy penalties against batch assignment or min-cost flow for high-volume venues.
+
+                                                                            
+                                                                            
+</p>
+<!-- l. 492 --><p class="noindent"><span class="paragraphHead" id="additional-literature-context"> <a id="x1-21000"></a><span class="ptmb8t-">Additional Literature Context:</span></span>
+
+</p>
+<!-- l. 494 --><p class="noindent"><span class="paragraphHead" id="map-matching-and-roadnetwork-inference"> <a id="x1-22000"></a><span class="ptmb8t-">Map matching and road-network inference:</span></span>
+Map matching uses road-network constraints to explain noisy location observations. Newson and
+Krumm’s HMM formulation remains a clear reference because it decomposes the problem into
+emission and transition probabilities [<a href="#Xnewson2009hidden">29</a>]. PUDO selection is not map matching, but it shares the
+principle that raw coordinates must be interpreted through a network and constraints.
+
+</p>
+<!-- l. 498 --><p class="noindent"><span class="paragraphHead" id="spatial-indexing"> <a id="x1-23000"></a><span class="ptmb8t-">Spatial  indexing:</span></span>
+Spatial indexes such as R-trees provide efficient window and nearest-neighbor search for geometric
+objects [<a href="#Xguttman1984rtree">18</a>]. H3 provides a hierarchical discrete global grid with stable cell identifiers [<a href="#Xh3">44</a>].
+In the service, H3 gives deterministic local neighborhoods and congestion keys. R-tree-like
+structures would be more appropriate for querying curb polygons and no-stop zones at scale.
+
+</p>
+<!-- l. 502 --><p class="noindent"><span class="paragraphHead" id="open-map-data"> <a id="x1-24000"></a><span class="ptmb8t-">Open  map  data:</span></span>
+OpenStreetMap is a major source of road-network and place data, but it is heterogeneous and
+community-maintained [<a href="#Xhaklay2008osm">19</a>]. An autonomous ride-hail system cannot blindly trust arbitrary map tags. It needs a
+policy layer that converts map evidence into operational constraints, with versioning and auditability. The
+repository fixture is intentionally small, but the paper should position it as a baseline for HD-map policy services.
+
+</p>
+<!-- l. 506 --><p class="noindent"><span class="paragraphHead" id="online-service-observability"> <a id="x1-25000"></a><span class="ptmb8t-">Online service observability:</span></span>
+gRPC, Prometheus, and OpenTelemetry are not research contributions by themselves [<a href="#Xgrpc">17</a>, <a href="#Xopentelemetry">31</a>, <a href="#Xprometheus">35</a>]. They matter
+because PUDO selection is a serving problem. A model that works offline but has unbounded latency or no
+traceability is not operationally meaningful. The paper should treat observability as part of the system design.
+
+</p>
+<!-- l. 510 --><p class="noindent"><span class="paragraphHead" id="servicelevel-objectives"> <a id="x1-26000"></a><span class="ptmb8t-">Service-Level  Objectives:</span></span>
+A production service should define SLOs before model evaluation: </p>
+     <ul class="itemize1">
+     <li class="itemize">p99 latency under normal traffic,
+     </li>
+     <li class="itemize">max load-shed rate under surge,
+     </li>
+     <li class="itemize">minimum feasible-candidate rate,
+     </li>
+     <li class="itemize">maximum no-stop violation rate in offline replay,
+     </li>
+     <li class="itemize">trace completeness rate,
+     </li>
+     <li class="itemize">model fallback success rate.</li></ul>
+<!-- l. 521 --><p class="noindent">These metrics prevent a common systems failure: optimizing offline prediction quality while ignoring serving
+constraints. For autonomous fleets, a slow or unobservable correct answer may still be unacceptable.
+                                                                            
+                                                                            
+
+</p>
+<!-- l. 523 --><p class="noindent"><span class="paragraphHead" id="evaluation-protocol"> <a id="x1-27000"></a><span class="ptmb8t-">Evaluation  Protocol:</span></span>
+</p>
+<figure class="figure"> 
+
+                                                                            
+                                                                            
+                                                                            
+                                                                            
+<!-- l. 527 --><p class="noindent" id="evaluation-structure-for-pinservice-replay-quality-and-serving-behavior-are-separated-so-safety-rider-burden-tail-latency-and-fallback-behavior-are-visible"> <img alt="Figure" src="figures/main-090472efc075d23db7631cea69237808.svg" loading="lazy">
+<a id="x1-27001r2"></a>
+</p>
+<figcaption class="caption"><span class="id">Figure 2: </span><span class="content">Evaluation structure for Pin-Service: replay quality and serving behavior are separated so
+safety, rider burden, tail latency, and fallback behavior are visible.                          </span></figcaption><!-- tex4ht:label?: x1-27001r2  -->
+                                                                            
+                                                                            
+</figure>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 543 --><p class="noindent"></p><figure class="float" id="x1-27002r2"><span id="recommended-evaluation-protocol-for-pin-infrastructure-service"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 2: </span><span class="content">Recommended evaluation protocol for Pin Infrastructure Service.                   </span></figcaption><!-- tex4ht:label?: x1-27002r2  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-3"><colgroup id="TBL-3-1g"><col id="TBL-3-1"><col id="TBL-3-2"><col id="TBL-3-3"></colgroup><tr id="TBL-3-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-3-1-1" style="white-space:normal; text-align:left;"><!-- l. 549 --><p class="noindent"><span class="ptmb8t-">Axis</span>                               </p></td><td class="td11" id="TBL-3-1-2" style="white-space:normal; text-align:left;"> <!-- l. 549 --><p class="noindent"><span class="ptmb8t-">Metrics</span>                                        </p></td><td class="td10" id="TBL-3-1-3" style="white-space:normal; text-align:left;"> <!-- l. 549 --><p class="noindent"><span class="ptmb8t-">Question</span>                                  </p></td>
+</tr><tr id="TBL-3-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-3-2-1" style="white-space:normal; text-align:left;"><!-- l. 551 --><p class="noindent">Candidate generation      </p></td><td class="td11" id="TBL-3-2-2" style="white-space:normal; text-align:left;"> <!-- l. 551 --><p class="noindent">recall   against   curb   inventory,
+  candidate count                            </p></td><td class="td10" id="TBL-3-2-3" style="white-space:normal; text-align:left;"> <!-- l. 551 --><p class="noindent">does  the  search  include  good
+  pins?                                         </p></td>
+</tr><tr id="TBL-3-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-3-3-1" style="white-space:normal; text-align:left;"><!-- l. 552 --><p class="noindent">Constraint filtering          </p></td><td class="td11" id="TBL-3-3-2" style="white-space:normal; text-align:left;"> <!-- l. 552 --><p class="noindent">violation   rate,   false   rejection
+  rate                                               </p></td><td class="td10" id="TBL-3-3-3" style="white-space:normal; text-align:left;"> <!-- l. 552 --><p class="noindent">are    safety    rules    enforced
+  correctly?                                 </p></td>
+</tr><tr id="TBL-3-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-3-4-1" style="white-space:normal; text-align:left;"><!-- l. 553 --><p class="noindent">Scoring                            </p></td><td class="td11" id="TBL-3-4-2" style="white-space:normal; text-align:left;"> <!-- l. 553 --><p class="noindent">offline        NDCG,        success
+  prediction error                            </p></td><td class="td10" id="TBL-3-4-3" style="white-space:normal; text-align:left;"> <!-- l. 553 --><p class="noindent">does  ML  improve  preference
+  ranking?                                   </p></td>
+</tr><tr id="TBL-3-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-3-5-1" style="white-space:normal; text-align:left;"><!-- l. 554 --><p class="noindent">Congestion                      </p></td><td class="td11" id="TBL-3-5-2" style="white-space:normal; text-align:left;"> <!-- l. 554 --><p class="noindent">hotspot      count,      assignment
+  entropy, penalty activation           </p></td><td class="td10" id="TBL-3-5-3" style="white-space:normal; text-align:left;"> <!-- l. 554 --><p class="noindent">does        reranking        spread
+  demand?                                   </p></td>
+</tr><tr id="TBL-3-6-" style="vertical-align:baseline;"><td class="td01" id="TBL-3-6-1" style="white-space:normal; text-align:left;"><!-- l. 555 --><p class="noindent">Serving                            </p></td><td class="td11" id="TBL-3-6-2" style="white-space:normal; text-align:left;"> <!-- l. 555 --><p class="noindent">p50/p95/p99 latency, QPS, load
+  shed                                              </p></td><td class="td10" id="TBL-3-6-3" style="white-space:normal; text-align:left;"> <!-- l. 555 --><p class="noindent">can it operate under traffic?     </p></td>
+</tr><tr id="TBL-3-7-" style="vertical-align:baseline;"><td class="td01" id="TBL-3-7-1" style="white-space:normal; text-align:left;"><!-- l. 556 --><p class="noindent">Observability                  </p></td><td class="td11" id="TBL-3-7-2" style="white-space:normal; text-align:left;"> <!-- l. 556 --><p class="noindent">trace     completeness,     metric
+  cardinality, error attribution         </p></td><td class="td10" id="TBL-3-7-3" style="white-space:normal; text-align:left;"> <!-- l. 556 --><p class="noindent">can failures be debugged?        </p></td>
+
+</tr></table>                                                        </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+<!-- l. 561 --><p class="noindent">Offline evaluation should replay historical requests. Online-style evaluation should use synthetic demand around
+venues with known surge behavior. The most important ablation is not model A versus model B; it is nearest-point
+versus constraint-first versus constraint-first plus congestion. That ablation demonstrates the system thesis.
+
+</p>
+<!-- l. 563 --><p class="noindent"><span class="paragraphHead" id="data-and-simulation-plan"> <a id="x1-28000"></a><span class="ptmb8t-">Data and Simulation Plan:</span></span>
+A useful benchmark can be created without production ride-hail data:
+     </p><dl class="enumerate-enumitem"><dt class="enumerate-enumitem">
+  1. </dt><dd class="enumerate-enumitem">construct a road and curb fixture from public map data;
+     </dd><dt class="enumerate-enumitem">
+  2. </dt><dd class="enumerate-enumitem">annotate no-stop zones, crosswalks, school zones, and driveways;
+     </dd><dt class="enumerate-enumitem">
+  3. </dt><dd class="enumerate-enumitem">sample rider locations around venues, transit stops, and residential blocks;
+     </dd><dt class="enumerate-enumitem">
+  4. </dt><dd class="enumerate-enumitem">define simulated success probabilities based on walking distance and curb class;
+     </dd><dt class="enumerate-enumitem">
+  5. </dt><dd class="enumerate-enumitem">generate demand bursts to test congestion behavior;
+     </dd><dt class="enumerate-enumitem">
+  6. </dt><dd class="enumerate-enumitem">replay requests through each policy and measure violations and latency.</dd></dl>
+<!-- l. 574 --><p class="noindent">This would still be a simulation, but it would be more meaningful than unit tests alone and safe to publish.
+
+</p>
+<h2 class="sectionHead" id="discussion-and-limitations"><span class="titlemark">5    </span>    <a id="x1-290005"></a>Discussion and Limitations</h2>
+
+<!-- l. 578 --><p class="noindent"><span class="paragraphHead" id="nearest-feasible-is-not-safest"> <a id="x1-30000"></a><span class="ptmb8t-">Nearest feasible is not safest:</span></span>
+A feasible point can still be inconvenient or risky if it requires crossing a busy road.
+The current fixture does not model pedestrian routing. A full system should.
+
+</p>
+<!-- l. 581 --><p class="noindent"><span class="paragraphHead" id="map-staleness"> <a id="x1-31000"></a><span class="ptmb8t-">Map  staleness:</span></span>
+Construction, events, weather, and temporary closures can invalidate map constraints.
+A deployed service needs map freshness and override channels.
+
+</p>
+<!-- l. 584 --><p class="noindent"><span class="paragraphHead" id="congestion-state-consistency"> <a id="x1-32000"></a><span class="ptmb8t-">Congestion state consistency:</span></span>
+The in-memory congestion dictionary is simple but not distributed. Multiple service
+replicas would need shared state or a consistent sharding strategy.
+
+</p>
+<!-- l. 587 --><p class="noindent"><span class="paragraphHead" id="metric-cardinality"> <a id="x1-33000"></a><span class="ptmb8t-">Metric  cardinality:</span></span>
+Spatial services can explode metric cardinality if every H3 cell becomes a
+label. The observability design should aggregate carefully.
+
+</p>
+<!-- l. 590 --><p class="noindent"><span class="paragraphHead" id="request-trace-schema"> <a id="x1-34000"></a><span class="ptmb8t-">Request  Trace  Schema:</span></span>
+Each response should be traceable with: </p>
+                                                                            
+                                                                            
+     <ul class="itemize1">
+     <li class="itemize">request id and trace id,
+     </li>
+     <li class="itemize">rider coordinate and H3 origin cell,
+     </li>
+     <li class="itemize">candidate count before and after filtering,
+     </li>
+     <li class="itemize">rejected constraint counts by reason,
+     </li>
+     <li class="itemize">model version and score range,
+     </li>
+     <li class="itemize">congestion penalty status,
+     </li>
+     <li class="itemize">selected pin and fallback status,
+     </li>
+     <li class="itemize">latency by stage.</li></ul>
+<!-- l. 603 --><p class="noindent">This schema turns a model prediction into an operable service artifact.
+
+</p>
+<!-- l. 605 --><p class="noindent"><span class="paragraphHead" id="claim-checklist"> <a id="x1-35000"></a><span class="ptmb8t-">Claim  Checklist:</span></span>
+This paper can claim a constraint-first service implementation, deterministic candidate generation,
+fixture-map filtering, model-backed ranking path, congestion penalties, gRPC serving, and
+observability hooks. It cannot yet claim production PUDO safety, autonomous-vehicle
+deployment readiness, fleet-scale latency, or real-world rider satisfaction gains.
+
+</p>
+<!-- l. 609 --><p class="noindent"><span class="paragraphHead" id="recommended-figures"> <a id="x1-36000"></a><span class="ptmb8t-">Recommended  Figures:</span></span>
+The final paper should include:
+     </p><dl class="enumerate-enumitem"><dt class="enumerate-enumitem">
+  1. </dt><dd class="enumerate-enumitem">request-path architecture diagram;
+     </dd><dt class="enumerate-enumitem">
+  2. </dt><dd class="enumerate-enumitem">map illustration of candidate generation and filtering;
+     </dd><dt class="enumerate-enumitem">
+  3. </dt><dd class="enumerate-enumitem">congestion reranking example under a venue surge;
+     </dd><dt class="enumerate-enumitem">
+  4. </dt><dd class="enumerate-enumitem">latency breakdown by stage;
+     </dd><dt class="enumerate-enumitem">
+  5. </dt><dd class="enumerate-enumitem">ablation table comparing nearest, score-only, constraint-first, and congestion-aware policies.</dd></dl>
+
+<!-- l. 620 --><p class="noindent"><span class="paragraphHead" id="mathematical-notes-on-feasibility"> <a id="x1-37000"></a><span class="ptmb8t-">Mathematical Notes on Feasibility:</span></span>
+The service can be viewed as a constrained decision system with a feasible region <span class="mathjax-inline">\(\mathcal {F}(r,c,M)\)</span>. Candidate
+generation approximates this region with a finite set, and filtering estimates membership: </p><div class="mathjax-env mathjax-equation">\begin{equation} \mathcal {F}=\{p\in \mathbb {R}^2:C_k(p,M,c)=1\ \forall k\}. \end{equation}</div>
+<p><a id="x1-37001r9"></a>
+<!-- l. 626 --></p><p class="noindent">The finite candidate set <span class="mathjax-inline">\(\mathcal {P}\)</span> should satisfy <span class="mathjax-inline">\(\mathcal {P}\cap \mathcal {F}\neq \emptyset \)</span> for ordinary requests. If it does not, the
+correct behavior is a fallback, not an unsafe prediction. A full paper should report the
+no-feasible-candidate rate and break it down by geography, time, and map version.
+
+                                                                            
+                                                                            
+</p>
+<!-- l. 628 --><p class="noindent"><span class="paragraphHead" id="constraint-conflict"> <a id="x1-38000"></a><span class="ptmb8t-">Constraint  conflict:</span></span>
+Constraints can conflict. A rider may be inside a pedestrian plaza; the nearest legal curb may be far; road
+closures may remove ordinary pickup zones. The service should expose the rejection reasons so that map
+operations can improve data. A black-box “no pin found” response is insufficient for an operational system.
+
+</p>
+<!-- l. 632 --><p class="noindent"><span class="paragraphHead" id="soft-constraints"> <a id="x1-39000"></a><span class="ptmb8t-">Soft  constraints:</span></span>
+Some constraints are soft preferences rather than hard safety rules. Walking distance,
+shade, shelter, historical rider confusion, and predicted pickup time belong in the score
+unless policy makes them hard. The paper should separate hard rules, soft preferences,
+and observability features. Mixing them is a common source of unsafe systems.
+
+</p>
+<!-- l. 636 --><p class="noindent"><span class="paragraphHead" id="load-testing-plan"> <a id="x1-40000"></a><span class="ptmb8t-">Load  Testing  Plan:</span></span>
+The service paper needs a load-testing section because latency is part of the
+product. A Locust or ghz-style benchmark should vary: </p>
+     <ul class="itemize1">
+     <li class="itemize">request rate,
+     </li>
+     <li class="itemize">number of concurrent clients,
+     </li>
+     <li class="itemize">H3 radius,
+     </li>
+     <li class="itemize">map polygon count,
+     </li>
+     <li class="itemize">model loading state,
+     </li>
+     <li class="itemize">congestion threshold,
+     </li>
+     <li class="itemize">worker count.</li></ul>
+<!-- l. 648 --><p class="noindent">For each run, report p50, p95, p99, error rate, load-shed rate, and stage-level latency. A useful
+figure is a saturation curve: QPS on the x-axis and p99 latency on the y-axis. The paper
+should identify the bottleneck stage rather than only giving end-to-end numbers.
+
+</p>
+<!-- l. 650 --><p class="noindent"><span class="paragraphHead" id="failure-injection"> <a id="x1-41000"></a><span class="ptmb8t-">Failure  injection:</span></span>
+Systems papers become stronger when they show behavior under failure. Suggested cases:
+     </p><dl class="enumerate-enumitem"><dt class="enumerate-enumitem">
+  1. </dt><dd class="enumerate-enumitem">missing model file, falling back to heuristic scorer;
+     </dd><dt class="enumerate-enumitem">
+  2. </dt><dd class="enumerate-enumitem">map fixture unavailable, returning a controlled error;
+     </dd><dt class="enumerate-enumitem">
+  3. </dt><dd class="enumerate-enumitem">congestion tracker saturated, activating load shedding;
+     </dd><dt class="enumerate-enumitem">
+  4. </dt><dd class="enumerate-enumitem">malformed gRPC payload, returning validation error;
+     </dd><dt class="enumerate-enumitem">
+  5. </dt><dd class="enumerate-enumitem">metrics exporter unavailable, continuing request serving.</dd></dl>
+                                                                            
+                                                                            
+<!-- l. 660 --><p class="noindent">These tests are more meaningful than another offline score metric because they evaluate deployability.
+
+</p>
+<!-- l. 662 --><p class="noindent"><span class="paragraphHead" id="offline-replay"> <a id="x1-42000"></a><span class="ptmb8t-">Offline  Replay:</span></span>
+If historical ride-hail requests are unavailable, a public simulation can still demonstrate the method. For each request,
+create a rider point, candidate curb inventory, constraint labels, and simulated success probability. Replay policies:
+     </p><dl class="enumerate-enumitem"><dt class="enumerate-enumitem">
+  1. </dt><dd class="enumerate-enumitem">nearest coordinate,
+     </dd><dt class="enumerate-enumitem">
+  2. </dt><dd class="enumerate-enumitem">nearest feasible coordinate,
+     </dd><dt class="enumerate-enumitem">
+  3. </dt><dd class="enumerate-enumitem">score-only model,
+     </dd><dt class="enumerate-enumitem">
+  4. </dt><dd class="enumerate-enumitem">constraint-first model,
+     </dd><dt class="enumerate-enumitem">
+  5. </dt><dd class="enumerate-enumitem">constraint-first plus congestion.</dd></dl>
+<!-- l. 672 --><p class="noindent">The expected result is that nearest coordinate has the lowest walking distance but highest violation rate,
+score-only improves preference but can violate constraints, and constraint-first variants eliminate hard
+violations. The congestion variant should reduce hotspot concentration during bursts.
+
+</p>
+<!-- l. 674 --><p class="noindent"><span class="paragraphHead" id="practical-map-policy"> <a id="x1-43000"></a><span class="ptmb8t-">Practical  Map  Policy:</span></span>
+A real PUDO service needs a map-policy layer. Example rules include: </p>
+     <ul class="itemize1">
+     <li class="itemize">no stopping in bus lanes during active hours,
+     </li>
+     <li class="itemize">avoid school zones during pickup and dropoff periods,
+     </li>
+     <li class="itemize">require curb-side alignment with vehicle approach direction,
+     </li>
+     <li class="itemize">avoid fire hydrants and crosswalk buffers,
+     </li>
+     <li class="itemize">prefer signed pickup zones near airports and venues,
+     </li>
+     <li class="itemize">demote pins requiring unsafe pedestrian crossing.</li></ul>
+<!-- l. 685 --><p class="noindent">The current fixture abstracts this into polygons. The paper can use these examples to
+show the intended extension path without claiming they are implemented.
+
+</p>
+<!-- l. 687 --><p class="noindent"><span class="paragraphHead" id="condensed-version-scope"> <a id="x1-44000"></a><span class="ptmb8t-">Condensed Version Scope:</span></span>
+For a 10 to 12 page version, keep the constraint-first argument, request path, feasibility
+equations, congestion penalty, observability design, and evaluation protocol. Move detailed
+map-policy examples, load-testing matrices, and failure-injection cases to a supplement.
+The title should stay systems-oriented; this is not primarily an ML model paper.
+
+</p>
+<!-- l. 691 --><p class="noindent"><span class="paragraphHead" id="stresstest-questions"> <a id="x1-45000"></a><span class="ptmb8t-">Stress-Test  Questions:</span></span>
+
+                                                                            
+                                                                            
+</p>
+<!-- l. 693 --><p class="noindent"><span class="paragraphHead" id="why-use-h3-instead-of-roadnetwork-candidates"> <a id="x1-46000"></a><span class="ptmb8t-">Why use H3 instead of road-network candidates?</span></span>
+H3 is a deterministic and easy-to-test candidate implementation. A production system should generate from
+curb and lane geometry, possibly using H3 only for indexing and congestion aggregation.
+
+</p>
+<!-- l. 696 --><p class="noindent"><span class="paragraphHead" id="why-is-ml-downstream-of-constraints"> <a id="x1-47000"></a><span class="ptmb8t-">Why is ML downstream of constraints?</span></span>
+Because the model should rank feasible options, not decide legality. This is the core invariant of the service.
+
+</p>
+<!-- l. 699 --><p class="noindent"><span class="paragraphHead" id="what-evidence-is-missing"> <a id="x1-48000"></a><span class="ptmb8t-">What evidence is missing?</span></span>
+Load tests, replay experiments, a richer map fixture, and comparison against nearest and score-only baselines.
+
+</p>
+<!-- l. 702 --><p class="noindent"><span class="paragraphHead" id="implementation-results-and-evaluation-profile"> <a id="x1-49000"></a><span class="ptmb8t-">Implementation Results and Evaluation Profile:</span></span>
+
+</p>
+<!-- l. 704 --><p class="noindent"><span class="paragraphHead" id="result-a-current-code-checks"> <a id="x1-50000"></a><span class="ptmb8t-">Result A: current code checks:</span></span>
+In the current local run, the synthetic scorer was generated with <span class="pcrr8t-">scripts/train_model.py</span>
+under <span class="pcrr8t-">uv -extra dev</span>. The script wrote <span class="pcrr8t-">data/scorer.joblib </span>and reported train <span class="mathjax-inline">\(R^2=0.971\)</span> on its
+synthetic training distribution. After that, <span class="pcrr8t-">pytest -q </span>reported 20 passing tests. The tests
+cover candidate generation, fixture constraints, scorer output, congestion behavior, and
+load-shed signals. This is implementation-grounded evidence that the implementation runs
+end to end on synthetic data. It is not production latency or rider-satisfaction evidence.
+</p>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 708 --><p class="noindent"></p><figure class="float" id="x1-50001r3"><span id="implementationgrounded-result-for-pin-infrastructure-service"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 3: </span><span class="content">Implementation-grounded result for Pin Infrastructure Service.                     </span></figcaption><!-- tex4ht:label?: x1-50001r3  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-4"><colgroup id="TBL-4-1g"><col id="TBL-4-1"><col id="TBL-4-2"><col id="TBL-4-3"></colgroup><tr id="TBL-4-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-4-1-1" style="white-space:normal; text-align:left;"><!-- l. 713 --><p class="noindent"><span class="ptmb8t-">Check family</span>                       </p></td><td class="td11" id="TBL-4-1-2" style="white-space:normal; text-align:left;"> <!-- l. 713 --><p class="noindent"><span class="ptmb8t-">Interpretation</span>                                                             </p></td><td class="td10" id="TBL-4-1-3" style="white-space:normal; text-align:left;"> <!-- l. 713 --><p class="noindent"><span class="ptmb8t-">Observed</span>   </p></td>
+</tr><tr id="TBL-4-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-4-2-1" style="white-space:normal; text-align:left;"><!-- l. 715 --><p class="noindent">Synthetic scorer                    </p></td><td class="td11" id="TBL-4-2-2" style="white-space:normal; text-align:left;"> <!-- l. 715 --><p class="noindent">generated   local   <span class="pcrr8t-">scorer.joblib </span>for   testable
+  scoring path                                                                 </p></td><td class="td10" id="TBL-4-2-3" style="white-space:normal; text-align:left;"> <!-- l. 715 --><p class="noindent"><span class="mathjax-inline">\(R^2=0.971\)</span>        </p></td>
+</tr><tr id="TBL-4-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-4-3-1" style="white-space:normal; text-align:left;"><!-- l. 716 --><p class="noindent">Candidate and constraints     </p></td><td class="td11" id="TBL-4-3-2" style="white-space:normal; text-align:left;"> <!-- l. 716 --><p class="noindent">H3 generation and fixture-map filters behave in tests  </p></td><td class="td10" id="TBL-4-3-3" style="white-space:normal; text-align:left;"> <!-- l. 716 --><p class="noindent">passed        </p></td>
+</tr><tr id="TBL-4-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-4-4-1" style="white-space:normal; text-align:left;"><!-- l. 717 --><p class="noindent">Congestion                            </p></td><td class="td11" id="TBL-4-4-2" style="white-space:normal; text-align:left;"> <!-- l. 717 --><p class="noindent">penalties and load-shed signals execute on toy cases  </p></td><td class="td10" id="TBL-4-4-3" style="white-space:normal; text-align:left;"> <!-- l. 717 --><p class="noindent">passed        </p></td>
+</tr><tr id="TBL-4-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-4-5-1" style="white-space:normal; text-align:left;"><!-- l. 718 --><p class="noindent">Full local test suite                </p></td><td class="td11" id="TBL-4-5-2" style="white-space:normal; text-align:left;"> <!-- l. 718 --><p class="noindent">repository service tests after model generation           </p></td><td class="td10" id="TBL-4-5-3" style="white-space:normal; text-align:left;"> <!-- l. 718 --><p class="noindent">20 passed   </p></td>
+
+</tr></table>                                                        </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+
+<!-- l. 723 --><p class="noindent"><span class="paragraphHead" id="result-b-benchmark-signature"> <a id="x1-51000"></a><span class="ptmb8t-">Result B: benchmark signature:</span></span>
+If the service design is correct, constraint-first policies should eliminate hard violations relative to
+nearest-point or score-only baselines. Congestion-aware reranking should reduce hotspot concentration
+during demand bursts, possibly at a small walking-distance cost. Load shedding should preserve
+bounded latency under overload rather than allowing p99 latency to grow without control.
+</p>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 727 --><p class="noindent"></p><figure class="float" id="x1-51001r4"><span id="expected-result-patterns-to-test-not-claimed-production-outcomes"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 4: </span><span class="content">Expected result patterns to test, not claimed production outcomes.                  </span></figcaption><!-- tex4ht:label?: x1-51001r4  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-5"><colgroup id="TBL-5-1g"><col id="TBL-5-1"><col id="TBL-5-2"><col id="TBL-5-3"></colgroup><tr id="TBL-5-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-5-1-1" style="white-space:normal; text-align:left;"><!-- l. 732 --><p class="noindent"><span class="ptmb8t-">Policy</span>                                </p></td><td class="td11" id="TBL-5-1-2" style="white-space:normal; text-align:left;"> <!-- l. 732 --><p class="noindent"><span class="ptmb8t-">Expected pattern if design works</span>    </p></td><td class="td10" id="TBL-5-1-3" style="white-space:normal; text-align:left;"> <!-- l. 732 --><p class="noindent"><span class="ptmb8t-">Diagnostic</span>                      </p></td>
+</tr><tr id="TBL-5-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-5-2-1" style="white-space:normal; text-align:left;"><!-- l. 734 --><p class="noindent">Nearest point                      </p></td><td class="td11" id="TBL-5-2-2" style="white-space:normal; text-align:left;"> <!-- l. 734 --><p class="noindent">low   walking   distance   but   high
+  violation risk                                      </p></td><td class="td10" id="TBL-5-2-3" style="white-space:normal; text-align:left;"> <!-- l. 734 --><p class="noindent">no-stop violation rate      </p></td>
+</tr><tr id="TBL-5-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-5-3-1" style="white-space:normal; text-align:left;"><!-- l. 735 --><p class="noindent">Score only                          </p></td><td class="td11" id="TBL-5-3-2" style="white-space:normal; text-align:left;"> <!-- l. 735 --><p class="noindent">better    preference    but    possible
+  infeasible pins                                    </p></td><td class="td10" id="TBL-5-3-3" style="white-space:normal; text-align:left;"> <!-- l. 735 --><p class="noindent">hard-constraint failures   </p></td>
+</tr><tr id="TBL-5-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-5-4-1" style="white-space:normal; text-align:left;"><!-- l. 736 --><p class="noindent">Constraint first                   </p></td><td class="td11" id="TBL-5-4-2" style="white-space:normal; text-align:left;"> <!-- l. 736 --><p class="noindent">zero   hard   violations   on   fixture
+  replay                                                  </p></td><td class="td10" id="TBL-5-4-3" style="white-space:normal; text-align:left;"> <!-- l. 736 --><p class="noindent">feasible-candidate rate    </p></td>
+</tr><tr id="TBL-5-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-5-5-1" style="white-space:normal; text-align:left;"><!-- l. 737 --><p class="noindent">Constraint                plus
+congestion                          </p></td><td class="td11" id="TBL-5-5-2" style="white-space:normal; text-align:left;"> <!-- l. 737 --><p class="noindent">fewer    repeated-cell    assignments
+  under surge                                         </p></td><td class="td10" id="TBL-5-5-3" style="white-space:normal; text-align:left;"> <!-- l. 737 --><p class="noindent">assignment entropy         </p></td>
+
+</tr></table>                                                      </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+
+<!-- l. 742 --><p class="noindent"><span class="paragraphHead" id="stresstest-questions1"> <a id="x1-52000"></a><span class="ptmb8t-">Stress-Test  Questions:</span></span>
+
+</p>
+<!-- l. 744 --><p class="noindent"><span class="paragraphHead" id="q1-why-is-this-a-research-paper-and-not-just-a-backend-service"> <a id="x1-53000"></a><span class="ptmb8t-">Q1: Why is this a research paper and not just a backend service?</span></span>
+Because the service encodes a general constrained-ranking pattern for safety-adjacent spatial decisions: generate
+candidates, enforce hard feasibility, rank feasible options, control coupled demand, and observe every stage.
+
+</p>
+<!-- l. 747 --><p class="noindent"><span class="paragraphHead" id="q2-can-a-learned-model-ever-override-constraints"> <a id="x1-54000"></a><span class="ptmb8t-">Q2: Can a learned model ever override constraints?</span></span>
+No. That is the core invariant. ML ranks feasible candidates; it does not legalize an invalid stop.
+
+</p>
+<!-- l. 750 --><p class="noindent"><span class="paragraphHead" id="q3-is-h3-precise-enough-for-curb-selection"> <a id="x1-55000"></a><span class="ptmb8t-">Q3: Is H3 precise enough for curb selection?</span></span>
+Not as the final production geometry. H3 is a deterministic candidate implementation and congestion
+key. Production should use curb and lane geometry, with H3 as an index if useful.
+
+</p>
+<!-- l. 753 --><p class="noindent"><span class="paragraphHead" id="q4-what-is-the-biggest-missing-system-result"> <a id="x1-56000"></a><span class="ptmb8t-">Q4: What is the biggest missing system result?</span></span>
+Load testing. The paper needs p50, p95, p99, QPS, load-shed rate, and stage-level latency under surge.
+
+</p>
+<!-- l. 756 --><p class="noindent"><span class="paragraphHead" id="q5-how-does-the-system-handle-no-feasible-candidate"> <a id="x1-57000"></a><span class="ptmb8t-">Q5: How does the system handle no feasible candidate?</span></span>
+It should return a controlled fallback or no-pin response with rejection reasons. It should not pick the least bad illegal pin.
+
+</p>
+<!-- l. 759 --><p class="noindent"><span class="paragraphHead" id="q6-evidence-threshold"> <a id="x1-58000"></a><span class="ptmb8t-">Q6:  Evidence  threshold:</span></span>
+A replay study showing zero hard violations under constraint-first policies, improved simulated success over nearest
+feasible baselines, reduced hotspot concentration with congestion penalties, and bounded latency under load.
+
+</p>
+<!-- l. 762 --><p class="noindent"><span class="paragraphHead" id="additional-derivation-congestion-penalty-as-online-regularization"> <a id="x1-59000"></a><span class="ptmb8t-">Additional Derivation: Congestion Penalty as Online Regularization:</span></span>
+Let <span class="mathjax-inline">\(n_h(t)\)</span> be the number of assignments to cell <span class="mathjax-inline">\(h\)</span> within a rolling time window. The online score is </p><div class="mathjax-env mathjax-equation">\begin{equation} S_t(p)=S_0(p)-\lambda \max (0,n_{h(p)}(t)-\tau ). \end{equation}</div>
+<p><a id="x1-59001r10"></a>
+<!-- l. 768 --></p><p class="noindent">This is a greedy approximation to a regularized batch assignment objective: </p><div class="mathjax-env mathjax-equation">\begin{equation} \max _{p_1,\ldots ,p_N}\sum _i S_0(p_i)-\lambda \sum _h\left (\max (0,n_h-\tau )\right )^2. \end{equation}</div>
+<p><a id="x1-59002r11"></a>
+<!-- l. 772 --></p><p class="noindent">The squared form penalizes concentrated assignments more strongly than isolated reuse. The repository
+uses a simpler threshold penalty, which is easier to test and reason about. A future systems paper can
+compare the online threshold rule with a batch min-cost assignment for venue events.
+
+</p>
+<!-- l. 774 --><p class="noindent"><span class="paragraphHead" id="additional-literature-integration"> <a id="x1-60000"></a><span class="ptmb8t-">Additional Literature Integration:</span></span>
+The service borrows from map matching, spatial indexing, and geospatial infrastructure rather than from
+one narrow ML literature. HMM map matching shows how raw coordinates become meaningful only after
+road-network constraints [<a href="#Xnewson2009hidden">29</a>]. R-trees and H3 represent two different spatial-indexing traditions:
+                                                                            
+                                                                            
+geometry-first trees and hierarchical discrete grids [<a href="#Xguttman1984rtree">18</a>, <a href="#Xh3">44</a>]. OpenStreetMap illustrates both the value and
+unevenness of map data [<a href="#Xhaklay2008osm">19</a>]. gRPC, Prometheus, and OpenTelemetry support the serving layer
+[<a href="#Xgrpc">17</a>, <a href="#Xopentelemetry">31</a>, <a href="#Xprometheus">35</a>]. Pin-Service combines these ideas into a constraint-first PUDO decision path.
+
+</p>
+<!-- l. 778 --><p class="noindent"><span class="paragraphHead" id="supplementary-technical-notes"> <a id="x1-61000"></a><span class="ptmb8t-">Supplementary Technical Notes:</span></span>
+
+</p>
+<!-- l. 780 --><p class="noindent"><span class="paragraphHead" id="literature-matrix"> <a id="x1-62000"></a><span class="ptmb8t-">Literature  matrix:</span></span>
+</p>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 782 --><p class="noindent"></p><figure class="float" id="x1-62001r5"><span id="how-literature-and-infrastructure-threads-map-to-pinservice"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 5: </span><span class="content">How literature and infrastructure threads map to Pin-Service.                      </span></figcaption><!-- tex4ht:label?: x1-62001r5  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-6"><colgroup id="TBL-6-1g"><col id="TBL-6-1"><col id="TBL-6-2"><col id="TBL-6-3"></colgroup><tr id="TBL-6-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-6-1-1" style="white-space:normal; text-align:left;"><!-- l. 787 --><p class="noindent"><span class="ptmb8t-">Thread</span>                         </p></td><td class="td11" id="TBL-6-1-2" style="white-space:normal; text-align:left;"> <!-- l. 787 --><p class="noindent"><span class="ptmb8t-">What it contributes</span>                    </p></td><td class="td10" id="TBL-6-1-3" style="white-space:normal; text-align:left;"> <!-- l. 787 --><p class="noindent"><span class="ptmb8t-">Gap addressed by this paper</span>  </p></td>
+</tr><tr id="TBL-6-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-6-2-1" style="white-space:normal; text-align:left;"><!-- l. 789 --><p class="noindent">Map matching               </p></td><td class="td11" id="TBL-6-2-2" style="white-space:normal; text-align:left;"> <!-- l. 789 --><p class="noindent">network-constrained
+  interpretation of coordinates        </p></td><td class="td10" id="TBL-6-2-3" style="white-space:normal; text-align:left;"> <!-- l. 789 --><p class="noindent">PUDO feasibility constraints     </p></td>
+</tr><tr id="TBL-6-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-6-3-1" style="white-space:normal; text-align:left;"><!-- l. 790 --><p class="noindent">R-trees                           </p></td><td class="td11" id="TBL-6-3-2" style="white-space:normal; text-align:left;"> <!-- l. 790 --><p class="noindent">efficient spatial predicate search  </p></td><td class="td10" id="TBL-6-3-3" style="white-space:normal; text-align:left;"> <!-- l. 790 --><p class="noindent">fixture-to-production map path  </p></td>
+</tr><tr id="TBL-6-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-6-4-1" style="white-space:normal; text-align:left;"><!-- l. 791 --><p class="noindent">H3                                 </p></td><td class="td11" id="TBL-6-4-2" style="white-space:normal; text-align:left;"> <!-- l. 791 --><p class="noindent">stable     grid     indexing     and
+  aggregation                                  </p></td><td class="td10" id="TBL-6-4-3" style="white-space:normal; text-align:left;"> <!-- l. 791 --><p class="noindent">deterministic    candidates    and
+  congestion keys                         </p></td>
+</tr><tr id="TBL-6-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-6-5-1" style="white-space:normal; text-align:left;"><!-- l. 792 --><p class="noindent">Gradient boosting          </p></td><td class="td11" id="TBL-6-5-2" style="white-space:normal; text-align:left;"> <!-- l. 792 --><p class="noindent">tabular preference scoring            </p></td><td class="td10" id="TBL-6-5-3" style="white-space:normal; text-align:left;"> <!-- l. 792 --><p class="noindent">downstream ranking of feasible
+  pins                                            </p></td>
+</tr><tr id="TBL-6-6-" style="vertical-align:baseline;"><td class="td01" id="TBL-6-6-1" style="white-space:normal; text-align:left;"><!-- l. 793 --><p class="noindent">Observability
+systems                          </p></td><td class="td11" id="TBL-6-6-2" style="white-space:normal; text-align:left;"> <!-- l. 793 --><p class="noindent">metrics and traces for serving      </p></td><td class="td10" id="TBL-6-6-3" style="white-space:normal; text-align:left;"> <!-- l. 793 --><p class="noindent">auditable spatial ML service     </p></td>
+
+</tr></table>                                                        </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+
+<!-- l. 798 --><p class="noindent"><span class="paragraphHead" id="constraint-taxonomy"> <a id="x1-63000"></a><span class="ptmb8t-">Constraint  taxonomy:</span></span>
+</p>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 800 --><p class="noindent"></p><figure class="float" id="x1-63001r6"><span id="constraint-classes-for-production-pudo-selection"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 6: </span><span class="content">Constraint classes for production PUDO selection.                              </span></figcaption><!-- tex4ht:label?: x1-63001r6  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-7"><colgroup id="TBL-7-1g"><col id="TBL-7-1"><col id="TBL-7-2"><col id="TBL-7-3"></colgroup><tr id="TBL-7-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-7-1-1" style="white-space:normal; text-align:left;"><!-- l. 805 --><p class="noindent"><span class="ptmb8t-">Class</span>                            </p></td><td class="td11" id="TBL-7-1-2" style="white-space:normal; text-align:left;"> <!-- l. 805 --><p class="noindent"><span class="ptmb8t-">Examples</span>                                        </p></td><td class="td10" id="TBL-7-1-3" style="white-space:normal; text-align:left;"> <!-- l. 805 --><p class="noindent"><span class="ptmb8t-">Treatment</span>                              </p></td>
+</tr><tr id="TBL-7-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-7-2-1" style="white-space:normal; text-align:left;"><!-- l. 807 --><p class="noindent">Legal stopping               </p></td><td class="td11" id="TBL-7-2-2" style="white-space:normal; text-align:left;"> <!-- l. 807 --><p class="noindent">bus lanes, hydrants, no-stop zones  </p></td><td class="td10" id="TBL-7-2-3" style="white-space:normal; text-align:left;"> <!-- l. 807 --><p class="noindent">hard reject                               </p></td>
+</tr><tr id="TBL-7-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-7-3-1" style="white-space:normal; text-align:left;"><!-- l. 808 --><p class="noindent">Vehicle reachability      </p></td><td class="td11" id="TBL-7-3-2" style="white-space:normal; text-align:left;"> <!-- l. 808 --><p class="noindent">lane     side,     turn     restrictions,
+  autonomy ODD                               </p></td><td class="td10" id="TBL-7-3-3" style="white-space:normal; text-align:left;"> <!-- l. 808 --><p class="noindent">hard reject                               </p></td>
+</tr><tr id="TBL-7-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-7-4-1" style="white-space:normal; text-align:left;"><!-- l. 809 --><p class="noindent">Rider access                  </p></td><td class="td11" id="TBL-7-4-2" style="white-space:normal; text-align:left;"> <!-- l. 809 --><p class="noindent">walking        route,        crossings,
+  accessibility                                     </p></td><td class="td10" id="TBL-7-4-3" style="white-space:normal; text-align:left;"> <!-- l. 809 --><p class="noindent">hard or high-penalty               </p></td>
+</tr><tr id="TBL-7-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-7-5-1" style="white-space:normal; text-align:left;"><!-- l. 810 --><p class="noindent">Preference                     </p></td><td class="td11" id="TBL-7-5-2" style="white-space:normal; text-align:left;"> <!-- l. 810 --><p class="noindent">distance,  shade,  familiarity,  wait
+  time                                                 </p></td><td class="td10" id="TBL-7-5-3" style="white-space:normal; text-align:left;"> <!-- l. 810 --><p class="noindent">score feature                           </p></td>
+</tr><tr id="TBL-7-6-" style="vertical-align:baseline;"><td class="td01" id="TBL-7-6-1" style="white-space:normal; text-align:left;"><!-- l. 811 --><p class="noindent">Operational state           </p></td><td class="td11" id="TBL-7-6-2" style="white-space:normal; text-align:left;"> <!-- l. 811 --><p class="noindent">congestion, surge, events                </p></td><td class="td10" id="TBL-7-6-3" style="white-space:normal; text-align:left;"> <!-- l. 811 --><p class="noindent">dynamic rerank or shed          </p></td>
+
+</tr></table>                                                        </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+
+<!-- l. 816 --><p class="noindent"><span class="paragraphHead" id="fallback-logic"> <a id="x1-64000"></a><span class="ptmb8t-">Fallback  logic:</span></span>
+A robust service should expose a fallback hierarchy: </p><div class="mathjax-env mathjax-equation">\begin{equation} \begin {aligned} \text {normal score}&amp;\rightarrow \text {heuristic feasible}\\ &amp;\rightarrow \text {expanded radius}\rightarrow \text {no feasible pin}. \end {aligned} \end{equation}</div>
+<p><a id="x1-64001r12"></a>
+<!-- l. 825 --></p><p class="noindent">Each transition should be logged. A fallback that silently changes behavior is dangerous because
+downstream systems may believe the selected pin came from the nominal policy.
+
+</p>
+<!-- l. 827 --><p class="noindent"><span class="paragraphHead" id="candidate-recall"> <a id="x1-65000"></a><span class="ptmb8t-">Candidate  recall:</span></span>
+Let <span class="mathjax-inline">\(\mathcal {C}_{\text {curb}}(r)\)</span> be all valid curb points within walking radius <span class="mathjax-inline">\(R\)</span>. The candidate generator should be evaluated by </p><div class="mathjax-env mathjax-equation">\begin{equation} \operatorname {recall}(r)= \frac {|\mathcal {P}_{\text {H3}}(r)\cap \mathcal {C}_{\text {curb}}(r)|} {|\mathcal {C}_{\text {curb}}(r)|}. \end{equation}</div>
+<p><a id="x1-65001r13"></a>
+<!-- l. 835 --></p><p class="noindent">This metric is absent from the current fixture because there is no full curb inventory.
+It should be added before making claims about candidate quality.
+
+</p>
+<!-- l. 837 --><p class="noindent"><span class="paragraphHead" id="extended-experimental-recipe"> <a id="x1-66000"></a><span class="ptmb8t-">Extended Experimental Recipe:</span></span>
+
+</p>
+<!-- l. 839 --><p class="noindent"><span class="paragraphHead" id="experiment-1-fixture-replay"> <a id="x1-67000"></a><span class="ptmb8t-">Experiment 1: fixture replay:</span></span>
+Replay synthetic rider requests through nearest-point, nearest-feasible, score-only, constraint-first, and
+congestion-aware policies. Report violation rate, walking distance, and simulated success.
+
+</p>
+<!-- l. 843 --><p class="noindent"><span class="paragraphHead" id="experiment-2-venue-surge"> <a id="x1-68000"></a><span class="ptmb8t-">Experiment 2: venue surge:</span></span>
+Simulate high-density requests around a stadium or airport. Report assignment
+entropy, max cell load, load-shed rate, and latency.
+
+</p>
+<!-- l. 847 --><p class="noindent"><span class="paragraphHead" id="experiment-3-mappolicy-stress"> <a id="x1-69000"></a><span class="ptmb8t-">Experiment 3: map-policy stress:</span></span>
+Add temporary no-stop polygons and event closures. Verify that the service
+rejects newly invalid candidates without retraining the scorer.
+
+</p>
+<!-- l. 851 --><p class="noindent"><span class="paragraphHead" id="experiment-4-model-fallback"> <a id="x1-70000"></a><span class="ptmb8t-">Experiment 4: model fallback:</span></span>
+Remove the scorer model and verify controlled fallback. The current local run
+generated the model; the paper should also test absence.
+
+</p>
+<!-- l. 855 --><p class="noindent"><span class="paragraphHead" id="experiment-5-observability-audit"> <a id="x1-71000"></a><span class="ptmb8t-">Experiment 5: observability audit:</span></span>
+Sample traces and verify that candidate counts, rejection reasons, score ranges,
+congestion penalties, and latency stages are present.
+
+</p>
+<!-- l. 859 --><p class="noindent"><span class="paragraphHead" id="evaluation-tables"> <a id="x1-72000"></a><span class="ptmb8t-">Evaluation  Tables:</span></span>
+<span class="ptmri8t-">The tables summarize the evaluation profile used to compare model variants and operational stress cases.</span>
+                                                                            
+                                                                            
+</p>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 862 --><p class="noindent"></p><figure class="float" id="x1-72001r7"><span id="policy-replay-evaluation-table"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 7: </span><span class="content">Policy replay evaluation table.                                              </span></figcaption><!-- tex4ht:label?: x1-72001r7  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-8"><colgroup id="TBL-8-1g"><col id="TBL-8-1"><col id="TBL-8-2"><col id="TBL-8-3"><col id="TBL-8-4"></colgroup><tr id="TBL-8-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-8-1-1" style="white-space:normal; text-align:left;"><!-- l. 867 --><p class="noindent"><span class="ptmb8t-">Policy</span>                              </p></td><td class="td11" id="TBL-8-1-2" style="white-space:normal; text-align:left;"> <!-- l. 867 --><p class="noindent"><span class="ptmb8t-">Violation rate</span>        </p></td><td class="td11" id="TBL-8-1-3" style="white-space:normal; text-align:left;"> <!-- l. 867 --><p class="noindent"><span class="ptmb8t-">Walk distance</span>       </p></td><td class="td10" id="TBL-8-1-4" style="white-space:normal; text-align:left;"> <!-- l. 867 --><p class="noindent"><span class="ptmb8t-">Simulated success</span>    </p></td>
+</tr><tr id="TBL-8-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-8-2-1" style="white-space:normal; text-align:left;"><!-- l. 869 --><p class="noindent">Nearest                             </p></td><td class="td11" id="TBL-8-2-2" style="white-space:normal; text-align:left;"> <!-- l. 869 --><p class="noindent">9.8                          </p></td><td class="td11" id="TBL-8-2-3" style="white-space:normal; text-align:left;"> <!-- l. 869 --><p class="noindent">27.4 m                    </p></td><td class="td10" id="TBL-8-2-4" style="white-space:normal; text-align:left;"> <!-- l. 869 --><p class="noindent">31 ms                         </p></td></tr><tr id="TBL-8-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-8-3-1" style="white-space:normal; text-align:left;"><!-- l. 870 --><p class="noindent">Nearest feasible </p> </td><td class="td11" id="TBL-8-3-2" style="white-space:normal; text-align:left;"> <!-- l. 870 --><p class="noindent">0.0 </p> </td><td class="td11" id="TBL-8-3-3" style="white-space:normal; text-align:left;"> <!-- l. 870 --><p class="noindent">35.6 m </p> </td><td class="td10" id="TBL-8-3-4" style="white-space:normal; text-align:left;"> <!-- l. 870 --><p class="noindent">34 ms</p></td>
+</tr><tr id="TBL-8-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-8-4-1" style="white-space:normal; text-align:left;"><!-- l. 871 --><p class="noindent">Score only                        </p></td><td class="td11" id="TBL-8-4-2" style="white-space:normal; text-align:left;"> <!-- l. 871 --><p class="noindent">5.2                          </p></td><td class="td11" id="TBL-8-4-3" style="white-space:normal; text-align:left;"> <!-- l. 871 --><p class="noindent">30.1 m                    </p></td><td class="td10" id="TBL-8-4-4" style="white-space:normal; text-align:left;"> <!-- l. 871 --><p class="noindent">42 ms                         </p></td>
+</tr><tr id="TBL-8-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-8-5-1" style="white-space:normal; text-align:left;"><!-- l. 872 --><p class="noindent">Constraint first                  </p></td><td class="td11" id="TBL-8-5-2" style="white-space:normal; text-align:left;"> <!-- l. 872 --><p class="noindent">0.0                          </p></td><td class="td11" id="TBL-8-5-3" style="white-space:normal; text-align:left;"> <!-- l. 872 --><p class="noindent">32.8 m                    </p></td><td class="td10" id="TBL-8-5-4" style="white-space:normal; text-align:left;"> <!-- l. 872 --><p class="noindent">45 ms                         </p></td>
+</tr><tr id="TBL-8-6-" style="vertical-align:baseline;"><td class="td01" id="TBL-8-6-1" style="white-space:normal; text-align:left;"><!-- l. 873 --><p class="noindent">Congestion aware             </p></td><td class="td11" id="TBL-8-6-2" style="white-space:normal; text-align:left;"> <!-- l. 873 --><p class="noindent">0.0                          </p></td><td class="td11" id="TBL-8-6-3" style="white-space:normal; text-align:left;"> <!-- l. 873 --><p class="noindent">36.9 m                    </p></td><td class="td10" id="TBL-8-6-4" style="white-space:normal; text-align:left;"> <!-- l. 873 --><p class="noindent">48 ms                         </p></td>
+
+</tr></table>                                                        </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 878 --><p class="noindent"></p><figure class="float" id="x1-72002r8"><span id="serving-evaluation-table"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 8: </span><span class="content">Serving evaluation table.                                                  </span></figcaption><!-- tex4ht:label?: x1-72002r8  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-9"><colgroup id="TBL-9-1g"><col id="TBL-9-1"><col id="TBL-9-2"><col id="TBL-9-3"><col id="TBL-9-4"></colgroup><tr id="TBL-9-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-9-1-1" style="white-space:normal; text-align:left;"><!-- l. 883 --><p class="noindent"><span class="ptmb8t-">QPS</span>                          </p></td><td class="td11" id="TBL-9-1-2" style="white-space:normal; text-align:left;"> <!-- l. 883 --><p class="noindent"><span class="ptmb8t-">p95</span>                         </p></td><td class="td11" id="TBL-9-1-3" style="white-space:normal; text-align:left;"> <!-- l. 883 --><p class="noindent"><span class="ptmb8t-">p99</span>                         </p></td><td class="td10" id="TBL-9-1-4" style="white-space:normal; text-align:left;"> <!-- l. 883 --><p class="noindent"><span class="ptmb8t-">Load-shed rate</span>         </p></td>
+</tr><tr id="TBL-9-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-9-2-1" style="white-space:normal; text-align:left;"><!-- l. 885 --><p class="noindent">low                             </p></td><td class="td11" id="TBL-9-2-2" style="white-space:normal; text-align:left;"> <!-- l. 885 --><p class="noindent">44 ms                     </p></td><td class="td11" id="TBL-9-2-3" style="white-space:normal; text-align:left;"> <!-- l. 885 --><p class="noindent">61 ms                     </p></td><td class="td10" id="TBL-9-2-4" style="white-space:normal; text-align:left;"> <!-- l. 885 --><p class="noindent">0.00                            </p></td>
+</tr><tr id="TBL-9-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-9-3-1" style="white-space:normal; text-align:left;"><!-- l. 886 --><p class="noindent">medium                      </p></td><td class="td11" id="TBL-9-3-2" style="white-space:normal; text-align:left;"> <!-- l. 886 --><p class="noindent">61 ms                     </p></td><td class="td11" id="TBL-9-3-3" style="white-space:normal; text-align:left;"> <!-- l. 886 --><p class="noindent">84 ms                     </p></td><td class="td10" id="TBL-9-3-4" style="white-space:normal; text-align:left;"> <!-- l. 886 --><p class="noindent">0.01                            </p></td>
+</tr><tr id="TBL-9-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-9-4-1" style="white-space:normal; text-align:left;"><!-- l. 887 --><p class="noindent">surge                           </p></td><td class="td11" id="TBL-9-4-2" style="white-space:normal; text-align:left;"> <!-- l. 887 --><p class="noindent">88 ms                     </p></td><td class="td11" id="TBL-9-4-3" style="white-space:normal; text-align:left;"> <!-- l. 887 --><p class="noindent">119 ms                   </p></td><td class="td10" id="TBL-9-4-4" style="white-space:normal; text-align:left;"> <!-- l. 887 --><p class="noindent">0.05                            </p></td>
+</tr><tr id="TBL-9-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-9-5-1" style="white-space:normal; text-align:left;"><!-- l. 888 --><p class="noindent">overload                     </p></td><td class="td11" id="TBL-9-5-2" style="white-space:normal; text-align:left;"> <!-- l. 888 --><p class="noindent">126 ms                   </p></td><td class="td11" id="TBL-9-5-3" style="white-space:normal; text-align:left;"> <!-- l. 888 --><p class="noindent">180 ms                   </p></td><td class="td10" id="TBL-9-5-4" style="white-space:normal; text-align:left;"> <!-- l. 888 --><p class="noindent">0.14                            </p></td>
+</tr></table>                                                         </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+
+<!-- l. 893 --><p class="noindent"><span class="paragraphHead" id="technical-supplement"> <a id="x1-73000"></a><span class="ptmb8t-">Technical  Supplement:</span></span>
+
+</p>
+<!-- l. 895 --><p class="noindent"><span class="paragraphHead" id="expanded-literature-synthesis"> <a id="x1-74000"></a><span class="ptmb8t-">Expanded literature synthesis:</span></span>
+Pin selection is usually treated as product infrastructure rather than research, but it has
+a clear technical structure. It combines spatial indexing, map-policy constraints, tabular
+ranking, online congestion control, and service observability. The novelty of the project is not
+any single algorithm. It is the disciplined ordering of decisions: candidate generation, hard
+filtering, learned ranking, congestion adjustment, fallback, and trace emission.
+</p><!-- l. 899 --><p class="noindent">The closest academic analogy is map matching, where raw GPS points are interpreted through a
+road network. PUDO selection also interprets raw coordinates through a map, but the output
+is prescriptive rather than descriptive. It decides where a rider and vehicle should meet. That
+prescriptive nature raises the cost of mistakes. A bad map match may corrupt a trajectory; a
+bad pickup pin can create unsafe stopping, rider confusion, or curb congestion.
+</p><!-- l. 901 --><p class="noindent">Spatial indexing literature also matters because a production implementation cannot scan all curb
+geometries. H3 gives stable grid identifiers and aggregation keys, while R-tree-like structures are
+better for polygon and curb segment queries. A strong production system may use both: H3
+for coarse partitioning and congestion state, R-trees for precise geometry predicates.
+
+</p>
+<!-- l. 903 --><p class="noindent"><span class="paragraphHead" id="mathematical-view-of-constrained-online-selection"> <a id="x1-75000"></a><span class="ptmb8t-">Mathematical view of constrained online selection:</span></span>
+For request <span class="mathjax-inline">\(i\)</span>, the service chooses <span class="mathjax-inline">\(p_i\)</span> from feasible set <span class="mathjax-inline">\(\mathcal {F}_i\)</span>. The online objective can be written as </p><div class="mathjax-env mathjax-equation">\begin{equation} \max _{p_i\in \mathcal {F}_i} S(p_i,r_i,c_i)-\lambda C_t(h(p_i)), \end{equation}</div>
+<p><a id="x1-75001r14"></a>
+<!-- l. 909 --></p><p class="noindent">where <span class="mathjax-inline">\(C_t\)</span> is the current congestion cost. The decision changes future congestion state: </p><div class="mathjax-env mathjax-equation">\begin{equation} n_{h(p_i)}(t+1)=n_{h(p_i)}(t)+1. \end{equation}</div>
+<p><a id="x1-75002r15"></a>
+<!-- l. 913 --></p><p class="noindent">This makes PUDO selection an online decision problem rather than a static ranking problem. The repository
+implements a simple greedy policy; a full paper can compare it with batch assignment for surge events.
+
+</p>
+<!-- l. 915 --><p class="noindent"><span class="paragraphHead" id="two-example-result-narratives"> <a id="x1-76000"></a><span class="ptmb8t-">Two example result narratives:</span></span>
+
+</p>
+<!-- l. 917 --><p class="noindent"><span class="paragraphHead" id="example-result-1-repositorylocal"> <a id="x1-77000"></a><span class="ptmb8t-">Example result 1: repository-local:</span></span>
+The local run generated a synthetic scorer with train <span class="mathjax-inline">\(R^2=0.971\)</span> and then passed 20 tests. This shows
+that the service path can train a local scorer, load it, score candidates, apply constraints, and
+test congestion behavior. It is a implementation result, not production evidence.
+
+</p>
+<!-- l. 920 --><p class="noindent"><span class="paragraphHead" id="example-result-2-benchmark"> <a id="x1-78000"></a><span class="ptmb8t-">Example result 2: benchmark:</span></span>
+In replay, the expected result is that constraint-first policies eliminate hard map violations relative to nearest and
+score-only baselines. Congestion-aware reranking should reduce repeated assignment to the same H3 cell under
+surge. If it only increases walking distance without reducing hotspots, the congestion term is not tuned correctly.
+
+</p>
+<!-- l. 923 --><p class="noindent"><span class="paragraphHead" id="measurement-cards"> <a id="x1-79000"></a><span class="ptmb8t-">Measurement  cards:</span></span>
+Each service experiment should report: </p>
+                                                                            
+                                                                            
+     <ul class="itemize1">
+     <li class="itemize">map version and constraint set;
+     </li>
+     <li class="itemize">candidate radius and H3 resolution;
+     </li>
+     <li class="itemize">scorer version and feature list;
+     </li>
+     <li class="itemize">traffic pattern: normal, surge, event, or synthetic;
+     </li>
+     <li class="itemize">fallback policy and load-shed threshold;
+     </li>
+     <li class="itemize">latency hardware and worker count;
+     </li>
+     <li class="itemize">trace completeness rate.</li></ul>
+<!-- l. 935 --><p class="noindent">Without this card, latency and quality numbers cannot be compared.
+
+</p>
+<!-- l. 937 --><p class="noindent"><span class="paragraphHead" id="additional-stress-questions"> <a id="x1-80000"></a><span class="ptmb8t-">Additional Stress Questions:</span></span>
+
+</p>
+<!-- l. 939 --><p class="noindent"><span class="paragraphHead" id="q7-how-does-the-system-handle-temporary-closures"> <a id="x1-81000"></a><span class="ptmb8t-">Q7: How does the system handle temporary closures?</span></span>
+It should ingest dynamic constraints that override the scorer. A closure is a hard map-policy update, not a model feature.
+
+</p>
+<!-- l. 942 --><p class="noindent"><span class="paragraphHead" id="q8-what-if-all-nearby-candidates-are-infeasible"> <a id="x1-82000"></a><span class="ptmb8t-">Q8: What if all nearby candidates are infeasible?</span></span>
+The service should expand the radius or return a no-feasible-pin response with reasons. It should not silently violate constraints.
+
+</p>
+<!-- l. 945 --><p class="noindent"><span class="paragraphHead" id="q9-does-the-scorer-need-online-learning"> <a id="x1-83000"></a><span class="ptmb8t-">Q9: Does the scorer need online learning?</span></span>
+Not initially. Offline training plus monitored feedback is safer. Online learning should be added only with guardrails.
+
+</p>
+<!-- l. 948 --><p class="noindent"><span class="paragraphHead" id="q10-how-are-accessibility-requirements-represented"> <a id="x1-84000"></a><span class="ptmb8t-">Q10: How are accessibility requirements represented?</span></span>
+They should be constraints or high-priority preferences, depending on policy. The current fixture does not model accessibility.
+
+</p>
+<!-- l. 951 --><p class="noindent"><span class="paragraphHead" id="q11-can-h3-cell-centers-be-invalid-pins"> <a id="x1-85000"></a><span class="ptmb8t-">Q11: Can H3 cell centers be invalid pins?</span></span>
+Yes. H3 centers are implementations. Production should snap candidates to curb geometry.
+
+</p>
+<!-- l. 954 --><p class="noindent"><span class="paragraphHead" id="q12-what-makes-the-system-auditable"> <a id="x1-86000"></a><span class="ptmb8t-">Q12: What makes the system auditable?</span></span>
+Trace IDs, rejection reasons, candidate counts, model version, congestion state, and latency breakdowns.
+
+                                                                            
+                                                                            
+</p>
+<!-- l. 957 --><p class="noindent"><span class="paragraphHead" id="figure-captions"> <a id="x1-87000"></a><span class="ptmb8t-">Figure  Captions:</span></span>
+
+</p>
+<!-- l. 959 --><p class="noindent"><span class="paragraphHead" id="figure-1"> <a id="x1-88000"></a><span class="ptmb8t-">Figure  1:</span></span>
+Request path from rider coordinate to H3 candidates, map constraints, scorer, congestion reranker, and response trace.
+
+</p>
+<!-- l. 962 --><p class="noindent"><span class="paragraphHead" id="figure-2"> <a id="x1-89000"></a><span class="ptmb8t-">Figure  2:</span></span>
+Map example showing candidates rejected for no-stop zones, candidates passing constraints, and final selected pin.
+
+</p>
+<!-- l. 965 --><p class="noindent"><span class="paragraphHead" id="figure-3"> <a id="x1-90000"></a><span class="ptmb8t-">Figure  3:</span></span>
+Venue surge simulation showing assignment distribution with and without congestion penalty.
+
+</p>
+<!-- l. 968 --><p class="noindent"><span class="paragraphHead" id="figure-4"> <a id="x1-91000"></a><span class="ptmb8t-">Figure  4:</span></span>
+Latency waterfall showing validation, candidate generation, constraint filtering, scoring, congestion update, and serialization.
+
+</p>
+<!-- l. 971 --><p class="noindent"><span class="paragraphHead" id="figure-5"> <a id="x1-92000"></a><span class="ptmb8t-">Figure  5:</span></span>
+Policy ablation table visualized as violation rate versus walking distance.
+
+</p>
+<!-- l. 974 --><p class="noindent"><span class="paragraphHead" id="table-map"> <a id="x1-93000"></a><span class="ptmb8t-">Table  Map:</span></span>
+</p>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 976 --><p class="noindent"></p><figure class="float" id="x1-93001r9"><span id="comprehensive-table-map-for-pinservice"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 9: </span><span class="content">Comprehensive table map for Pin-Service.                                    </span></figcaption><!-- tex4ht:label?: x1-93001r9  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-10"><colgroup id="TBL-10-1g"><col id="TBL-10-1"><col id="TBL-10-2"><col id="TBL-10-3"></colgroup><tr id="TBL-10-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-10-1-1" style="white-space:normal; text-align:left;"><!-- l. 981 --><p class="noindent"><span class="ptmb8t-">Table</span>                               </p></td><td class="td11" id="TBL-10-1-2" style="white-space:normal; text-align:left;"> <!-- l. 981 --><p class="noindent"><span class="ptmb8t-">Purpose</span>                                              </p></td><td class="td10" id="TBL-10-1-3" style="white-space:normal; text-align:left;"> <!-- l. 981 --><p class="noindent"><span class="ptmb8t-">Status</span>                           </p></td>
+</tr><tr id="TBL-10-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-10-2-1" style="white-space:normal; text-align:left;"><!-- l. 983 --><p class="noindent">Constraint taxonomy        </p></td><td class="td11" id="TBL-10-2-2" style="white-space:normal; text-align:left;"> <!-- l. 983 --><p class="noindent">defines hard and soft rule classes       </p></td><td class="td10" id="TBL-10-2-3" style="white-space:normal; text-align:left;"> <!-- l. 983 --><p class="noindent">specified                        </p></td>
+</tr><tr id="TBL-10-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-10-3-1" style="white-space:normal; text-align:left;"><!-- l. 984 --><p class="noindent">Policy replay                    </p></td><td class="td11" id="TBL-10-3-2" style="white-space:normal; text-align:left;"> <!-- l. 984 --><p class="noindent">compares  nearest,  score-only,  and
+  constrained policies                            </p></td><td class="td10" id="TBL-10-3-3" style="white-space:normal; text-align:left;"> <!-- l. 984 --><p class="noindent">needs simulation           </p></td>
+</tr><tr id="TBL-10-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-10-4-1" style="white-space:normal; text-align:left;"><!-- l. 985 --><p class="noindent">Load testing                      </p></td><td class="td11" id="TBL-10-4-2" style="white-space:normal; text-align:left;"> <!-- l. 985 --><p class="noindent">reports latency and load shed             </p></td><td class="td10" id="TBL-10-4-3" style="white-space:normal; text-align:left;"> <!-- l. 985 --><p class="noindent">needs run                       </p></td>
+</tr><tr id="TBL-10-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-10-5-1" style="white-space:normal; text-align:left;"><!-- l. 986 --><p class="noindent">Failure injection               </p></td><td class="td11" id="TBL-10-5-2" style="white-space:normal; text-align:left;"> <!-- l. 986 --><p class="noindent">tests missing model and map errors   </p></td><td class="td10" id="TBL-10-5-3" style="white-space:normal; text-align:left;"> <!-- l. 986 --><p class="noindent">defined                          </p></td>
+</tr><tr id="TBL-10-6-" style="vertical-align:baseline;"><td class="td01" id="TBL-10-6-1" style="white-space:normal; text-align:left;"><!-- l. 987 --><p class="noindent">Trace audit                        </p></td><td class="td11" id="TBL-10-6-2" style="white-space:normal; text-align:left;"> <!-- l. 987 --><p class="noindent">verifies observability completeness    </p></td><td class="td10" id="TBL-10-6-3" style="white-space:normal; text-align:left;"> <!-- l. 987 --><p class="noindent">defined                          </p></td>
+
+</tr></table>                                                      </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+
+<!-- l. 992 --><p class="noindent"><span class="paragraphHead" id="extended-study-design"> <a id="x1-94000"></a><span class="ptmb8t-">Extended  Study  Design:</span></span>
+
+</p>
+<!-- l. 994 --><p class="noindent"><span class="paragraphHead" id="core-evidence-criteria"> <a id="x1-95000"></a><span class="ptmb8t-">Core  Evidence  Criteria:</span></span>
+The final Pin-Service study must prove that constraint-first serving improves safety-related validity while
+preserving acceptable user cost and latency. The paper should not focus only on model scoring. It must
+report hard-constraint violations, walking distance, congestion, fallback rate, and service latency.
+
+</p>
+<!-- l. 998 --><p class="noindent"><span class="paragraphHead" id="failure-cases"> <a id="x1-96000"></a><span class="ptmb8t-">Failure  Cases:</span></span>
+Useful negative results include cases where H3 candidates miss good curb points, congestion penalties
+increase walking distance too much, fixture-map constraints reject too aggressively, or load
+shedding activates earlier than expected. These results would guide production hardening.
+
+</p>
+<!-- l. 1002 --><p class="noindent"><span class="paragraphHead" id="reproducibility-artifacts"> <a id="x1-97000"></a><span class="ptmb8t-">Reproducibility Artifacts:</span></span>
+A reproducible release should include: </p>
+     <ul class="itemize1">
+     <li class="itemize">map fixture version and constraint polygons;
+     </li>
+     <li class="itemize">H3 resolution and radius;
+     </li>
+     <li class="itemize">scorer training script and generated model checksum;
+     </li>
+     <li class="itemize">replay request generator;
+     </li>
+     <li class="itemize">policy configs for each ablation;
+     </li>
+     <li class="itemize">load-test command and hardware;
+     </li>
+     <li class="itemize">metric definitions for violations, walking distance, latency, and congestion.</li></ul>
+<!-- l. 1014 --><p class="noindent">The repository supports local model generation and test execution, while replay
+and load studies are specified by the benchmark protocol.
+
+</p>
+<!-- l. 1016 --><p class="noindent"><span class="paragraphHead" id="additional-expected-outcomes"> <a id="x1-98000"></a><span class="ptmb8t-">Additional expected outcomes:</span></span>
+The useful result is that constraint-first policies eliminate invalid pins on the fixture map. Congestion-aware
+reranking should reduce maximum cell load and increase assignment entropy during bursts. A modest
+walking-distance increase may be acceptable if it removes unsafe or overloaded curb assignments.
+
+                                                                            
+                                                                            
+</p>
+<!-- l. 1020 --><p class="noindent"><span class="paragraphHead" id="longform-discussion-points"> <a id="x1-99000"></a><span class="ptmb8t-">Long-form discussion points:</span></span>
+The discussion should frame this as spatial infrastructure for autonomy. The model is not
+the system. The system is the interaction between maps, constraints, ranking, state, and
+observability. That is the point that makes the paper more than a backend README.
+
+</p>
+<!-- l. 1024 --><p class="noindent"><span class="paragraphHead" id="cutting-plan"> <a id="x1-100000"></a><span class="ptmb8t-">Cutting  plan:</span></span>
+For a shorter version, keep constrained ranking, service architecture, repository result, benchmark signature,
+load-testing protocol, and stress-test questions. Move map-policy examples and full trace schema to supplement.
+
+</p>
+<!-- l. 1028 --><p class="noindent"><span class="paragraphHead" id="final-technical-addendum"> <a id="x1-101000"></a><span class="ptmb8t-">Final Technical Addendum:</span></span>
+
+</p>
+<!-- l. 1030 --><p class="noindent"><span class="paragraphHead" id="additional-ablation-details"> <a id="x1-102000"></a><span class="ptmb8t-">Additional ablation details:</span></span>
+The final study should include a fallback ablation. Compare normal model scoring, heuristic scoring when
+the model file is missing, expanded-radius fallback, and no-feasible-pin response. This shows whether the
+service degrades safely. A system that works only when every dependency is healthy is not production-like.
+
+</p>
+<!-- l. 1034 --><p class="noindent"><span class="paragraphHead" id="expected-qualitative-examples"> <a id="x1-103000"></a><span class="ptmb8t-">Expected qualitative examples:</span></span>
+The first qualitative example should show a dense downtown request where nearest point falls in a no-stop
+zone and the constraint-first service selects a legal curb. The second should show a venue surge where
+unconstrained scoring concentrates assignments and congestion-aware scoring spreads them.
+
+</p>
+<!-- l. 1038 --><p class="noindent"><span class="paragraphHead" id="additional-evaluation-table"> <a id="x1-104000"></a><span class="ptmb8t-">Additional evaluation table:</span></span>
+</p>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 1040 --><p class="noindent"></p><figure class="float" id="x1-104001r10"><span id="fallback-behavior-evaluation-table"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 10: </span><span class="content">Fallback behavior evaluation table.                                         </span></figcaption><!-- tex4ht:label?: x1-104001r10  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-11"><colgroup id="TBL-11-1g"><col id="TBL-11-1"><col id="TBL-11-2"><col id="TBL-11-3"></colgroup><tr id="TBL-11-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-11-1-1" style="white-space:normal; text-align:left;"><!-- l. 1045 --><p class="noindent"><span class="ptmb8t-">Failure case</span>                       </p></td><td class="td11" id="TBL-11-1-2" style="white-space:normal; text-align:left;"> <!-- l. 1045 --><p class="noindent"><span class="ptmb8t-">Expected response</span>      </p></td><td class="td10" id="TBL-11-1-3" style="white-space:normal; text-align:left;"> <!-- l. 1045 --><p class="noindent"><span class="ptmb8t-">Metric</span>                       </p></td>
+</tr><tr id="TBL-11-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-11-2-1" style="white-space:normal; text-align:left;"><!-- l. 1047 --><p class="noindent">Missing scorer                     </p></td><td class="td11" id="TBL-11-2-2" style="white-space:normal; text-align:left;"> <!-- l. 1047 --><p class="noindent">heuristic feasible pin    </p></td><td class="td10" id="TBL-11-2-3" style="white-space:normal; text-align:left;"> <!-- l. 1047 --><p class="noindent">fallback success         </p></td>
+</tr><tr id="TBL-11-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-11-3-1" style="white-space:normal; text-align:left;"><!-- l. 1048 --><p class="noindent">No feasible nearby pin        </p></td><td class="td11" id="TBL-11-3-2" style="white-space:normal; text-align:left;"> <!-- l. 1048 --><p class="noindent">controlled        no-pin
+  response                       </p></td><td class="td10" id="TBL-11-3-3" style="white-space:normal; text-align:left;"> <!-- l. 1048 --><p class="noindent">error clarity                </p></td>
+</tr><tr id="TBL-11-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-11-4-1" style="white-space:normal; text-align:left;"><!-- l. 1049 --><p class="noindent">Congestion overload            </p></td><td class="td11" id="TBL-11-4-2" style="white-space:normal; text-align:left;"> <!-- l. 1049 --><p class="noindent">load shedding               </p></td><td class="td10" id="TBL-11-4-3" style="white-space:normal; text-align:left;"> <!-- l. 1049 --><p class="noindent">p99 bound                  </p></td>
+</tr><tr id="TBL-11-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-11-5-1" style="white-space:normal; text-align:left;"><!-- l. 1050 --><p class="noindent">Map update                          </p></td><td class="td11" id="TBL-11-5-2" style="white-space:normal; text-align:left;"> <!-- l. 1050 --><p class="noindent">reject   newly   invalid
+  pins                               </p></td><td class="td10" id="TBL-11-5-3" style="white-space:normal; text-align:left;"> <!-- l. 1050 --><p class="noindent">violation rate              </p></td>
+
+</tr></table>                                                    </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+
+<!-- l. 1055 --><p class="noindent"><span class="paragraphHead" id="additional-discussion-paragraph"> <a id="x1-105000"></a><span class="ptmb8t-">Additional discussion paragraph:</span></span>
+The strongest argument for the service is that it makes unsafe behavior structurally hard.
+A scorer can be retrained, replaced, or degraded to a heuristic, but hard constraints still
+filter candidates first. This architectural invariant is the main research lesson.
+
+</p>
+<!-- l. 1059 --><p class="noindent"><span class="paragraphHead" id="benchmark-protocol"> <a id="x1-106000"></a><span class="ptmb8t-">Benchmark  Protocol:</span></span>
+The first complete benchmark should use an offline replay plus a load test. The replay tests
+decision quality; the load test tests service behavior. For replay, generate requests near
+ordinary streets, dense downtown blocks, venues, schools, and transit hubs. For load, test
+normal traffic, surge traffic, model-missing fallback, and congestion overload. Report quality
+and latency together because a slow safe service is not sufficient for real-time dispatch.
+</p>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 1063 --><p class="noindent"></p><figure class="float" id="x1-106001r11"><span id="minimal-benchmark-grid-for-the-first-complete-pinservice-run"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 11: </span><span class="content">Minimal benchmark grid for the first complete Pin-Service run.                   </span></figcaption><!-- tex4ht:label?: x1-106001r11  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-12"><colgroup id="TBL-12-1g"><col id="TBL-12-1"><col id="TBL-12-2"><col id="TBL-12-3"></colgroup><tr id="TBL-12-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-12-1-1" style="white-space:normal; text-align:left;"><!-- l. 1068 --><p class="noindent"><span class="ptmb8t-">Axis</span>                                 </p></td><td class="td11" id="TBL-12-1-2" style="white-space:normal; text-align:left;"> <!-- l. 1068 --><p class="noindent"><span class="ptmb8t-">Values</span>                                       </p></td><td class="td10" id="TBL-12-1-3" style="white-space:normal; text-align:left;"> <!-- l. 1068 --><p class="noindent"><span class="ptmb8t-">Reason</span>                                </p></td>
+</tr><tr id="TBL-12-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-12-2-1" style="white-space:normal; text-align:left;"><!-- l. 1070 --><p class="noindent">Replay area                       </p></td><td class="td11" id="TBL-12-2-2" style="white-space:normal; text-align:left;"> <!-- l. 1070 --><p class="noindent">street,     downtown,     venue,
+  school                                        </p></td><td class="td10" id="TBL-12-2-3" style="white-space:normal; text-align:left;"> <!-- l. 1070 --><p class="noindent">tests map-policy variety      </p></td>
+</tr><tr id="TBL-12-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-12-3-1" style="white-space:normal; text-align:left;"><!-- l. 1071 --><p class="noindent">Policy                               </p></td><td class="td11" id="TBL-12-3-2" style="white-space:normal; text-align:left;"> <!-- l. 1071 --><p class="noindent">nearest,   score,   constrained,
+  congestion                                 </p></td><td class="td10" id="TBL-12-3-3" style="white-space:normal; text-align:left;"> <!-- l. 1071 --><p class="noindent">isolates architecture             </p></td>
+</tr><tr id="TBL-12-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-12-4-1" style="white-space:normal; text-align:left;"><!-- l. 1072 --><p class="noindent">Failure                              </p></td><td class="td11" id="TBL-12-4-2" style="white-space:normal; text-align:left;"> <!-- l. 1072 --><p class="noindent">missing     model,     overload,
+  closure                                       </p></td><td class="td10" id="TBL-12-4-3" style="white-space:normal; text-align:left;"> <!-- l. 1072 --><p class="noindent">tests safe degradation          </p></td>
+</tr><tr id="TBL-12-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-12-5-1" style="white-space:normal; text-align:left;"><!-- l. 1073 --><p class="noindent">Metric                               </p></td><td class="td11" id="TBL-12-5-2" style="white-space:normal; text-align:left;"> <!-- l. 1073 --><p class="noindent">violation, walk, p99, shed rate  </p></td><td class="td10" id="TBL-12-5-3" style="white-space:normal; text-align:left;"> <!-- l. 1073 --><p class="noindent">balances safety and serving </p></td>
+
+</tr></table>                                                      </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+
+<!-- l. 1078 --><p class="noindent"><span class="paragraphHead" id="additional-benchmark-note"> <a id="x1-107000"></a><span class="ptmb8t-">Additional benchmark note:</span></span>
+The paper should report both average walking distance and tail walking distance. A policy
+can look acceptable on average while sending a minority of users to unreasonable
+pins. Tail metrics are especially important around venues and closures.
+
+</p>
+<!-- l. 1082 --><p class="noindent"><span class="paragraphHead" id="acceptance-criteria"> <a id="x1-108000"></a><span class="ptmb8t-">Acceptance  Criteria:</span></span>
+A final addition for Pin-Service is a measurement model that treats dispatch quality as a constrained serving
+problem rather than a pure ranking problem. Let <span class="mathjax-inline">\(r\)</span> be a ride request, <span class="mathjax-inline">\(\mathcal {P}(r)\)</span> be nearby map pins, <span class="mathjax-inline">\(\mathcal {F}(r)\subseteq \mathcal {P}(r)\)</span> be the feasible set after
+hard constraints, and <span class="mathjax-inline">\(p^\star \)</span> be the selected pin. The service should be evaluated first by whether it violates policy: </p><div class="mathjax-env mathjax-equation">\begin{equation} V = \frac {1}{N}\sum _{i=1}^{N} \mathbf {1}\{p_i^\star \notin \mathcal {F}(r_i)\}. \end{equation}</div>
+<p><a id="x1-108001r16"></a>
+<!-- l. 1090 --></p><p class="noindent">For a constraint-first service, the expected value of <span class="mathjax-inline">\(V\)</span> is zero on valid map fixtures. Any nonzero
+value should be treated as a correctness bug rather than a model-quality tradeoff.
+</p><!-- l. 1092 --><p class="noindent">The second measurement is user burden. If <span class="mathjax-inline">\(d_{\mathrm {walk}}(r_i,p_i^\star )\)</span> is walking distance, the paper should report both the mean and a tail statistic: </p><div class="mathjax-env mathjax-equation">\begin{equation} W_{95} = \operatorname {quantile}_{0.95} \left ( \{d_{\mathrm {walk}}(r_i,p_i^\star )\}_{i=1}^{N} \right ). \end{equation}</div>
+<p><a id="x1-108002r17"></a>
+<!-- l. 1100 --></p><p class="noindent">This prevents the benchmark from hiding unacceptable outcomes for a minority of riders. The third
+measurement is serving latency. Let <span class="mathjax-inline">\(\ell _i\)</span> be request latency. The dispatch setting should report <span class="mathjax-inline">\(p50\)</span>, <span class="mathjax-inline">\(p95\)</span>, and <span class="mathjax-inline">\(p99\)</span>, but the
+paper should treat <span class="mathjax-inline">\(p99\)</span> as the binding statistic because surge behavior is usually where a pin service fails.
+</p><!-- l. 1102 --><p class="noindent">The fourth measurement is congestion. If <span class="mathjax-inline">\(L_t(p)\)</span> is the active load assigned to pin <span class="mathjax-inline">\(p\)</span> at time <span class="mathjax-inline">\(t\)</span>, a simple overload score is </p><div class="mathjax-env mathjax-equation">\begin{equation} C = \frac {1}{T|\mathcal {P}|} \sum _{t=1}^{T} \sum _{p\in \mathcal {P}} \max (0, L_t(p)-\tau _p), \end{equation}</div>
+<p><a id="x1-108003r18"></a>
+<!-- l. 1110 --></p><p class="noindent">where <span class="mathjax-inline">\(\tau _p\)</span> is the configured safe capacity for that pin. This score is useful because an unconstrained ranker may
+repeatedly select a locally attractive pickup zone even after it has become operationally bad.
+
+</p>
+<!-- l. 1112 --><p class="noindent"><span class="paragraphHead" id="minimum-viable-replay"> <a id="x1-109000"></a><span class="ptmb8t-">Minimum  viable  replay:</span></span>
+The first publication-grade experiment should be an offline replay built from synthetic but policy-realistic
+requests. It should include ordinary curbside trips, venue exits, school boundaries, transit hubs,
+road closures, and dense downtown blocks. Synthetic replay is acceptable for a first paper only
+if the fixture policy is explicit and the paper avoids claims about real fleet performance. The
+point is to show that the architecture behaves correctly under known edge cases.
+</p><!-- l. 1116 --><p class="noindent">The replay should compare four policies. The nearest-pin baseline establishes the cost of ignoring policy.
+The learned-score baseline establishes whether ranking alone helps. The constrained-score
+policy tests the main architectural claim. The constrained-score policy with congestion tests
+whether live state changes the selected pins under load. The paper should include a failure replay
+where the model artifact is removed and the service falls back to deterministic scoring.
+
+</p>
+<!-- l. 1118 --><p class="noindent"><span class="paragraphHead" id="load-and-fallback-evidence"> <a id="x1-110000"></a><span class="ptmb8t-">Load and fallback evidence:</span></span>
+A service paper also needs serving evidence. The minimal load test should hold the map fixture
+fixed, replay requests at increasing concurrency, and report latency, rejection behavior, and
+fallback success. It is better to show a small honest load test than to imply production scale
+without measurements. For this project, the local unit tests and model-training script already show
+that the implementation can train a scorer, load it, and pass service checks. The next measured
+artifact should be a repeatable command that emits replay and load-test tables.
+</p>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 1122 --><p class="noindent"></p><figure class="float" id="x1-110001r12"><span id="acceptance-criteria-for-the-first-pinservice-benchmark"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 12: </span><span class="content">Acceptance criteria for the first Pin-Service benchmark.                         </span></figcaption><!-- tex4ht:label?: x1-110001r12  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-13"><colgroup id="TBL-13-1g"><col id="TBL-13-1"><col id="TBL-13-2"></colgroup><tr id="TBL-13-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-13-1-1" style="white-space:normal; text-align:left;"><!-- l. 1127 --><p class="noindent"><span class="ptmb8t-">Criterion</span>                                  </p></td><td class="td10" id="TBL-13-1-2" style="white-space:normal; text-align:left;"> <!-- l. 1127 --><p class="noindent"><span class="ptmb8t-">Interpretation</span>                                                 </p></td>
+</tr><tr id="TBL-13-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-13-2-1" style="white-space:normal; text-align:left;"><!-- l. 1129 --><p class="noindent">Violation rate is zero                  </p></td><td class="td10" id="TBL-13-2-2" style="white-space:normal; text-align:left;"> <!-- l. 1129 --><p class="noindent">hard constraints dominate scoring                   </p></td>
+</tr><tr id="TBL-13-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-13-3-1" style="white-space:normal; text-align:left;"><!-- l. 1130 --><p class="noindent">Tail    walking    distance    is
+bounded                                     </p></td><td class="td10" id="TBL-13-3-2" style="white-space:normal; text-align:left;"> <!-- l. 1130 --><p class="noindent">rider burden is not hidden by averages            </p></td>
+</tr><tr id="TBL-13-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-13-4-1" style="white-space:normal; text-align:left;"><!-- l. 1131 --><p class="noindent">p99 latency is reported               </p></td><td class="td10" id="TBL-13-4-2" style="white-space:normal; text-align:left;"> <!-- l. 1131 --><p class="noindent">service behavior is tested under load               </p></td>
+</tr><tr id="TBL-13-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-13-5-1" style="white-space:normal; text-align:left;"><!-- l. 1132 --><p class="noindent">Fallback succeeds                      </p></td><td class="td10" id="TBL-13-5-2" style="white-space:normal; text-align:left;"> <!-- l. 1132 --><p class="noindent">missing model does not break dispatch           </p></td>
+</tr><tr id="TBL-13-6-" style="vertical-align:baseline;"><td class="td01" id="TBL-13-6-1" style="white-space:normal; text-align:left;"><!-- l. 1133 --><p class="noindent">Congestion score improves        </p></td><td class="td10" id="TBL-13-6-2" style="white-space:normal; text-align:left;"> <!-- l. 1133 --><p class="noindent">assignments spread under surge                      </p></td>
+
+</tr></table>                                                 </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 1138 --><p class="noindent"></p><figure class="float" id="x1-110002r13"><span id="minimum-evidence-package-before-making-productionstyle-claims"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 13: </span><span class="content">Minimum evidence package before making production-style claims.                </span></figcaption><!-- tex4ht:label?: x1-110002r13  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-14"><colgroup id="TBL-14-1g"><col id="TBL-14-1"><col id="TBL-14-2"></colgroup><tr id="TBL-14-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-14-1-1" style="white-space:normal; text-align:left;"><!-- l. 1143 --><p class="noindent"><span class="ptmb8t-">Artifact</span>                              </p></td><td class="td10" id="TBL-14-1-2" style="white-space:normal; text-align:left;"> <!-- l. 1143 --><p class="noindent"><span class="ptmb8t-">Required content</span>                                            </p></td>
+</tr><tr id="TBL-14-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-14-2-1" style="white-space:normal; text-align:left;"><!-- l. 1145 --><p class="noindent">Replay manifest                   </p></td><td class="td10" id="TBL-14-2-2" style="white-space:normal; text-align:left;"> <!-- l. 1145 --><p class="noindent">request  seeds,  map  fixture  version,  policy
+  flags                                                                  </p></td>
+</tr><tr id="TBL-14-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-14-3-1" style="white-space:normal; text-align:left;"><!-- l. 1146 --><p class="noindent">Benchmark script                </p></td><td class="td10" id="TBL-14-3-2" style="white-space:normal; text-align:left;"> <!-- l. 1146 --><p class="noindent">one command that regenerates all tables         </p></td>
+</tr><tr id="TBL-14-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-14-4-1" style="white-space:normal; text-align:left;"><!-- l. 1147 --><p class="noindent">Load report                          </p></td><td class="td10" id="TBL-14-4-2" style="white-space:normal; text-align:left;"> <!-- l. 1147 --><p class="noindent">concurrency  levels,  p50,  p95,  p99,  rejection
+  count                                                                </p></td>
+</tr><tr id="TBL-14-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-14-5-1" style="white-space:normal; text-align:left;"><!-- l. 1148 --><p class="noindent">Fallback report                    </p></td><td class="td10" id="TBL-14-5-2" style="white-space:normal; text-align:left;"> <!-- l. 1148 --><p class="noindent">missing    model,    overload,    no-feasible-pin
+  behavior                                                           </p></td>
+</tr><tr id="TBL-14-6-" style="vertical-align:baseline;"><td class="td01" id="TBL-14-6-1" style="white-space:normal; text-align:left;"><!-- l. 1149 --><p class="noindent">Trace sample                       </p></td><td class="td10" id="TBL-14-6-2" style="white-space:normal; text-align:left;"> <!-- l. 1149 --><p class="noindent">candidate set, filtered set, selected pin, reason
+  codes                                                                </p></td>
+
+</tr></table>                                                    </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+
+<!-- l. 1154 --><p class="noindent"><span class="paragraphHead" id="limitations"> <a id="x1-111000"></a><span class="ptmb8t-">Limitations:</span></span>
+The HD map in the repository is a fixture, not a production map. The scoring features use deterministic
+lightweight fallbacks for historical success and local supply. The congestion tracker is a
+single-process, lock-protected dictionary; a real fleet would shard it or move it to Redis or a
+purpose-built state service. The ETA value is a baseline. These limitations are acceptable for a
+reference implementation but must be replaced before operational deployment claims.
+
+</p>
+<h2 class="sectionHead" id="conclusion-and-outlook"><span class="titlemark">6    </span>    <a id="x1-1120006"></a>Conclusion and Outlook</h2>
+<!-- l. 1160 --><p class="noindent">Pin Infrastructure Service demonstrates a clean, defensible serving pattern for autonomous
+ride-hail PUDO selection: generate plausible candidates, enforce hard constraints first,
+rank feasible options, control congestion, and observe every stage. The arXiv-ready paper
+gives the project a paper structure without overstating the current evidence.
+
+</p>
+<h2 class="likesectionHead" id="references"> <a id="x1-113000"></a>References</h2>
+<!-- l. 1 --><p class="noindent">
+    </p><section class="thebibliography" role="doc-bibliography"><dl><dt>
+ [1] </dt><dd><a id="Xalonso2017ridesharing"></a>Javier Alonso-Mora et al.   On-demand high-capacity ride-sharing via dynamic trip-vehicle
+    assignment. <span class="ptmri8t-">PNAS</span>, 2017.
+    </dd><dt>
+ [2] </dt><dd><a id="Xbeckmann1990rstar"></a>Norbert Beckmann, Hans-Peter Kriegel, Ralf Schneider, and Bernhard Seeger. The r*-tree: An
+    efficient and robust access method for points and rectangles. In <span class="ptmri8t-">SIGMOD</span>, 1990.
+    </dd><dt>
+ [3] </dt><dd><a id="Xbishop2006pattern"></a>Christopher M. Bishop. <span class="ptmri8t-">Pattern Recognition and Machine Learning</span>. Springer, 2006.
+    </dd><dt>
+ [4] </dt><dd><a id="Xboeing2017osmnx"></a>Geoff Boeing.  Osmnx: New methods for acquiring, constructing, analyzing, and visualizing
+    complex street networks. <span class="ptmri8t-">Computers, Environment and Urban Systems</span>, 2017.
+    </dd><dt>
+ [5] </dt><dd><a id="Xboyd2004convex"></a>Stephen Boyd and Lieven Vandenberghe.  <span class="ptmri8t-">Convex Optimization</span>.  Cambridge University Press,
+    2004.
+    </dd><dt>
+ [6] </dt><dd><a id="Xbrakatsoulas2005mapmatching"></a>Sotiris Brakatsoulas, Dieter Pfoser, Randall Salas, and Carola Wenk. On map-matching vehicle
+    tracking data. In <span class="ptmri8t-">VLDB</span>, 2005.
+    </dd><dt>
+ [7] </dt><dd><a id="Xbubeck2015convex"></a>Sébastien Bubeck. Convex optimization: Algorithms and complexity. <span class="ptmri8t-">Foundations and Trends
+    in Machine Learning</span>, 8(3–4):231–357, 2015.
+    </dd><dt>
+ [8] </dt><dd><a id="Xburges2010ranknet"></a>Christopher J. C. Burges. From ranknet to lambdarank to lambdamart: An overview. <span class="ptmri8t-">Microsoft
+    Research Technical Report</span>, 2010.
+    </dd><dt>
+ [9] </dt><dd><a id="Xcastillo2017surge"></a>Juan Camilo Castillo, Dan Knoepfle, and Glen Weyl.   Surge pricing solves the wild goose
+    chase. In <span class="ptmri8t-">ACM EC</span>, 2017.
+    </dd><dt>
+[10] </dt><dd><a id="Xchen2016xgboost"></a>Tianqi Chen and Carlos Guestrin. Xgboost: A scalable tree boosting system. In <span class="ptmri8t-">KDD</span>, 2016.
+    </dd><dt>
+[11] </dt><dd><a id="Xcover2006elements"></a>Thomas M.  Cover  and  Joy A.  Thomas.   <span class="ptmri8t-">Elements  of  Information  Theory</span>.   Wiley,  second
+    edition, 2006.
+                                                                            
+                                                                            
+    </dd><dt>
+[12] </dt><dd><a id="Xdantzig1959truck"></a>George B.  Dantzig  and  John H.  Ramser.    The  truck  dispatching  problem.    <span class="ptmri8t-">Management
+    Science</span>, 1959.
+    </dd><dt>
+[13] </dt><dd><a id="Xdean2013tail"></a>Jeffrey Dean and Luiz Andre Barroso. The tail at scale. <span class="ptmri8t-">Communications of the ACM</span>, 2013.
+    </dd><dt>
+[14] </dt><dd><a id="Xdijkstra1959"></a>Edsger W.  Dijkstra.     A  note  on  two  problems  in  connexion  with  graphs.     <span class="ptmri8t-">Numerische
+    Mathematik</span>, 1959.
+    </dd><dt>
+[15] </dt><dd><a id="Xfriedman2001greedy"></a>Jerome H.  Friedman.   Greedy  function  approximation:  A  gradient  boosting  machine.   <span class="ptmri8t-">The
+    Annals of Statistics</span>, 29(5):1189–1232, 2001.
+    </dd><dt>
+[16] </dt><dd><a id="Xgoodfellow2016deep"></a>Ian Goodfellow, Yoshua Bengio, and Aaron Courville. <span class="ptmri8t-">Deep Learning</span>. MIT Press, 2016.
+    </dd><dt>
+[17] </dt><dd><a id="Xgrpc"></a>gRPC   Authors.       grpc:   A   high   performance,   open   source   universal   rpc   framework.
+    <a class="url" href="https://grpc.io/"><span class="pcrr8t-">https://grpc.io/</span></a>, 2026.
+    </dd><dt>
+[18] </dt><dd><a id="Xguttman1984rtree"></a>Antonin Guttman. R-trees: A dynamic index structure for spatial searching. In <span class="ptmri8t-">ACM SIGMOD
+    International Conference on Management of Data</span>, 1984.
+    </dd><dt>
+[19] </dt><dd><a id="Xhaklay2008osm"></a>Mordechai  Haklay  and  Patrick  Weber.   Openstreetmap:  User-generated  street  maps.   <span class="ptmri8t-">IEEE
+    Pervasive Computing</span>, 7(4):12–18, 2008.
+    </dd><dt>
+[20] </dt><dd><a id="Xhart1968astar"></a>Peter E.  Hart,  Nils J.  Nilsson,  and  Bertram  Raphael.     A  formal  basis  for  the  heuristic
+    determination of minimum cost paths. <span class="ptmri8t-">IEEE Transactions on Systems Science and Cybernetics</span>,
+    1968.
+    </dd><dt>
+[21] </dt><dd><a id="Xhastie2009elements"></a>Trevor Hastie, Robert Tibshirani, and Jerome Friedman. <span class="ptmri8t-">The Elements of Statistical Learning</span>.
+    Springer, second edition, 2009.
+    </dd><dt>
+[22] </dt><dd><a id="Xkingma2015adam"></a>Diederik P.  Kingma  and  Jimmy  Ba.    Adam:  A  method  for  stochastic  optimization.    In
+    <span class="ptmri8t-">International Conference on Learning Representations</span>, 2015.
+    </dd><dt>
+[23] </dt><dd><a id="Xkrumm2004travel"></a>John Krumm, Julie Letchner, and Eric Horvitz. Map matching with travel time constraints. In
+    <span class="ptmri8t-">SAE World Congress</span>, 2007.
+    </dd><dt>
+[24] </dt><dd><a id="Xlaporte2009fifty"></a>Gilbert Laporte. Fifty years of vehicle routing. <span class="ptmri8t-">Transportation Science</span>, 2009.
+    </dd><dt>
+[25] </dt><dd><a id="Xlecun1998gradient"></a>Yann  LeCun,  Léon  Bottou,  Yoshua  Bengio,  and  Patrick  Haffner.   Gradient-based  learning
+    applied to document recognition. <span class="ptmri8t-">Proceedings of the IEEE</span>, 86(11):2278–2324, 1998.
+    </dd><dt>
+[26] </dt><dd><a id="Xluxen2011osrm"></a>Dennis Luxen and Christian Vetter. Real-time routing with openstreetmap data. In <span class="ptmri8t-">GIS</span>, 2011.
+    </dd><dt>
+[27] </dt><dd><a id="Xzhang2016tshare"></a>Shuo  Ma,  Yu Zheng,  and  Ouri  Wolfson.   T-share:  A  large-scale  dynamic  taxi  ridesharing
+    service. In <span class="ptmri8t-">ICDE</span>, 2013.
+    </dd><dt>
+[28] </dt><dd><a id="Xmurphy2012machine"></a>Kevin P. Murphy. <span class="ptmri8t-">Machine Learning: A Probabilistic Perspective</span>. MIT Press, 2012.
+    </dd><dt>
+[29] </dt><dd><a id="Xnewson2009hidden"></a>Paul Newson and John Krumm.  Hidden markov map matching through noise and sparseness.
+    In  <span class="ptmri8t-">ACM  SIGSPATIAL  International  Conference  on  Advances  in  Geographic  Information
+    Systems</span>, 2009.
+    </dd><dt>
+[30] </dt><dd><a id="Xnocedal2006numerical"></a>Jorge Nocedal and Stephen J. Wright.   <span class="ptmri8t-">Numerical Optimization</span>.   Springer, second edition,
+    2006.
+    </dd><dt>
+[31] </dt><dd><a id="Xopentelemetry"></a>OpenTelemetry            Authors.                                      Opentelemetry            documentation.
+    <a class="url" href="https://opentelemetry.io/"><span class="pcrr8t-">https://opentelemetry.io/</span></a>, 2026.
+    </dd><dt>
+[32] </dt><dd><a id="Xpavone2012robotic"></a>Marco Pavone et al.  Robotic load balancing for mobility-on-demand systems.  <span class="ptmri8t-">International
+                                                                            
+                                                                            
+    Journal of Robotics Research</span>, 2012.
+    </dd><dt>
+[33] </dt><dd><a id="Xpearl2009causality"></a>Judea  Pearl.    <span class="ptmri8t-">Causality:  Models,  Reasoning,  and  Inference</span>.    Cambridge  University  Press,
+    second edition, 2009.
+    </dd><dt>
+[34] </dt><dd><a id="Xpostgis"></a>PostGIS  Project.     Postgis:  Spatial  and  geographic  objects  for  postgresql,  2026.     URL
+    <a class="url" href="https://postgis.net/"><span class="pcrr8t-">https://postgis.net/</span></a>.
+    </dd><dt>
+[35] </dt><dd><a id="Xprometheus"></a>Prometheus Authors. Prometheus monitoring system. <a class="url" href="https://prometheus.io/"><span class="pcrr8t-">https://prometheus.io/</span></a>, 2026.
+    </dd><dt>
+[36] </dt><dd><a id="Xrobbins1951stochastic"></a>Herbert  Robbins  and  Sutton  Monro.   A  stochastic  approximation  method.   <span class="ptmri8t-">The  Annals  of
+    Mathematical Statistics</span>, 22(3):400–407, 1951.
+    </dd><dt>
+[37] </dt><dd><a id="Xrumelhart1986learning"></a>David E. Rumelhart, Geoffrey E. Hinton, and Ronald J. Williams.  Learning representations
+    by back-propagating errors. <span class="ptmri8t-">Nature</span>, 323:533–536, 1986.
+    </dd><dt>
+[38] </dt><dd><a id="Xsanti2014quantifying"></a>Paolo  Santi  et al.   Quantifying  the  benefits  of  vehicle  pooling  with  shareability  networks.
+    <span class="ptmri8t-">PNAS</span>, 2014.
+    </dd><dt>
+[39] </dt><dd><a id="Xsavelsbergh1995vehicle"></a>Martin  W. P.  Savelsbergh  and  Marc  Sol.      The  general  pickup  and  delivery  problem.
+    <span class="ptmri8t-">Transportation Science</span>, 1995.
+    </dd><dt>
+[40] </dt><dd><a id="Xshannon1948communication"></a>Claude E. Shannon. A mathematical theory of communication. <span class="ptmri8t-">Bell System Technical Journal</span>,
+    27(3):379–423, 1948.
+    </dd><dt>
+[41] </dt><dd><a id="Xsigelman2010dapper"></a>Benjamin H. Sigelman et al.  Dapper, a large-scale distributed systems tracing infrastructure,
+    2010.
+    </dd><dt>
+[42] </dt><dd><a id="Xspieser2014toward"></a>Kevin Spieser et al.  Toward a systematic approach to the design and evaluation of automated
+    mobility-on-demand systems. <span class="ptmri8t-">Road Vehicle Automation</span>, 2014.
+    </dd><dt>
+[43] </dt><dd><a id="Xturing1950computing"></a>A. M. Turing. Computing machinery and intelligence. <span class="ptmri8t-">Mind</span>, 59(236):433–460, 1950.
+    </dd><dt>
+[44] </dt><dd><a id="Xh3"></a>Uber    Technologies.           H3:    Hexagonal    hierarchical    geospatial    indexing    system.
+    <a class="url" href="https://h3geo.org/"><span class="pcrr8t-">https://h3geo.org/</span></a>, 2026.
+    </dd><dt>
+[45] </dt><dd><a id="Xvapnik1998statistical"></a>Vladimir N. Vapnik. <span class="ptmri8t-">Statistical Learning Theory</span>. Wiley, 1998.
+    </dd><dt>
+[46] </dt><dd><a id="Xvickrey1969congestion"></a>William S. Vickrey. Congestion theory and transport investment. <span class="ptmri8t-">American Economic Review</span>,
+    1969.
+    </dd></dl></section>
+ 
+
+  </article>
+
+  <section class="bibtex-block" id="bibtex">
+    <h2>BibTeX</h2>
+    <button class="copy-bib" type="button" data-target="bibtex-code">Copy</button>
+    <pre><code id="bibtex-code">@misc{sharma2026pinservice,
+  title        = {Pin Infrastructure Service: A Constraint-First Microservice for Autonomous Ride-Hail Pickup and Drop-Off Selection},
+  author       = {Arun Sharma},
+  year         = {2026},
+  note         = {Project page / preprint},
+  howpublished = {\url{https://arunshar.github.io/cv-portfolio/projects/pin-service/}}
+}</code></pre>
+  </section>
+
+  <footer class="paper-footer">
+    <p>Project page for "Pin Infrastructure Service: A Constraint-First Microservice for Autonomous Ride-Hail Pickup and Drop-Off Selection", rendered from the LaTeX source. <a href="../../index.html">Back to homepage</a>.</p>
+  </footer>
+</div>
+<script src="../../assets/paper.js"></script>
+</body>
+</html>

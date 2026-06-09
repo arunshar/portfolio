@@ -1,0 +1,1443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PhysFlow-Earth: Physics-Constrained Rectified Flow for Earth Observation Super-Resolution and Climate Downscaling - Arun Sharma</title>
+<meta name="description" content="Physics-constrained rectified flow for Sentinel-2 super-resolution and ERA5/CHIRPS climate downscaling.">
+<link rel="stylesheet" href="paper.gen.css">
+<link rel="stylesheet" href="../../assets/paper.css">
+<script>window.MathJax = { tex: { tags: "ams" } };</script>
+<script async id="MathJax-script" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js"></script>
+</head>
+<body class="project-page">
+<div class="wrap">
+  <nav class="topnav"><a href="../../index.html">Arun Sharma</a> <span aria-hidden="true">/</span> <a href="../../index.html#projects">Selected Projects</a></nav>
+
+  <header class="paper-header">
+    <h1>PhysFlow-Earth: Physics-Constrained Rectified Flow for Earth Observation Super-Resolution and Climate Downscaling</h1>
+    <p class="authors">Arun Sharma</p>
+    <p class="affiliation">University of Minnesota, Twin Cities</p>
+    <p class="venue">In preparation. Target: NeurIPS 2026 Climate Change AI workshop</p>
+    <div class="buttons"><a class="btn" href="../../assets/papers/physflow-earth.pdf">Paper (PDF)</a>
+      <a class="btn" href="https://github.com/arunshar/physflow-earth" target="_blank" rel="noopener">Code</a>
+      <a class="btn" href="https://huggingface.co/spaces/Arun0808/physflow-earth" target="_blank" rel="noopener">Demo</a>
+      <a class="btn" href="paper.md">Markdown</a>
+      <a class="btn" href="#bibtex">BibTeX</a></div>
+  </header>
+
+  <figure class="teaser">
+    <img src="figures/main-375ccbd4af0e321b0943c22f7450a9b7.svg" alt="PhysFlow-Earth: Physics-Constrained Rectified Flow for Earth Observation Super-Resolution and Climate Downscaling overview" loading="lazy">
+  </figure>
+
+  <nav class="toc" aria-label="Contents">
+    <h2>Contents</h2>
+    <ol>
+      <li><a href="#introduction">Introduction</a></li>
+      <li><a href="#related-work">Related Work</a></li>
+      <li><a href="#method-and-architecture">Method and Architecture</a></li>
+      <li><a href="#evaluation">Evaluation</a></li>
+      <li><a href="#discussion-and-limitations">Discussion and Limitations</a></li>
+      <li><a href="#conclusion-and-outlook">Conclusion and Outlook</a></li>
+      <li><a href="#references">References</a></li>
+    </ol>
+  </nav>
+
+  <article class="paper-body">
+<section class="abstract" role="doc-abstract"> 
+
+<div class="centerline">                                  <span class="ptmb8t-x-x-120">Abstract</span>                                  </div>
+     <blockquote class="quote">
+     <!-- l. 254 --><p class="noindent">Generative super-resolution models can produce visually plausible Earth-observation
+     fields  while  violating  the  physical  quantities  that  make  the  fields  useful:  coarse
+     precipitation  totals,  wind  divergence,  or  spectral  index  consistency  in  multispectral
+     imagery. PhysFlow-Earth is a conditional rectified-flow stack for satellite and climate
+     downscaling that exposes these constraints as differentiable residuals during training.
+     The  implementation  combines  a  rectified-flow  objective,  a  Diffusion  Transformer
+     velocity   backbone,   low-resolution   conditioning   tokens,   and   a   learned   physics
+     codebook.   Residual   modules   enforce   average-pool   consistency   for   precipitation,
+     horizontal-divergence  penalties  for  wind,  and  band-ratio  consistency  for  Sentinel-2.
+     This  paper  documents  the  project  as  an  arXiv-style  systems  paper  grounded  in  the
+     current  repository.  It  reports  only  implementation  validation  from  the  test  suite  and
+     leaves benchmark claims for future reproduction on WorldStrat, SEN2VENuS, ERA5,
+     and CHIRPS.
+</p>
+     </blockquote>
+</section>
+
+<h2 class="sectionHead" id="introduction"><span class="titlemark">1    </span>    <a id="x1-10001"></a>Introduction</h2>
+<!-- l. 259 --><p class="noindent">Remote-sensing and climate products often require information at a spatial resolution finer than the native
+sensor or simulation grid. Super-resolution and statistical downscaling methods address this mismatch by
+learning a mapping from coarse fields to high-resolution fields. Diffusion and flow-based generative models
+are attractive because they represent uncertainty and can synthesize sharp spatial structure [<a href="#Xho2020denoising">11</a>, <a href="#Xlipman2023flow">23</a>, <a href="#Xliu2022rectified">24</a>]. In
+scientific geospatial settings, however, sharpness is not enough. The high-resolution output must preserve
+coarse aggregate mass, respect physically meaningful band relationships, and avoid vector-field artifacts.
+</p><!-- l. 261 --><p class="noindent">PhysFlow-Earth implements a conservative alternative: a conditional rectified flow whose training loss includes
+differentiable physics residuals evaluated on the projected clean sample. The repository is deliberately
+structured as a reusable research implementation. It provides the flow wrapper, residual operators, a DiT-style
+velocity model, a Diffusers-like pipeline interface, Hydra configuration, a Gradio Space, and CPU tests.
+</p><!-- l. 263 --><p class="noindent">This paper takes a conservative stance. The README describes intended benchmark targets and deployment
+workflows, but the current paper does not restate unverified leaderboard claims. Instead it explains the
+method, records what the tests establish, and names the measurements needed before submission.
+
+</p>
+<!-- l. 265 --><p class="noindent"><span class="paragraphHead" id="contributions"> <a id="x1-2000"></a><span class="ptmb8t-">Contributions:</span></span>
+     </p><dl class="enumerate-enumitem"><dt class="enumerate-enumitem">
+  1. </dt><dd class="enumerate-enumitem">A conditional rectified-flow objective for Earth-observation super-resolution with residuals
+     applied to the predicted clean sample.
+     </dd><dt class="enumerate-enumitem">
+  2. </dt><dd class="enumerate-enumitem">Differentiable  residual  modules  for  coarse  mass  conservation,  horizontal  wind  divergence,
+     and Sentinel-2 band-ratio preservation.
+     </dd><dt class="enumerate-enumitem">
+  3. </dt><dd class="enumerate-enumitem">A DiT velocity backbone with low-resolution conditioning tokens and cross-attention to a
+     learned physics codebook.
+     </dd><dt class="enumerate-enumitem">
+  4. </dt><dd class="enumerate-enumitem">A  reproducible  software  package  with  shape  tests,  residual  tests,  training-step  tests,  and  a
+     CPU-safe Hugging Face Space.</dd></dl>
+                                                                            
+                                                                            
+<figure class="figure"> 
+
+                                                                            
+                                                                            
+                                                                            
+                                                                            
+<!-- l. 279 --><p class="noindent" id="detailed-physflowearth-architecture-the-diagram-shows-the-tokenized-conditional-transport-path-the-repeated-attentionstyle-velocity-block-the-cleansample-decoder-and-the-physics-residual-heads-the-evaluation-side-is-explicit-so-image-metrics-scientific-residuals-calibration-and-sampling-cost-are-not-conflated"><img alt="Figure" src="figures/main-375ccbd4af0e321b0943c22f7450a9b7.svg" loading="lazy">
+<a id="x1-2005r1"></a>
+</p>
+<figcaption class="caption"><span class="id">Figure 1:  </span><span class="content">Detailed  PhysFlow-Earth  architecture.  The  diagram  shows  the  tokenized  conditional
+transport path, the repeated attention-style velocity block, the clean-sample decoder, and the physics
+residual heads. The evaluation side is explicit so image metrics, scientific residuals, calibration, and
+sampling cost are not conflated.
+</span></figcaption><!-- tex4ht:label?: x1-2005r1  -->
+                                                                            
+                                                                            
+</figure>
+
+<!-- l. 342 --><p class="noindent"><span class="paragraphHead" id="scope"> <a id="x1-3000"></a><span class="ptmb8t-">Scope:</span></span>
+The central research tension in Earth-observation downscaling is that visual quality and scientific
+validity are not the same objective. A high-resolution precipitation field can look crisp while
+violating the coarse accumulation that conditioned it. A wind field can look spatially realistic
+while producing implausible divergence artifacts. A multispectral sample can improve image
+metrics while distorting indices used by downstream land-cover or water analysis. This
+makes naive image super-resolution a poor default for scientific geospatial data.
+</p><!-- l. 346 --><p class="noindent">PhysFlow-Earth positions generative modeling as a conditional transport problem with explicit scientific
+residuals. The model is allowed to represent uncertainty and high-frequency structure, but it is penalized
+when the predicted endpoint violates known aggregate or spectral constraints. This is a middle path between
+unconstrained image generation and hard-coded physical simulation. It is not a replacement for
+numerical weather prediction or radiative-transfer modeling. It is a lightweight framework for
+making neural downscaling less indifferent to the quantities that domain users care about.
+</p><!-- l. 348 --><p class="noindent">The choice of rectified flow is pragmatic. Diffusion models are strong but can require many
+denoising steps and a more complex training objective. Rectified flow gives a direct velocity target
+and a clean endpoint estimate. That endpoint estimate is precisely where residuals should be
+evaluated. The method therefore has a natural place to ask: if this is the model’s current clean
+high-resolution field, does it preserve mass, divergence behavior, and band relationships?
+</p><!-- l. 350 --><p class="noindent">The paper should be read as a research implementation rather than a leaderboard claim. The
+repository implements the residuals, model wrapper, DiT-style velocity path, pipeline surface, and
+tests. What it does not yet contain is a public benchmark table on WorldStrat, SEN2VENuS,
+ERA5, WeatherBench, or CHIRPS. This distinction matters. This paper builds enough theory and
+evaluation detail to make those future results interpretable instead of merely decorative.
+
+</p>
+<!-- l. 352 --><p class="noindent"><span class="paragraphHead" id="expanded-contributions"> <a id="x1-4000"></a><span class="ptmb8t-">Expanded  contributions:</span></span>
+The expanded version contributes four additional research assets: a residual-weight selection protocol, an
+area-weighted aggregation extension for global grids, an uncertainty-evaluation plan for generative
+downscaling, and a set of reader-facing claim boundaries. These are necessary because a physics-guided
+generative model can otherwise sound impressive while remaining scientifically under-specified.
+
+</p>
+<h2 class="sectionHead" id="related-work"><span class="titlemark">2    </span>    <a id="x1-50002"></a>Related  Work</h2>
+
+<!-- l. 357 --><p class="noindent"><span class="paragraphHead" id="expanded-citation-map"> <a id="x1-6000"></a><span class="ptmb8t-">Expanded  Citation  Map:</span></span>
+The expanded references place PhysFlow-Earth between image restoration, generative modeling,
+physics-informed learning, and weather/remote-sensing downscaling. SRCNN, SRGAN, EDSR, RCAN,
+SwinIR, and U-Net represent the classical deep restoration backbone family [<a href="#Xdong2016srcnn">8</a>, <a href="#Xledig2017srgan">18</a>, <a href="#Xliang2021swinir">21</a>, <a href="#Xlim2017edsr">22</a>, <a href="#Xronneberger2015unet">38</a>, <a href="#Xzhang2018rcan">46</a>].
+DDPM, score-based modeling, Palette, latent diffusion, EDM, DiT, rectified flow, flow matching, and
+stochastic interpolants define the generative side [<a href="#Xalbergo2023stochastic">1</a>, <a href="#Xho2020denoising">11</a>, <a href="#Xkarras2022edm">14</a>, <a href="#Xlipman2023flow">23</a>, <a href="#Xliu2022rectified">24</a>, <a href="#Xpeebles2023scalable">31</a>, <a href="#Xrombach2022latent">37</a>, <a href="#Xsaharia2022image">40</a>, <a href="#Xsong2021score">42</a>]. Physics-informed
+neural networks, theory-guided data science, scientific-knowledge integration, Fourier neural operators,
+FourCastNet, GraphCast, Pangu-Weather, and generative precipitation nowcasting motivate residual checks
+beyond perceptual sharpness [<a href="#Xbi2023panguweather">2</a>, <a href="#Xkarniadakis2021physicsinformed">12</a>, <a href="#Xkarpatne2017theory">13</a>, <a href="#Xlam2023graphcast">16</a>, <a href="#Xli2021fourier">20</a>, <a href="#Xpathak2022fourcastnet">29</a>, <a href="#Xraissi2019physics">32</a>, <a href="#Xravuri2021skillful">33</a>, <a href="#Xwillard2022integrating">45</a>]. WorldStrat, SEN2VENuS, CorrDiff,
+and precipitation diffusion define the likely benchmark neighborhood [<a href="#Xcornebise2022worldstrat">6</a>, <a href="#Xleinonen2023precipitation">19</a>, <a href="#Xmardani2023corrdiff">25</a>, <a href="#Xmichel2022sen2venus">26</a>].
+
+</p>
+<!-- l. 361 --><p class="noindent"><span class="paragraphHead" id="generative-superresolution"> <a id="x1-7000"></a><span class="ptmb8t-">Generative super-resolution:</span></span>
+Diffusion models have become a standard route to high-fidelity image generation [<a href="#Xho2020denoising">11</a>, <a href="#Xsaharia2022image">40</a>, <a href="#Xsong2021score">42</a>]. Rectified
+flow and flow matching simplify sampling by learning velocity fields between noise and data [<a href="#Xlipman2023flow">23</a>, <a href="#Xliu2022rectified">24</a>].
+PhysFlow-Earth follows this family but treats physical consistency as a training objective, not a post-hoc filter.
+                                                                            
+                                                                            
+
+</p>
+<!-- l. 364 --><p class="noindent"><span class="paragraphHead" id="transformers-for-diffusion-and-flow"> <a id="x1-8000"></a><span class="ptmb8t-">Transformers for diffusion and flow:</span></span>
+Diffusion Transformers replace U-Net inductive biases with patch-token self-attention and
+adaptive normalization [<a href="#Xpeebles2023scalable">31</a>]. This design is useful for multispectral and climate grids because
+conditioning can be represented as tokens rather than only as concatenated channels.
+
+</p>
+<!-- l. 367 --><p class="noindent"><span class="paragraphHead" id="physicsguided-machine-learning"> <a id="x1-9000"></a><span class="ptmb8t-">Physics-guided machine learning:</span></span>
+Physics-informed neural networks and knowledge-guided machine learning show that scientific constraints
+can improve generalization and prevent physically invalid outputs [<a href="#Xkarpatne2017theory">13</a>, <a href="#Xraissi2019physics">32</a>]. PhysFlow-Earth keeps the
+constraint layer lightweight: residuals are ordinary differentiable PyTorch modules with a common interface.
+
+</p>
+<!-- l. 370 --><p class="noindent"><span class="paragraphHead" id="earthobservation-downscaling"> <a id="x1-10000"></a><span class="ptmb8t-">Earth-observation downscaling:</span></span>
+Remote-sensing super-resolution and climate downscaling have different data assumptions but a shared
+mathematical structure: infer a high-resolution field conditioned on a coarser observation. WorldStrat
+provides paired high-resolution commercial satellite imagery and Sentinel-2 context for global
+super-resolution research [<a href="#Xcornebise2022worldstrat">6</a>]. SEN2VENuS provides Sentinel-2 and VEN<span class="mathjax-inline">\(\mu \)</span>S acquisitions for
+radiometrically consistent super-resolution [<a href="#Xmichel2022sen2venus">26</a>]. Diffusion-based atmospheric downscaling
+work such as CorrDiff and spatiotemporal precipitation diffusion shows that generative
+models can sharpen weather fields while representing uncertainty [<a href="#Xleinonen2023precipitation">19</a>, <a href="#Xmardani2023corrdiff">25</a>]. PhysFlow-Earth
+fits into this line but makes the residual constraints explicit in the loss. Earth-system ML and
+climate-ML surveys further argue that process understanding and scientific diagnostics should be
+integrated into model design rather than left as a post-hoc visualization layer [<a href="#Xreichstein2019deep">34</a>, <a href="#Xrolnick2019climate">36</a>].
+
+</p>
+<!-- l. 375 --><p class="noindent"><span class="paragraphHead" id="literature-synthesis"> <a id="x1-11000"></a><span class="ptmb8t-">Literature  synthesis:</span></span>
+PhysFlow-Earth combines two research streams that are often evaluated with different instincts.
+Diffusion, score-based modeling, rectified flows, latent diffusion, and flow matching provide
+powerful conditional generative models for images [<a href="#Xho2020denoising">11</a>, <a href="#Xkarras2022edm">14</a>, <a href="#Xlipman2023flow">23</a>, <a href="#Xliu2022rectified">24</a>, <a href="#Xrombach2022latent">37</a>, <a href="#Xsong2021score">42</a>]. Remote-sensing
+super-resolution and downscaling papers, including SRGAN, EDSR, RCAN, SwinIR, CorrDiff,
+GraphCast, FourCastNet, Pangu-Weather, and precipitation nowcasting, emphasize scientific
+validity, calibration, and geophysical structure [<a href="#Xbi2023panguweather">2</a>, <a href="#Xlam2023graphcast">16</a>, <a href="#Xledig2017srgan">18</a>, <a href="#Xliang2021swinir">21</a>, <a href="#Xlim2017edsr">22</a>, <a href="#Xmardani2023corrdiff">25</a>, <a href="#Xpathak2022fourcastnet">29</a>, <a href="#Xravuri2021skillful">33</a>, <a href="#Xzhang2018rcan">46</a>].
+</p><!-- l. 378 --><p class="noindent">The key tension is that perceptual sharpness and physical consistency are not identical objectives. A
+visually plausible high-resolution field can violate conservation, band relationships, or uncertainty
+calibration. Physics-informed neural networks and theory-guided data science address this tension by
+placing governing equations or residual constraints into the learning objective [<a href="#Xkarniadakis2021physicsinformed">12</a>, <a href="#Xkarpatne2017theory">13</a>, <a href="#Xraissi2019physics">32</a>, <a href="#Xwillard2022integrating">45</a>].
+PhysFlow-Earth uses that idea in a generative downscaling setting: the residual does not replace the
+likelihood or flow objective, but it biases the sampler toward fields that respect declared physical checks.
+</p><!-- l. 380 --><p class="noindent">Earth-observation benchmarks also require careful geographic splits. WorldStrat, SEN2VENUS,
+and climate AI surveys show that remote-sensing models often fail when geography, season,
+sensor conditions, or domain shift changes [<a href="#Xcornebise2022worldstrat">6</a>, <a href="#Xmichel2022sen2venus">26</a>, <a href="#Xreichstein2019deep">34</a>, <a href="#Xrolnick2019climate">36</a>]. The literature therefore supports
+an evaluation that reports image metrics, residual metrics, uncertainty metrics, and held-out
+geography together. That combined reporting is the distinguishing feature of the paper.
+
+</p>
+<!-- l. 382 --><p class="noindent"><span class="paragraphHead" id="foundational-reference-anchors"> <a id="x1-12000"></a><span class="ptmb8t-">Foundational reference anchors:</span></span>
+The bibliography also anchors the project-specific contribution in older and broader technical
+foundations: statistical learning and pattern recognition, deep learning, information theory,
+convex and numerical optimization, stochastic approximation, adaptive gradient methods,
+causality, and early AI framing [<a href="#Xbishop2006pattern">3</a>–<a href="#Xbubeck2015convex">5</a>, <a href="#Xcover2006elements">7</a>, <a href="#Xgoodfellow2016deep">9</a>, <a href="#Xhastie2009elements">10</a>, <a href="#Xkingma2015adam">15</a>, <a href="#Xlecun1998gradient">17</a>, <a href="#Xmurphy2012machine">27</a>, <a href="#Xnocedal2006numerical">28</a>, <a href="#Xpearl2009causality">30</a>, <a href="#Xrobbins1951stochastic">35</a>, <a href="#Xrumelhart1986learning">39</a>, <a href="#Xshannon1948communication">41</a>, <a href="#Xturing1950computing">43</a>, <a href="#Xvapnik1998statistical">44</a>].
+                                                                            
+                                                                            
+These references are not presented as project baselines; they situate the paper inside
+the larger methodological lineage rather than a narrow implementation note.
+
+</p>
+<h2 class="sectionHead" id="method-and-architecture"><span class="titlemark">3    </span>    <a id="x1-130003"></a>Method and Architecture</h2>
+
+<!-- l. 386 --><p class="noindent"><span class="paragraphHead" id="problem-formulation"> <a id="x1-14000"></a><span class="ptmb8t-">Problem  Formulation:</span></span>
+Let <span class="mathjax-inline">\(x_{\ell }\)</span> be a low-resolution input field and <span class="mathjax-inline">\(x_h\)</span> be the high-resolution target. The task is to learn a
+conditional generator <span class="mathjax-inline">\(G_{\theta }(x_{\ell })\)</span> that produces high-resolution samples <span class="mathjax-inline">\(\hat {x}_h\)</span> matching the data distribution while
+preserving a set of physical or spectral constraints. Each modality defines a residual operator <span class="mathjax-inline">\(R_m\)</span>: </p><div class="mathjax-env mathjax-equation">\begin{equation} R_m(\hat {x}_h, x_{\ell }) \rightarrow \mathbb {R}^{C_m \times H_m \times W_m}. \end{equation}</div>
+<p><a id="x1-14001r1"></a>
+<!-- l. 392 --></p><p class="noindent">For coarse mass conservation, <span class="mathjax-inline">\(R\)</span> is an average-pooling error. For wind, it is a finite-difference
+divergence. For Sentinel-2, it compares indices such as NDVI and NDWI after downsampling.
+
+</p>
+<!-- l. 394 --><p class="noindent"><span class="paragraphHead" id="method"> <a id="x1-15000"></a><span class="ptmb8t-">Method:</span></span>
+
+</p>
+<!-- l. 396 --><p class="noindent"><span class="paragraphHead" id="rectifiedflow-training"> <a id="x1-16000"></a><span class="ptmb8t-">Rectified-flow  training:</span></span>
+PhysFlow-Earth learns a velocity model <span class="mathjax-inline">\(v_{\theta }(x_t,t,c)\)</span> where <span class="mathjax-inline">\(c\)</span> includes low-resolution conditioning.
+For clean sample <span class="mathjax-inline">\(x_1\)</span> and random noise <span class="mathjax-inline">\(x_0\)</span>, the linear interpolant is </p><div class="mathjax-env mathjax-equation">\begin{equation} x_t = (1-t)x_0 + tx_1, \quad t\sim \mathcal {U}(0,1). \end{equation}</div>
+<p><a id="x1-16001r2"></a>
+<!-- l. 402 --></p><p class="noindent">The vanilla rectified-flow target is the constant velocity </p><div class="mathjax-env mathjax-equation">\begin{equation} v^* = x_1 - x_0. \end{equation}</div>
+<p><a id="x1-16002r3"></a>
+<!-- l. 406 --></p><p class="noindent">The implementation computes a projected clean sample </p><div class="mathjax-env mathjax-equation">\begin{equation} \hat {x}_1 = x_t + (1-t)v_{\theta }(x_t,t,c), \end{equation}</div>
+<p><a id="x1-16003r4"></a>
+<!-- l. 410 --></p><p class="noindent">and evaluates residuals on <span class="mathjax-inline">\(\hat {x}_1\)</span>. The total objective is </p><div class="mathjax-env mathjax-equation">\begin{equation} \mathcal {L} = \|v_{\theta }(x_t,t,c)-(x_1-x_0)\|_2^2 + \lambda _{\text {phys}}\sum _m w_m \|R_m(\hat {x}_1,c)\|_2^2. \end{equation}</div>
+<p><a id="x1-16004r5"></a>
+<!-- l. 416 --></p><p class="noindent">Because the residual is evaluated before detaching the model output, gradients flow back through the velocity prediction.
+
+</p>
+<!-- l. 418 --><p class="noindent"><span class="paragraphHead" id="residual-operators"> <a id="x1-17000"></a><span class="ptmb8t-">Residual  operators:</span></span>
+
+</p>
+<!-- l. 420 --><p class="noindent"><span class="paragraphHead" id="mass-conservation"> <a id="x1-18000"></a><span class="ptmb8t-">Mass  conservation:</span></span>
+For precipitation or other scalar intensive fields, the high-resolution output should preserve coarse cell means. The residual is </p><div class="mathjax-env mathjax-equation">\begin{equation} R_{\text {mass}}(\hat {x}_h,x_{\ell }) = \text {AvgPool}_{s}(\hat {x}_h)-x_{\ell }. \end{equation}</div>
+<p><a id="x1-18001r6"></a>
+
+<!-- l. 427 --></p><p class="noindent"><span class="paragraphHead" id="horizontal-divergence"> <a id="x1-19000"></a><span class="ptmb8t-">Horizontal  divergence:</span></span>
+For a wind field <span class="mathjax-inline">\((u,v)\)</span>, PhysFlow-Earth computes a finite-difference divergence: </p><div class="mathjax-env mathjax-equation">\begin{equation} R_{\text {div}} = \frac {\partial u}{\partial x}+\frac {\partial v}{\partial y}. \end{equation}</div>
+<p><a id="x1-19001r7"></a>
+<!-- l. 432 --></p><p class="noindent">The operator is intentionally simple and unit-testable. Production runs should calibrate spacing from the actual grid.
+
+</p>
+<!-- l. 434 --><p class="noindent"><span class="paragraphHead" id="bandratio-consistency"> <a id="x1-20000"></a><span class="ptmb8t-">Band-ratio  consistency:</span></span>
+For Sentinel-2, the model compares downsampled spectral indices: </p><div class="mathjax-env mathjax-equation">\begin{equation} \begin {aligned} \text {NDVI}(x)&amp;=\frac {x_{\text {NIR}}-x_{\text {red}}}{x_{\text {NIR}}+x_{\text {red}}+\epsilon },\\ \text {NDWI}(x)&amp;=\frac {x_{\text {green}}-x_{\text {SWIR}}}{x_{\text {green}}+x_{\text {SWIR}}+\epsilon }. \end {aligned} \end{equation}</div>
+<p><a id="x1-20001r8"></a>
+<!-- l. 442 --></p><p class="noindent">The residual is the concatenation of average-pooled index differences.
+                                                                            
+                                                                            
+
+</p>
+<!-- l. 444 --><p class="noindent"><span class="paragraphHead" id="velocity-backbone"> <a id="x1-21000"></a><span class="ptmb8t-">Velocity  backbone:</span></span>
+The velocity network is a Diffusion Transformer. High-resolution noisy fields are patch-embedded.
+Low-resolution fields are tokenized separately and concatenated to the patch sequence. Each block applies
+self-attention, cross-attention to a learned physics codebook, and an adaptive normalization MLP driven by
+sinusoidal time embeddings. The output head maps patch tokens back to pixel space through pixel shuffle.
+
+</p>
+<!-- l. 448 --><p class="noindent"><span class="paragraphHead" id="implementation"> <a id="x1-22000"></a><span class="ptmb8t-">Implementation:</span></span>
+The project is packaged as <span class="pcrr8t-">physflow</span>. Core modules are intentionally narrow: </p>
+     <ul class="itemize1">
+     <li class="itemize"><span class="pcrr8t-">flow.RectifiedFlow</span>: wraps a velocity model and implements the hybrid loss.
+     </li>
+     <li class="itemize"><span class="pcrr8t-">physics.residual</span>: defines residual modules with a shared interface.
+     </li>
+     <li class="itemize"><span class="pcrr8t-">models.DiTVelocity</span>: implements the tokenized velocity backbone.
+     </li>
+     <li class="itemize"><span class="pcrr8t-">models.PhysFlowPipeline</span>: exposes inference in a pipeline style.
+     </li>
+     <li class="itemize"><span class="pcrr8t-">space/app.py</span>: demonstrates downscaling inputs and physics dashboards in Gradio.</li></ul>
+
+<h2 class="sectionHead" id="evaluation"><span class="titlemark">4    </span>    <a id="x1-230004"></a>Evaluation</h2>
+<!-- l. 461 --><p class="noindent">Table <a href="#current-validation-in-the-physflowearth-repository">1<!-- tex4ht:ref: tab:validation  --></a> summarizes the current implementation-grounded checks. These are not a replacement for
+benchmark evaluation, but they protect the scientific invariants the method depends on.
+</p>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 463 --><p class="noindent"></p><figure class="float" id="x1-23001r1"><span id="current-validation-in-the-physflowearth-repository"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 1: </span><span class="content">Current validation in the PhysFlow-Earth repository.                             </span></figcaption><!-- tex4ht:label?: x1-23001r1  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-2"><colgroup id="TBL-2-1g"><col id="TBL-2-1"><col id="TBL-2-2"><col id="TBL-2-3"></colgroup><tr id="TBL-2-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-2-1-1" style="white-space:normal; text-align:left;"><!-- l. 469 --><p class="noindent"><span class="ptmb8t-">Area</span>                                </p></td><td class="td11" id="TBL-2-1-2" style="white-space:normal; text-align:left;"> <!-- l. 469 --><p class="noindent"><span class="ptmb8t-">What is checked</span>                                                                         </p></td><td class="td10" id="TBL-2-1-3" style="white-space:normal; text-align:right;"> <span class="ptmb8t-">Count</span></td>
+</tr><tr id="TBL-2-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-2-2-1" style="white-space:normal; text-align:left;"><!-- l. 471 --><p class="noindent">Physics residuals              </p></td><td class="td11" id="TBL-2-2-2" style="white-space:normal; text-align:left;"> <!-- l. 471 --><p class="noindent">average  pooling  inverse,  zero  divergence  on  constant  fields,
+  linear-gradient divergence, mass residual, band-ratio residual   </p></td><td class="td10" id="TBL-2-2-3" style="white-space:normal; text-align:right;">     6</td>
+</tr><tr id="TBL-2-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-2-3-1" style="white-space:normal; text-align:left;"><!-- l. 472 --><p class="noindent">Flow training                    </p></td><td class="td11" id="TBL-2-3-2" style="white-space:normal; text-align:left;"> <!-- l. 472 --><p class="noindent">velocity  loss  decreases  on  a  tiny  model,  physics  loss  is
+  non-negative, full backward pass runs                                        </p></td><td class="td10" id="TBL-2-3-3" style="white-space:normal; text-align:right;">     3</td>
+</tr><tr id="TBL-2-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-2-4-1" style="white-space:normal; text-align:left;"><!-- l. 473 --><p class="noindent">Model and Space path      </p></td><td class="td11" id="TBL-2-4-2" style="white-space:normal; text-align:left;"> <!-- l. 473 --><p class="noindent">DiT  output  shape,  pipeline  output  shape,  UI  construction,
+  constants, requirements, HF frontmatter                                     </p></td><td class="td10" id="TBL-2-4-3" style="white-space:normal; text-align:right;">     8</td>
+
+</tr></table>                                                            </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+<!-- l. 478 --><p class="noindent">The next benchmark layer should evaluate WorldStrat and SEN2VENuS for Sentinel-2 super-resolution,
+ERA5 or WeatherBench-style grids for winds, and CHIRPS or ERA5 precipitation for
+conservation. Metrics should include PSNR, SSIM, LPIPS where appropriate, and residual-specific
+physical scores such as mass error, divergence norm, and spectral-index preservation.
+
+</p>
+<!-- l. 480 --><p class="noindent"><span class="paragraphHead" id="theory-conditional-transport-with-scientific-residuals"> <a id="x1-24000"></a><span class="ptmb8t-">Theory: Conditional Transport with Scientific Residuals:</span></span>
+PhysFlow-Earth can be understood as learning a conditional transport map from a simple base
+distribution to a high-resolution Earth-observation distribution. Let <span class="mathjax-inline">\(p_0\)</span> be the noise distribution
+and <span class="mathjax-inline">\(p_1(x_h\mid x_{\ell })\)</span> be the conditional data distribution of high-resolution fields given a low-resolution
+field. A continuous-time generator defines an ordinary differential equation </p><div class="mathjax-env mathjax-equation">\begin{equation} \frac {d x_t}{dt}=v_{\theta }(x_t,t,x_{\ell }),\qquad x_0\sim p_0,\quad t\in [0,1], \end{equation}</div>
+<p><a id="x1-24001r9"></a>
+<!-- l. 486 --></p><p class="noindent">and produces <span class="mathjax-inline">\(x_1\)</span> by integrating the learned velocity field. Rectified flow chooses a simple linear interpolation
+between paired samples and trains the model to predict the displacement between endpoints [<a href="#Xliu2022rectified">24</a>]. Flow
+matching generalizes this view to probability paths and corresponding vector fields [<a href="#Xlipman2023flow">23</a>].
+</p><!-- l. 488 --><p class="noindent">The scientific question is where physics enters this transport. A post-hoc filter can reject
+samples that violate a constraint, but rejection is expensive and does not teach the generator.
+A projection layer can force the output into a feasible set, but hard projections may be
+non-differentiable or may destroy perceptual detail. PhysFlow-Earth uses a softer design: it
+evaluates differentiable residuals on the predicted clean sample and adds those residuals to the
+training objective. This keeps sampling simple while shaping the learned velocity field.
+
+</p>
+<!-- l. 490 --><p class="noindent"><span class="paragraphHead" id="residuals-as-weak-constraints"> <a id="x1-25000"></a><span class="ptmb8t-">Residuals as weak constraints:</span></span>
+Let <span class="mathjax-inline">\(\mathcal {C}\)</span> be the ideal feasible set </p><div class="mathjax-env mathjax-equation">\begin{equation} \mathcal {C}(x_{\ell }) = \{x: R_m(x,x_{\ell })=0\ \forall m\}. \end{equation}</div>
+<p><a id="x1-25001r10"></a>
+<!-- l. 496 --></p><p class="noindent">The training objective with residual penalties is a weak enforcement of this set: </p><div class="mathjax-env mathjax-equation">\begin{equation} \mathbb {E}\left [ \|v_{\theta }(x_t,t,x_{\ell })-v^*\|_2^2 +\sum _m \lambda _m \|R_m(\hat {x}_1,x_{\ell })\|_2^2 \right ]. \end{equation}</div>
+<p><a id="x1-25002r11"></a>
+<!-- l. 503 --></p><p class="noindent">When <span class="mathjax-inline">\(\lambda _m\)</span> is small, residuals act as regularizers. When <span class="mathjax-inline">\(\lambda _m\)</span> is large, they approximate constrained optimization but
+may reduce sample diversity or introduce artifacts. A publication-quality version should therefore report a
+Pareto curve: perceptual quality versus physical residual. One scalar score is not enough.
+
+</p>
+<!-- l. 505 --><p class="noindent"><span class="paragraphHead" id="cleansample-projection"> <a id="x1-26000"></a><span class="ptmb8t-">Clean-sample  projection:</span></span>
+The residual is evaluated on </p><div class="mathjax-env mathjax-equation">\begin{equation} \hat {x}_1=x_t+(1-t)v_{\theta }(x_t,t,x_{\ell }), \end{equation}</div>
+<p><a id="x1-26001r12"></a>
+<!-- l. 511 --></p><p class="noindent">not on <span class="mathjax-inline">\(x_t\)</span>. This is important. At intermediate time <span class="mathjax-inline">\(t\)</span>, <span class="mathjax-inline">\(x_t\)</span> contains noise by construction and should not satisfy physical
+constraints. The projected clean sample is the model’s current estimate of the endpoint. Penalizing that
+estimate gives the velocity model useful gradients without asking noisy states to be physically meaningful.
+
+</p>
+<!-- l. 513 --><p class="noindent"><span class="paragraphHead" id="conservation-and-aggregation"> <a id="x1-27000"></a><span class="ptmb8t-">Conservation and aggregation:</span></span>
+For a coarse scalar field, the most basic consistency condition is aggregation: </p><div class="mathjax-env mathjax-equation">\begin{equation} A_s x_h \approx x_{\ell }, \end{equation}</div>
+<p><a id="x1-27001r13"></a>
+<!-- l. 519 --></p><p class="noindent">where <span class="mathjax-inline">\(A_s\)</span> averages each <span class="mathjax-inline">\(s\times s\)</span> high-resolution block. This is a discrete conservation law. For
+precipitation it can represent mass or accumulation consistency; for downscaled scalar
+variables it represents agreement with the coarse product. The residual </p><div class="mathjax-env mathjax-equation">\begin{equation} R_{\text {mass}}=A_s\hat {x}_h-x_{\ell } \end{equation}</div>
+<p><a id="x1-27002r14"></a>
+<!-- l. 523 --></p><p class="noindent">is simple, differentiable, and easy to test. It is also incomplete: it does not ensure realistic texture,
+extremes, or temporal coherence. It should be reported alongside distributional metrics.
+
+                                                                            
+                                                                            
+</p>
+<!-- l. 525 --><p class="noindent"><span class="paragraphHead" id="vectorfield-residuals"> <a id="x1-28000"></a><span class="ptmb8t-">Vector-field  residuals:</span></span>
+For wind, the divergence proxy is </p><div class="mathjax-env mathjax-equation">\begin{equation} R_{\text {div}}=\nabla _h\cdot \hat {u}, \end{equation}</div>
+<p><a id="x1-28001r15"></a>
+<!-- l. 531 --></p><p class="noindent">where <span class="mathjax-inline">\(\nabla _h\)</span> is a horizontal finite-difference operator. This is a weak proxy rather than a full atmospheric equation. It
+does not include vertical motion, pressure gradients, Coriolis terms, boundary-layer effects, or terrain. Its role in
+the current repository is to test the architecture for vector residuals. The benchmark paper should be careful:
+it can claim a differentiable divergence residual, not a full Navier-Stokes or primitive-equation solver.
+
+</p>
+<!-- l. 533 --><p class="noindent"><span class="paragraphHead" id="spectral-residuals"> <a id="x1-29000"></a><span class="ptmb8t-">Spectral  residuals:</span></span>
+For Sentinel-2 imagery, radiometric consistency can be more useful than a generic image prior. NDVI and
+NDWI constraints are examples of index-level consistency. If the high-resolution output looks sharp but
+changes vegetation or water indices after downsampling, it is less useful for downstream Earth-science
+tasks. The residuals therefore compare band-ratio functions after aggregation. Because ratios are sensitive to
+denominator noise, the implementation includes <span class="mathjax-inline">\(\epsilon \)</span> and should evaluate sensitivity to radiometric scaling.
+
+</p>
+<!-- l. 537 --><p class="noindent"><span class="paragraphHead" id="design-space"> <a id="x1-30000"></a><span class="ptmb8t-">Design  Space:</span></span>
+PhysFlow-Earth sits between three families of methods:
+     </p><dl class="enumerate-enumitem"><dt class="enumerate-enumitem">
+  1. </dt><dd class="enumerate-enumitem">deterministic super-resolution models trained with pixel or perceptual losses;
+     </dd><dt class="enumerate-enumitem">
+  2. </dt><dd class="enumerate-enumitem">diffusion or flow models trained for conditional sample quality;
+     </dd><dt class="enumerate-enumitem">
+  3. </dt><dd class="enumerate-enumitem">physics-informed models trained with residual constraints.</dd></dl>
+<!-- l. 545 --><p class="noindent">The project chooses the third path only where constraints are cheap and differentiable. It does not try to
+solve a full PDE inside the sampler. This is deliberate. A lightweight residual layer is easier to test, easier to
+ablate, and more likely to survive contact with heterogeneous satellite and climate products.
+
+</p>
+<!-- l. 547 --><p class="noindent"><span class="paragraphHead" id="why-rectified-flow"> <a id="x1-31000"></a><span class="ptmb8t-">Why  rectified  flow:</span></span>
+Rectified flow is attractive for this implementation because the target velocity <span class="mathjax-inline">\(x_1-x_0\)</span> is simple and the
+predicted clean sample has a closed-form estimate at any training time. For a portfolio
+implementation, this reduces moving parts relative to a multi-step denoising objective. In a
+future production model, the choice should be empirical: compare rectified flow, conditional
+diffusion, and flow matching under the same residual losses and sampling budgets.
+
+</p>
+<!-- l. 551 --><p class="noindent"><span class="paragraphHead" id="why-a-dit-backbone"> <a id="x1-32000"></a><span class="ptmb8t-">Why  a  DiT  backbone:</span></span>
+Earth-observation fields are multi-channel arrays with long-range spatial structure. A DiT-style backbone
+makes conditioning modular. Low-resolution fields, time embeddings, variable identifiers, and
+physics-codebook tokens can be represented as tokens. This is useful when the same architecture must
+handle precipitation, wind, and multispectral imagery. The tradeoff is compute: transformers scale poorly
+with token count unless patch size, attention pattern, or windowing is chosen carefully.
+
+</p>
+<!-- l. 555 --><p class="noindent"><span class="paragraphHead" id="why-a-physics-codebook"> <a id="x1-33000"></a><span class="ptmb8t-">Why a physics codebook:</span></span>
+The learned physics codebook in the current repository is a conditioning mechanism. It
+should not be oversold as symbolic physics. Its purpose is to give the model a small
+set of learned latent anchors that can interact with patch tokens. A future paper should
+ablate the codebook size and compare it with ordinary learned condition tokens.
+
+                                                                            
+                                                                            
+</p>
+<!-- l. 559 --><p class="noindent"><span class="paragraphHead" id="additional-literature-context"> <a id="x1-34000"></a><span class="ptmb8t-">Additional Literature Context:</span></span>
+
+</p>
+<!-- l. 561 --><p class="noindent"><span class="paragraphHead" id="diffusion-and-scorebased-generation"> <a id="x1-35000"></a><span class="ptmb8t-">Diffusion and score-based generation:</span></span>
+DDPM introduced a practical denoising objective for generative modeling [<a href="#Xho2020denoising">11</a>]. Score-based generative
+modeling framed the same family through stochastic differential equations [<a href="#Xsong2021score">42</a>]. SR3 showed that
+iterative refinement can produce strong image super-resolution results [<a href="#Xsaharia2022image">40</a>]. These methods are
+relevant because downscaling is a conditional image-generation problem. They are insufficient
+by themselves because scientific fields require consistency beyond visual plausibility.
+
+</p>
+<!-- l. 565 --><p class="noindent"><span class="paragraphHead" id="flow-matching-and-rectified-transport"> <a id="x1-36000"></a><span class="ptmb8t-">Flow matching and rectified transport:</span></span>
+Rectified flow learns a velocity field that moves noise to data along straight or nearly straight paths
+[<a href="#Xliu2022rectified">24</a>]. Flow matching provides a broader framework for learning continuous normalizing flows
+from prescribed probability paths [<a href="#Xlipman2023flow">23</a>]. PhysFlow-Earth uses this family because the velocity
+objective is direct and because residuals can be evaluated on the projected endpoint.
+
+</p>
+<!-- l. 569 --><p class="noindent"><span class="paragraphHead" id="climate-and-weather-downscaling"> <a id="x1-37000"></a><span class="ptmb8t-">Climate and weather downscaling:</span></span>
+CorrDiff uses residual corrective diffusion for kilometer-scale atmospheric downscaling [<a href="#Xmardani2023corrdiff">25</a>]. Precipitation
+video diffusion uses temporal conditioning to represent high-frequency precipitation patterns [<a href="#Xleinonen2023precipitation">19</a>]. These
+works motivate generative approaches for weather fields but also highlight the need for physical
+diagnostics: sharp precipitation maps are not automatically mass-consistent or decision-useful.
+
+</p>
+<!-- l. 573 --><p class="noindent"><span class="paragraphHead" id="remotesensing-superresolution-datasets"> <a id="x1-38000"></a><span class="ptmb8t-">Remote-sensing super-resolution datasets:</span></span>
+WorldStrat and SEN2VENuS are natural benchmark candidates [<a href="#Xcornebise2022worldstrat">6</a>, <a href="#Xmichel2022sen2venus">26</a>]. WorldStrat emphasizes
+global coverage and a pairing between high-resolution commercial imagery and Sentinel-2.
+SEN2VENuS emphasizes radiometrically consistent cross-sensor training data. A strong paper should
+use both if licensing and data volume allow because they stress different failure modes.
+
+</p>
+<!-- l. 577 --><p class="noindent"><span class="paragraphHead" id="evaluation-protocol"> <a id="x1-39000"></a><span class="ptmb8t-">Evaluation  Protocol:</span></span>
+</p>
+<figure class="figure"> 
+
+                                                                            
+                                                                            
+                                                                            
+                                                                            
+<!-- l. 581 --><p class="noindent" id="evaluation-structure-for-physflowearth-image-quality-physical-residuals-uncertainty-and-compute-are-reported-as-a-frontier-rather-than-one-scalar-score"> <img alt="Figure" src="figures/main-5c327efcb76c41679d0ad287e8ef156f.svg" loading="lazy">
+<a id="x1-39001r2"></a>
+</p>
+<figcaption class="caption"><span class="id">Figure 2: </span><span class="content">Evaluation structure for PhysFlow-Earth: image quality, physical residuals, uncertainty,
+and compute are reported as a frontier rather than one scalar score.                         </span></figcaption><!-- tex4ht:label?: x1-39001r2  -->
+                                                                            
+                                                                            
+</figure>
+<!-- l. 597 --><p class="noindent">The evaluation must separate image quality, physical consistency, calibration, and
+sampling cost. Table <a href="#recommended-evaluation-protocol-for-a-full-physflowearth-paper">2<!-- tex4ht:ref: tab:protocol  --></a> gives the recommended measurement plan.
+</p>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 599 --><p class="noindent"></p><figure class="float" id="x1-39002r2"><span id="recommended-evaluation-protocol-for-a-full-physflowearth-paper"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 2: </span><span class="content">Recommended evaluation protocol for a full PhysFlow-Earth paper.                 </span></figcaption><!-- tex4ht:label?: x1-39002r2  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-3"><colgroup id="TBL-3-1g"><col id="TBL-3-1"><col id="TBL-3-2"><col id="TBL-3-3"></colgroup><tr id="TBL-3-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-3-1-1" style="white-space:normal; text-align:left;"><!-- l. 605 --><p class="noindent"><span class="ptmb8t-">Axis</span>                              </p></td><td class="td11" id="TBL-3-1-2" style="white-space:normal; text-align:left;"> <!-- l. 605 --><p class="noindent"><span class="ptmb8t-">Metrics</span>                                       </p></td><td class="td10" id="TBL-3-1-3" style="white-space:normal; text-align:left;"> <!-- l. 605 --><p class="noindent"><span class="ptmb8t-">Purpose</span>                                       </p></td>
+</tr><tr id="TBL-3-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-3-2-1" style="white-space:normal; text-align:left;"><!-- l. 607 --><p class="noindent">Visual fidelity                </p></td><td class="td11" id="TBL-3-2-2" style="white-space:normal; text-align:left;"> <!-- l. 607 --><p class="noindent">PSNR, SSIM, LPIPS, spectral
+  angle                                           </p></td><td class="td10" id="TBL-3-2-3" style="white-space:normal; text-align:left;"> <!-- l. 607 --><p class="noindent">standard       comparison       with
+  super-resolution baselines           </p></td>
+</tr><tr id="TBL-3-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-3-3-1" style="white-space:normal; text-align:left;"><!-- l. 608 --><p class="noindent">Distributional realism   </p></td><td class="td11" id="TBL-3-3-2" style="white-space:normal; text-align:left;"> <!-- l. 608 --><p class="noindent">CRPS,      rank      histograms,
+  extreme-value frequency            </p></td><td class="td10" id="TBL-3-3-3" style="white-space:normal; text-align:left;"> <!-- l. 608 --><p class="noindent">checks  uncertainty  and  tails  for
+  climate variables                         </p></td>
+</tr><tr id="TBL-3-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-3-4-1" style="white-space:normal; text-align:left;"><!-- l. 609 --><p class="noindent">Mass consistency          </p></td><td class="td11" id="TBL-3-4-2" style="white-space:normal; text-align:left;"> <!-- l. 609 --><p class="noindent">average-pool               residual,
+  coarse-cell bias                           </p></td><td class="td10" id="TBL-3-4-3" style="white-space:normal; text-align:left;"> <!-- l. 609 --><p class="noindent">verifies conservation against the
+  conditioning field                        </p></td>
+</tr><tr id="TBL-3-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-3-5-1" style="white-space:normal; text-align:left;"><!-- l. 610 --><p class="noindent">Vector consistency        </p></td><td class="td11" id="TBL-3-5-2" style="white-space:normal; text-align:left;"> <!-- l. 610 --><p class="noindent">divergence  norm  and  spatial
+  spectrum                                     </p></td><td class="td10" id="TBL-3-5-3" style="white-space:normal; text-align:left;"> <!-- l. 610 --><p class="noindent">detects   physically   implausible
+  wind artifacts                               </p></td>
+</tr><tr id="TBL-3-6-" style="vertical-align:baseline;"><td class="td01" id="TBL-3-6-1" style="white-space:normal; text-align:left;"><!-- l. 611 --><p class="noindent">Spectral consistency      </p></td><td class="td11" id="TBL-3-6-2" style="white-space:normal; text-align:left;"> <!-- l. 611 --><p class="noindent">NDVI   and   NDWI   residuals
+  after downsampling                    </p></td><td class="td10" id="TBL-3-6-3" style="white-space:normal; text-align:left;"> <!-- l. 611 --><p class="noindent">checks                      downstream
+  remote-sensing utility                 </p></td>
+</tr><tr id="TBL-3-7-" style="vertical-align:baseline;"><td class="td01" id="TBL-3-7-1" style="white-space:normal; text-align:left;"><!-- l. 612 --><p class="noindent">Sampling cost                </p></td><td class="td11" id="TBL-3-7-2" style="white-space:normal; text-align:left;"> <!-- l. 612 --><p class="noindent">number
+  of  function  evaluations,  wall
+  time, memory                             </p></td><td class="td10" id="TBL-3-7-3" style="white-space:normal; text-align:left;"> <!-- l. 612 --><p class="noindent">distinguishes      quality      from
+  compute budget                           </p></td>
+
+</tr></table>                                                        </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+<!-- l. 617 --><p class="noindent">Baselines should include bicubic interpolation, deterministic CNN or U-Net super-resolution,
+conditional diffusion without residuals, rectified flow without residuals, and PhysFlow-Earth with
+each residual family enabled separately. The residual ablations matter more than the aggregate
+score. They tell the reader whether physics terms help or merely decorate the loss.
+
+</p>
+<!-- l. 619 --><p class="noindent"><span class="paragraphHead" id="dataset-cards-for-future-runs"> <a id="x1-40000"></a><span class="ptmb8t-">Dataset Cards for Future Runs:</span></span>
+Each dataset card should report: </p>
+     <ul class="itemize1">
+     <li class="itemize">spatial resolution of input and target,
+     </li>
+     <li class="itemize">temporal matching tolerance,
+     </li>
+     <li class="itemize">channel list and radiometric scaling,
+     </li>
+     <li class="itemize">geographic split and climate or land-cover diversity,
+     </li>
+     <li class="itemize">cloud, missing-data, and quality-mask policy,
+     </li>
+     <li class="itemize">training, validation, and test counts,
+     </li>
+     <li class="itemize">whether examples are paired, weakly paired, or synthetically degraded.</li></ul>
+<!-- l. 631 --><p class="noindent">Downscaling papers are especially vulnerable to leakage. Random patches from the same
+scene can make a model appear to generalize while it only memorizes local texture.
+A credible split should hold out geography and time where possible.
+
+</p>
+<h2 class="sectionHead" id="discussion-and-limitations"><span class="titlemark">5    </span>    <a id="x1-410005"></a>Discussion and Limitations</h2>
+
+<!-- l. 635 --><p class="noindent"><span class="paragraphHead" id="perceptualphysics-conflict"> <a id="x1-42000"></a><span class="ptmb8t-">Perceptual-physics conflict:</span></span>
+A model can reduce LPIPS while increasing coarse-cell mass error. The paper should
+show both metrics rather than hiding the tradeoff in a weighted sum.
+
+</p>
+<!-- l. 638 --><p class="noindent"><span class="paragraphHead" id="residual-shortcutting"> <a id="x1-43000"></a><span class="ptmb8t-">Residual  shortcutting:</span></span>
+If the residual weight is too high, the model may learn blurry fields that satisfy aggregation but lose
+high-frequency structure. Conversely, if the weight is too low, the residual becomes decorative.
+
+</p>
+<!-- l. 641 --><p class="noindent"><span class="paragraphHead" id="radiometric-mismatch"> <a id="x1-44000"></a><span class="ptmb8t-">Radiometric  mismatch:</span></span>
+Band-ratio residuals assume compatible scaling and band definitions. Cross-sensor
+datasets can violate that assumption if preprocessing differs by source.
+
+                                                                            
+                                                                            
+</p>
+<!-- l. 644 --><p class="noindent"><span class="paragraphHead" id="coordinate-and-area-effects"> <a id="x1-45000"></a><span class="ptmb8t-">Coordinate and area effects:</span></span>
+Average pooling assumes equal-area pixels. Climate grids and satellite products often
+require latitude-aware area weights. The current repository uses simple pooling; a
+full paper should implement area-weighted aggregation for global grids.
+
+</p>
+<!-- l. 647 --><p class="noindent"><span class="paragraphHead" id="training-recipe"> <a id="x1-46000"></a><span class="ptmb8t-">Training  Recipe:</span></span>
+A stable training recipe should start with the residual weights at zero for a short warmup, then ramp them to the target values: </p><div class="mathjax-env mathjax-equation">\begin{equation} \lambda _m(s)=\lambda _m^{\max }\min (1,s/S_{\text {warm}}). \end{equation}</div>
+<p><a id="x1-46001r16"></a>
+<!-- l. 653 --></p><p class="noindent">This avoids early optimization where random outputs are heavily penalized by residuals before the velocity
+field has learned the data scale. The paper should report whether residual ramping was used.
+
+</p>
+<!-- l. 655 --><p class="noindent"><span class="paragraphHead" id="claim-checklist"> <a id="x1-47000"></a><span class="ptmb8t-">Claim  Checklist:</span></span>
+This paper can safely claim a conditional rectified-flow implementation, implemented residual
+modules, DiT output-shape validation, and a public CPU-safe demo. It should not yet claim
+superior downscaling, calibrated uncertainty, climate-model replacement, or production-quality
+physical fidelity. Those claims require benchmark tables and domain review.
+
+</p>
+<!-- l. 659 --><p class="noindent"><span class="paragraphHead" id="future-figures"> <a id="x1-48000"></a><span class="ptmb8t-">Future  Figures:</span></span>
+The final paper should include:
+     </p><dl class="enumerate-enumitem"><dt class="enumerate-enumitem">
+  1. </dt><dd class="enumerate-enumitem">flow diagram showing low-resolution conditioning, velocity model, projected clean sample,
+     and residual loss;
+     </dd><dt class="enumerate-enumitem">
+  2. </dt><dd class="enumerate-enumitem">examples of coarse input, target, baseline, and PhysFlow output;
+     </dd><dt class="enumerate-enumitem">
+  3. </dt><dd class="enumerate-enumitem">residual heatmaps for mass, divergence, and spectral indices;
+     </dd><dt class="enumerate-enumitem">
+  4. </dt><dd class="enumerate-enumitem">Pareto curves showing image quality versus physical residual;
+     </dd><dt class="enumerate-enumitem">
+  5. </dt><dd class="enumerate-enumitem">sampling-speed comparison between rectified flow and diffusion baselines.</dd></dl>
+<!-- l. 669 --><p class="noindent">This paper names these figures but does not synthesize fake outputs.
+
+</p>
+<!-- l. 671 --><p class="noindent"><span class="paragraphHead" id="residual-weight-selection"> <a id="x1-49000"></a><span class="ptmb8t-">Residual Weight Selection:</span></span>
+Selecting <span class="mathjax-inline">\(\lambda _m\)</span> is a scientific modeling decision, not a tuning detail. If the residual weight is
+too small, the model ignores physics. If it is too large, the model can satisfy the residual
+while losing distributional realism. A useful sweep reports a Pareto frontier: </p><div class="mathjax-env mathjax-equation">\begin{equation} \left (\operatorname {LPIPS}(\lambda _m),\ \|R_m(\hat {x},x_{\ell })\|_2\right ). \end{equation}</div>
+<p><a id="x1-49001r17"></a>
+<!-- l. 677 --></p><p class="noindent">The final paper should not choose a single value without showing this tradeoff. For
+multi-residual training, a grid over all weights may be expensive; a staged sweep can
+first tune each residual independently and then test combined settings.
+
+</p>
+<!-- l. 679 --><p class="noindent"><span class="paragraphHead" id="normalization"> <a id="x1-50000"></a><span class="ptmb8t-">Normalization:</span></span>
+Residuals must be normalized before weighting. A divergence residual and an NDVI residual can have different
+units and scales. A practical rule is to divide each residual by its baseline standard deviation on the training set: </p><div class="mathjax-env mathjax-equation">\begin{equation} \tilde {R}_m=\frac {R_m-\mu _m}{\sigma _m+\epsilon }. \end{equation}</div>
+<p><a id="x1-50001r18"></a>
+<!-- l. 685 --></p><p class="noindent">The current code keeps residual modules simple. A benchmark version should report whether residual normalization is used.
+
+                                                                            
+                                                                            
+</p>
+<!-- l. 687 --><p class="noindent"><span class="paragraphHead" id="areaweighted-aggregation"> <a id="x1-51000"></a><span class="ptmb8t-">Area-Weighted Aggregation:</span></span>
+Average pooling assumes every high-resolution pixel contributes equal area to a coarse
+cell. This is reasonable for local projected imagery but questionable for latitude-longitude
+climate grids. For global grids, mass residuals should use area weights: </p><div class="mathjax-env mathjax-equation">\begin{equation} R_{\text {area}} = \frac {\sum _{i\in c} a_i\hat {x}_i}{\sum _{i\in c}a_i}-x_{\ell ,c}. \end{equation}</div>
+<p><a id="x1-51001r19"></a>
+<!-- l. 693 --></p><p class="noindent">For regular lat-lon grids, <span class="mathjax-inline">\(a_i\)</span> is approximately proportional to <span class="mathjax-inline">\(\cos (\phi _i)\)</span>. Adding this option would
+make PhysFlow-Earth more defensible for global climate downscaling.
+
+</p>
+<!-- l. 695 --><p class="noindent"><span class="paragraphHead" id="temporal-extension"> <a id="x1-52000"></a><span class="ptmb8t-">Temporal  Extension:</span></span>
+The current formulation is spatial. Climate and weather fields are temporal. A
+temporal extension would model <span class="mathjax-inline">\(x_{1:T}\)</span> and include residuals over time: </p><div class="mathjax-env mathjax-equation">\begin{equation} \mathcal {L}_{\text {temp}}=\sum _t\mathcal {L}_{\text {flow}}(x_t)+ \lambda _{\Delta }\sum _t\|\hat {x}_{t+1}-\hat {x}_{t}\|_{\text {phys}}. \end{equation}</div>
+<p><a id="x1-52001r20"></a>
+<!-- l. 702 --></p><p class="noindent">For precipitation, temporal accumulation constraints matter. For wind, temporal coherence and
+advection matter. The paper lists these as scoped extensions rather than implemented features.
+
+</p>
+<!-- l. 704 --><p class="noindent"><span class="paragraphHead" id="uncertainty"> <a id="x1-53000"></a><span class="ptmb8t-">Uncertainty:</span></span>
+Generative downscaling is valuable partly because multiple high-resolution states can correspond to one
+coarse field. Evaluation should therefore include uncertainty metrics. Continuous ranked probability score,
+rank histograms, and coverage of prediction intervals are better than reporting only PSNR. If the model is
+sampled <span class="mathjax-inline">\(K\)</span> times for the same input, the paper should report ensemble mean quality and ensemble spread.
+
+</p>
+<!-- l. 708 --><p class="noindent"><span class="paragraphHead" id="condensed-version-scope"> <a id="x1-54000"></a><span class="ptmb8t-">Condensed Version Scope:</span></span>
+For a 10 to 12 page version, keep the conditional transport formulation, residual-on-clean-sample derivation,
+residual modules, DiT conditioning, evaluation protocol, and limitations. Move residual-weight sweeps,
+area-weighted aggregation, and temporal extensions to an appendix. The strongest final narrative is: visual
+quality is not enough for scientific downscaling, so train the generator with explicit differentiable residuals.
+
+</p>
+<!-- l. 712 --><p class="noindent"><span class="paragraphHead" id="stresstest-questions"> <a id="x1-55000"></a><span class="ptmb8t-">Stress-Test  Questions:</span></span>
+
+</p>
+<!-- l. 714 --><p class="noindent"><span class="paragraphHead" id="is-this-a-full-climate-model"> <a id="x1-56000"></a><span class="ptmb8t-">Is this a full climate model?</span></span>
+No. It is a conditional generative downscaling implementation with lightweight physical residuals.
+
+</p>
+<!-- l. 717 --><p class="noindent"><span class="paragraphHead" id="why-not-hardproject-samples-onto-constraints"> <a id="x1-57000"></a><span class="ptmb8t-">Why not hard-project samples onto constraints?</span></span>
+Hard projection can be non-differentiable, expensive, or destructive to texture.
+Residual penalties provide a simple differentiable compromise.
+
+</p>
+<!-- l. 720 --><p class="noindent"><span class="paragraphHead" id="what-evidence-is-missing"> <a id="x1-58000"></a><span class="ptmb8t-">What evidence is missing?</span></span>
+WorldStrat, SEN2VENuS, ERA5, and precipitation benchmark runs; residual-weight
+sweeps; uncertainty evaluation; and checkpoint-backed demo outputs.
+
+                                                                            
+                                                                            
+</p>
+<!-- l. 723 --><p class="noindent"><span class="paragraphHead" id="implementation-results-and-evaluation-profile"> <a id="x1-59000"></a><span class="ptmb8t-">Implementation Results and Evaluation Profile:</span></span>
+
+</p>
+<!-- l. 725 --><p class="noindent"><span class="paragraphHead" id="result-a-current-code-checks"> <a id="x1-60000"></a><span class="ptmb8t-">Result A: current code checks:</span></span>
+In the current local run, <span class="pcrr8t-">uv run -extra dev pytest -q </span>reports 20 passing tests. The tests cover
+residual behavior, rectified-flow training steps, model shapes, pipeline outputs, and the public Space
+contract. This result supports the claim that the implemented residual modules and training implementation
+execute correctly on small CPU-safe examples. It does not establish scientific downscaling accuracy.
+</p>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 729 --><p class="noindent"></p><figure class="float" id="x1-60001r3"><span id="implementationgrounded-result-for-physflowearth"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 3: </span><span class="content">Implementation-grounded result for PhysFlow-Earth.                            </span></figcaption><!-- tex4ht:label?: x1-60001r3  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-4"><colgroup id="TBL-4-1g"><col id="TBL-4-1"><col id="TBL-4-2"><col id="TBL-4-3"></colgroup><tr id="TBL-4-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-4-1-1" style="white-space:normal; text-align:left;"><!-- l. 734 --><p class="noindent"><span class="ptmb8t-">Check family</span>                       </p></td><td class="td11" id="TBL-4-1-2" style="white-space:normal; text-align:left;"> <!-- l. 734 --><p class="noindent"><span class="ptmb8t-">Interpretation</span>                                                             </p></td><td class="td10" id="TBL-4-1-3" style="white-space:normal; text-align:left;"> <!-- l. 734 --><p class="noindent"><span class="ptmb8t-">Observed</span>   </p></td>
+</tr><tr id="TBL-4-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-4-2-1" style="white-space:normal; text-align:left;"><!-- l. 736 --><p class="noindent">Residual modules                  </p></td><td class="td11" id="TBL-4-2-2" style="white-space:normal; text-align:left;"> <!-- l. 736 --><p class="noindent">mass, divergence, and band-ratio operators behave
+  on test tensors                                                              </p></td><td class="td10" id="TBL-4-2-3" style="white-space:normal; text-align:left;"> <!-- l. 736 --><p class="noindent">passed        </p></td>
+</tr><tr id="TBL-4-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-4-3-1" style="white-space:normal; text-align:left;"><!-- l. 737 --><p class="noindent">Flow wrapper                        </p></td><td class="td11" id="TBL-4-3-2" style="white-space:normal; text-align:left;"> <!-- l. 737 --><p class="noindent">velocity  loss  and  physics  loss  support  backward
+  passes                                                                           </p></td><td class="td10" id="TBL-4-3-3" style="white-space:normal; text-align:left;"> <!-- l. 737 --><p class="noindent">passed        </p></td>
+</tr><tr id="TBL-4-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-4-4-1" style="white-space:normal; text-align:left;"><!-- l. 738 --><p class="noindent">Model path                            </p></td><td class="td11" id="TBL-4-4-2" style="white-space:normal; text-align:left;"> <!-- l. 738 --><p class="noindent">DiT and pipeline return expected tensor shapes          </p></td><td class="td10" id="TBL-4-4-3" style="white-space:normal; text-align:left;"> <!-- l. 738 --><p class="noindent">passed        </p></td>
+</tr><tr id="TBL-4-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-4-5-1" style="white-space:normal; text-align:left;"><!-- l. 739 --><p class="noindent">Full local test suite                </p></td><td class="td11" id="TBL-4-5-2" style="white-space:normal; text-align:left;"> <!-- l. 739 --><p class="noindent">repository unit and smoke tests                                   </p></td><td class="td10" id="TBL-4-5-3" style="white-space:normal; text-align:left;"> <!-- l. 739 --><p class="noindent">20 passed   </p></td>
+
+</tr></table>                                                        </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+
+<!-- l. 744 --><p class="noindent"><span class="paragraphHead" id="result-b-benchmark-signature"> <a id="x1-61000"></a><span class="ptmb8t-">Result B: benchmark signature:</span></span>
+The expected result is not simply higher PSNR. If PhysFlow-Earth works, it should reduce physical
+residuals at comparable visual quality, or improve visual quality at comparable residuals. The strongest
+evidence would be a Pareto frontier, not a single point. For precipitation, the model should preserve coarse
+totals better than unconstrained diffusion. For Sentinel-2, it should preserve index behavior after
+downsampling. For wind, it should avoid increasing divergence artifacts relative to the baseline.
+</p>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 748 --><p class="noindent"></p><figure class="float" id="x1-61001r4"><span id="expected-result-patterns-to-test-not-claimed-outcomes"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 4: </span><span class="content">Expected result patterns to test, not claimed outcomes.                           </span></figcaption><!-- tex4ht:label?: x1-61001r4  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-5"><colgroup id="TBL-5-1g"><col id="TBL-5-1"><col id="TBL-5-2"><col id="TBL-5-3"></colgroup><tr id="TBL-5-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-5-1-1" style="white-space:normal; text-align:left;"><!-- l. 753 --><p class="noindent"><span class="ptmb8t-">Task</span>                                </p></td><td class="td11" id="TBL-5-1-2" style="white-space:normal; text-align:left;"> <!-- l. 753 --><p class="noindent"><span class="ptmb8t-">Expected pattern if method works</span>     </p></td><td class="td10" id="TBL-5-1-3" style="white-space:normal; text-align:left;"> <!-- l. 753 --><p class="noindent"><span class="ptmb8t-">Diagnostic</span>                    </p></td>
+</tr><tr id="TBL-5-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-5-2-1" style="white-space:normal; text-align:left;"><!-- l. 755 --><p class="noindent">Precipitation                     </p></td><td class="td11" id="TBL-5-2-2" style="white-space:normal; text-align:left;"> <!-- l. 755 --><p class="noindent">lower  coarse-cell  accumulation  error
+  at similar sharpness                               </p></td><td class="td10" id="TBL-5-2-3" style="white-space:normal; text-align:left;"> <!-- l. 755 --><p class="noindent">mass residual                </p></td>
+</tr><tr id="TBL-5-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-5-3-1" style="white-space:normal; text-align:left;"><!-- l. 756 --><p class="noindent">Wind                                 </p></td><td class="td11" id="TBL-5-3-2" style="white-space:normal; text-align:left;"> <!-- l. 756 --><p class="noindent">lower    divergence    proxy    without
+  excessive smoothing                              </p></td><td class="td10" id="TBL-5-3-3" style="white-space:normal; text-align:left;"> <!-- l. 756 --><p class="noindent">divergence   norm   and
+  spectrum                       </p></td>
+</tr><tr id="TBL-5-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-5-4-1" style="white-space:normal; text-align:left;"><!-- l. 757 --><p class="noindent">Sentinel-2                         </p></td><td class="td11" id="TBL-5-4-2" style="white-space:normal; text-align:left;"> <!-- l. 757 --><p class="noindent">better NDVI/NDWI preservation after
+  aggregation                                            </p></td><td class="td10" id="TBL-5-4-3" style="white-space:normal; text-align:left;"> <!-- l. 757 --><p class="noindent">index residual                </p></td>
+</tr><tr id="TBL-5-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-5-5-1" style="white-space:normal; text-align:left;"><!-- l. 758 --><p class="noindent">Sampling                          </p></td><td class="td11" id="TBL-5-5-2" style="white-space:normal; text-align:left;"> <!-- l. 758 --><p class="noindent">fewer  steps  than  diffusion  at  similar
+  residual-quality tradeoff                        </p></td><td class="td10" id="TBL-5-5-3" style="white-space:normal; text-align:left;"> <!-- l. 758 --><p class="noindent">NFE and wall time        </p></td>
+
+</tr></table>                                                       </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+
+<!-- l. 763 --><p class="noindent"><span class="paragraphHead" id="stresstest-questions1"> <a id="x1-62000"></a><span class="ptmb8t-">Stress-Test  Questions:</span></span>
+
+</p>
+<!-- l. 765 --><p class="noindent"><span class="paragraphHead" id="q1-are-the-physics-residuals-physically-complete"> <a id="x1-63000"></a><span class="ptmb8t-">Q1: Are the physics residuals physically complete?</span></span>
+No. They are lightweight residuals. Mass pooling, divergence proxies, and spectral ratios
+are useful constraints, but they are not full atmospheric dynamics or radiative-transfer
+models. The paper must present them as weak scientific regularizers.
+
+</p>
+<!-- l. 768 --><p class="noindent"><span class="paragraphHead" id="q2-can-residuals-make-samples-blurry"> <a id="x1-64000"></a><span class="ptmb8t-">Q2: Can residuals make samples blurry?</span></span>
+Yes. Strong residual weights can over-prioritize aggregate consistency and suppress
+high-frequency structure. That is why the evaluation must show Pareto curves.
+
+</p>
+<!-- l. 771 --><p class="noindent"><span class="paragraphHead" id="q3-why-rectified-flow-instead-of-diffusion"> <a id="x1-65000"></a><span class="ptmb8t-">Q3: Why rectified flow instead of diffusion?</span></span>
+Rectified flow gives a direct endpoint estimate and can reduce sampling complexity. The choice still
+needs empirical comparison against conditional diffusion under equal compute.
+
+</p>
+<!-- l. 774 --><p class="noindent"><span class="paragraphHead" id="q4-are-averagepooling-residuals-valid-on-global-grids"> <a id="x1-66000"></a><span class="ptmb8t-">Q4: Are average-pooling residuals valid on global grids?</span></span>
+Only if cell areas are comparable. For global lat-lon grids, area-weighted aggregation
+is needed, and the paper includes this extension explicitly.
+
+</p>
+<!-- l. 777 --><p class="noindent"><span class="paragraphHead" id="q5-how-does-the-method-represent-uncertainty"> <a id="x1-67000"></a><span class="ptmb8t-">Q5: How does the method represent uncertainty?</span></span>
+Through generative sampling, but calibration is unproven. The paper should report CRPS,
+rank histograms, and interval coverage before making uncertainty claims.
+
+</p>
+<!-- l. 780 --><p class="noindent"><span class="paragraphHead" id="q6-what-result-would-make-the-paper-credible"> <a id="x1-68000"></a><span class="ptmb8t-">Q6: What result would make the paper credible?</span></span>
+A credible result would show that the method moves the quality-physics frontier, not merely that it improves one
+metric by sacrificing another. The benchmark table should include image metrics, residual metrics, and compute.
+
+</p>
+<!-- l. 783 --><p class="noindent"><span class="paragraphHead" id="additional-derivation-residual-gradients"> <a id="x1-69000"></a><span class="ptmb8t-">Additional Derivation: Residual Gradients:</span></span>
+For the mass residual <span class="mathjax-inline">\(R=A\hat {x}_1-x_{\ell }\)</span>, the residual loss is </p><div class="mathjax-env mathjax-equation">\begin{equation} \mathcal {L}_{m}=\|A\hat {x}_1-x_{\ell }\|_2^2. \end{equation}</div>
+<p><a id="x1-69001r21"></a>
+<!-- l. 789 --></p><p class="noindent">Since <span class="mathjax-inline">\(\hat {x}_1=x_t+(1-t)v_{\theta }\)</span>, the gradient with respect to the velocity prediction is </p><div class="mathjax-env mathjax-equation">\begin{equation} \frac {\partial \mathcal {L}_{m}}{\partial v_{\theta }} =2(1-t)A^\top (A\hat {x}_1-x_{\ell }). \end{equation}</div>
+<p><a id="x1-69002r22"></a>
+<!-- l. 794 --></p><p class="noindent">This shows why the clean-sample residual gives useful training signal. At early times,
+the factor <span class="mathjax-inline">\((1-t)\)</span> is large and residual corrections can influence the velocity. Near <span class="mathjax-inline">\(t=1\)</span>, the model
+is already close to the endpoint and the residual gradient naturally weakens.
+</p><!-- l. 796 --><p class="noindent">For a generic residual <span class="mathjax-inline">\(R_m(\hat {x}_1,c)\)</span>, the chain rule gives </p><div class="mathjax-env mathjax-equation">\begin{equation} \frac {\partial \mathcal {L}_{m}}{\partial v_{\theta }} =2(1-t)\left (\frac {\partial R_m}{\partial \hat {x}_1}\right )^\top R_m(\hat {x}_1,c). \end{equation}</div>
+<p><a id="x1-69003r23"></a>
+<!-- l. 801 --></p><p class="noindent">This compact expression is the reason residual modules can remain ordinary differentiable
+PyTorch functions. No special sampler modification is needed at training time.
+                                                                            
+                                                                            
+
+</p>
+<!-- l. 803 --><p class="noindent"><span class="paragraphHead" id="additional-literature-integration"> <a id="x1-70000"></a><span class="ptmb8t-">Additional Literature Integration:</span></span>
+The diffusion and score-model literature gives the generative foundation [<a href="#Xho2020denoising">11</a>, <a href="#Xsaharia2022image">40</a>, <a href="#Xsong2021score">42</a>]. Rectified flow and
+flow matching give the velocity-field view [<a href="#Xlipman2023flow">23</a>, <a href="#Xliu2022rectified">24</a>]. Physics-informed and theory-guided ML motivate
+residual constraints [<a href="#Xkarpatne2017theory">13</a>, <a href="#Xraissi2019physics">32</a>]. Remote-sensing and weather downscaling datasets define the empirical target
+[<a href="#Xcornebise2022worldstrat">6</a>, <a href="#Xleinonen2023precipitation">19</a>, <a href="#Xmardani2023corrdiff">25</a>, <a href="#Xmichel2022sen2venus">26</a>]. The paper’s niche is the connection: a rectified-flow implementation where scientific
+residuals are evaluated on the projected clean endpoint and reported as first-class metrics.
+
+</p>
+<!-- l. 807 --><p class="noindent"><span class="paragraphHead" id="supplementary-technical-notes"> <a id="x1-71000"></a><span class="ptmb8t-">Supplementary Technical Notes:</span></span>
+
+</p>
+<!-- l. 809 --><p class="noindent"><span class="paragraphHead" id="literature-matrix"> <a id="x1-72000"></a><span class="ptmb8t-">Literature  matrix:</span></span>
+</p>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 811 --><p class="noindent"></p><figure class="float" id="x1-72001r5"><span id="how-major-literature-threads-map-to-physflowearth"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 5: </span><span class="content">How major literature threads map to PhysFlow-Earth.                            </span></figcaption><!-- tex4ht:label?: x1-72001r5  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-6"><colgroup id="TBL-6-1g"><col id="TBL-6-1"><col id="TBL-6-2"><col id="TBL-6-3"></colgroup><tr id="TBL-6-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-6-1-1" style="white-space:normal; text-align:left;"><!-- l. 816 --><p class="noindent"><span class="ptmb8t-">Thread</span>                         </p></td><td class="td11" id="TBL-6-1-2" style="white-space:normal; text-align:left;"> <!-- l. 816 --><p class="noindent"><span class="ptmb8t-">What it contributes</span>                    </p></td><td class="td10" id="TBL-6-1-3" style="white-space:normal; text-align:left;"> <!-- l. 816 --><p class="noindent"><span class="ptmb8t-">Gap addressed by this paper</span>  </p></td>
+</tr><tr id="TBL-6-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-6-2-1" style="white-space:normal; text-align:left;"><!-- l. 818 --><p class="noindent">DDPM     and     score
+models                           </p></td><td class="td11" id="TBL-6-2-2" style="white-space:normal; text-align:left;"> <!-- l. 818 --><p class="noindent">high-fidelity             conditional
+  generation                                    </p></td><td class="td10" id="TBL-6-2-3" style="white-space:normal; text-align:left;"> <!-- l. 818 --><p class="noindent">scientific    residuals    are    not
+  central                                        </p></td>
+</tr><tr id="TBL-6-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-6-3-1" style="white-space:normal; text-align:left;"><!-- l. 819 --><p class="noindent">Rectified flow                </p></td><td class="td11" id="TBL-6-3-2" style="white-space:normal; text-align:left;"> <!-- l. 819 --><p class="noindent">simple       endpoint       velocity
+  learning                                        </p></td><td class="td10" id="TBL-6-3-3" style="white-space:normal; text-align:left;"> <!-- l. 819 --><p class="noindent">residuals    need    clean-sample
+  attachment                                 </p></td>
+</tr><tr id="TBL-6-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-6-4-1" style="white-space:normal; text-align:left;"><!-- l. 820 --><p class="noindent">DiT models                   </p></td><td class="td11" id="TBL-6-4-2" style="white-space:normal; text-align:left;"> <!-- l. 820 --><p class="noindent">tokenized generative backbones  </p></td><td class="td10" id="TBL-6-4-3" style="white-space:normal; text-align:left;"> <!-- l. 820 --><p class="noindent">Earth-observation  conditioning
+  design                                        </p></td>
+</tr><tr id="TBL-6-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-6-5-1" style="white-space:normal; text-align:left;"><!-- l. 821 --><p class="noindent">PINNs and KGML        </p></td><td class="td11" id="TBL-6-5-2" style="white-space:normal; text-align:left;"> <!-- l. 821 --><p class="noindent">physical constraints in learning   </p></td><td class="td10" id="TBL-6-5-3" style="white-space:normal; text-align:left;"> <!-- l. 821 --><p class="noindent">lightweight       residuals       for
+  generative downscaling             </p></td>
+</tr><tr id="TBL-6-6-" style="vertical-align:baseline;"><td class="td01" id="TBL-6-6-1" style="white-space:normal; text-align:left;"><!-- l. 822 --><p class="noindent">Climate downscaling     </p></td><td class="td11" id="TBL-6-6-2" style="white-space:normal; text-align:left;"> <!-- l. 822 --><p class="noindent">task and dataset motivation          </p></td><td class="td10" id="TBL-6-6-3" style="white-space:normal; text-align:left;"> <!-- l. 822 --><p class="noindent">metric  suite  combining  quality
+  and physics                                </p></td>
+
+</tr></table>                                                        </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+
+<!-- l. 827 --><p class="noindent"><span class="paragraphHead" id="residual-taxonomy"> <a id="x1-73000"></a><span class="ptmb8t-">Residual  taxonomy:</span></span>
+</p>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 829 --><p class="noindent"></p><figure class="float" id="x1-73001r6"><span id="residual-families-and-what-they-can-and-cannot-claim"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 6: </span><span class="content">Residual families and what they can and cannot claim.                           </span></figcaption><!-- tex4ht:label?: x1-73001r6  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-7"><colgroup id="TBL-7-1g"><col id="TBL-7-1"><col id="TBL-7-2"><col id="TBL-7-3"></colgroup><tr id="TBL-7-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-7-1-1" style="white-space:normal; text-align:left;"><!-- l. 834 --><p class="noindent"><span class="ptmb8t-">Residual</span>                      </p></td><td class="td11" id="TBL-7-1-2" style="white-space:normal; text-align:left;"> <!-- l. 834 --><p class="noindent"><span class="ptmb8t-">Useful claim</span>                                   </p></td><td class="td10" id="TBL-7-1-3" style="white-space:normal; text-align:left;"> <!-- l. 834 --><p class="noindent"><span class="ptmb8t-">Claim to avoid</span>                       </p></td>
+</tr><tr id="TBL-7-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-7-2-1" style="white-space:normal; text-align:left;"><!-- l. 836 --><p class="noindent">Mass pooling                 </p></td><td class="td11" id="TBL-7-2-2" style="white-space:normal; text-align:left;"> <!-- l. 836 --><p class="noindent">preserves       coarse       aggregate
+  statistics                                           </p></td><td class="td10" id="TBL-7-2-3" style="white-space:normal; text-align:left;"> <!-- l. 836 --><p class="noindent">solves hydrology                    </p></td>
+</tr><tr id="TBL-7-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-7-3-1" style="white-space:normal; text-align:left;"><!-- l. 837 --><p class="noindent">Divergence proxy          </p></td><td class="td11" id="TBL-7-3-2" style="white-space:normal; text-align:left;"> <!-- l. 837 --><p class="noindent">discourages   simple   vector-field
+  artifacts                                            </p></td><td class="td10" id="TBL-7-3-3" style="white-space:normal; text-align:left;"> <!-- l. 837 --><p class="noindent">enforces               atmospheric
+  dynamics                                </p></td>
+</tr><tr id="TBL-7-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-7-4-1" style="white-space:normal; text-align:left;"><!-- l. 838 --><p class="noindent">Band ratios                    </p></td><td class="td11" id="TBL-7-4-2" style="white-space:normal; text-align:left;"> <!-- l. 838 --><p class="noindent">preserves    index-level    spectral
+  relationships                                    </p></td><td class="td10" id="TBL-7-4-3" style="white-space:normal; text-align:left;"> <!-- l. 838 --><p class="noindent">guarantees            radiometric
+  correctness                              </p></td>
+</tr><tr id="TBL-7-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-7-5-1" style="white-space:normal; text-align:left;"><!-- l. 839 --><p class="noindent">Area-weighted
+pooling                          </p></td><td class="td11" id="TBL-7-5-2" style="white-space:normal; text-align:left;"> <!-- l. 839 --><p class="noindent">handles global grid area variation   </p></td><td class="td10" id="TBL-7-5-3" style="white-space:normal; text-align:left;"> <!-- l. 839 --><p class="noindent">replaces regridding validation</p></td>
+</tr><tr id="TBL-7-6-" style="vertical-align:baseline;"><td class="td01" id="TBL-7-6-1" style="white-space:normal; text-align:left;"><!-- l. 840 --><p class="noindent">Temporal smoothness   </p></td><td class="td11" id="TBL-7-6-2" style="white-space:normal; text-align:left;"> <!-- l. 840 --><p class="noindent">discourages           frame-to-frame
+  flicker                                              </p></td><td class="td10" id="TBL-7-6-3" style="white-space:normal; text-align:left;"> <!-- l. 840 --><p class="noindent">solves advection or dynamics </p></td>
+
+</tr></table>                                                        </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+
+<!-- l. 845 --><p class="noindent"><span class="paragraphHead" id="multiobjective-training"> <a id="x1-74000"></a><span class="ptmb8t-">Multi-objective  training:</span></span>
+The model should be interpreted as solving a multi-objective optimization problem: </p><div class="mathjax-env mathjax-equation">\begin{equation} \min _{\theta }\left [ \mathbb {E}\mathcal {L}_{\text {flow}}, \mathbb {E}\mathcal {L}_{\text {mass}}, \mathbb {E}\mathcal {L}_{\text {div}}, \mathbb {E}\mathcal {L}_{\text {index}}, \operatorname {NFE} \right ]. \end{equation}</div>
+<p><a id="x1-74001r24"></a>
+<!-- l. 857 --></p><p class="noindent">A weighted sum chooses one point on this frontier. The paper should therefore report multiple points. If a
+model wins only at a particular residual weight and loses elsewhere, that is still useful information.
+
+</p>
+<!-- l. 859 --><p class="noindent"><span class="paragraphHead" id="areaweighted-mass-residual"> <a id="x1-75000"></a><span class="ptmb8t-">Area-weighted mass residual:</span></span>
+For global fields with latitude <span class="mathjax-inline">\(\phi _i\)</span>, an area-weighted pooling operator can be written as </p><div class="mathjax-env mathjax-equation">\begin{equation} A_{cj}=\frac {a_j\mathbb {1}[j\in c]}{\sum _{k\in c}a_k},\qquad a_j\propto \cos (\phi _j). \end{equation}</div>
+<p><a id="x1-75001r25"></a>
+<!-- l. 865 --></p><p class="noindent">The residual becomes <span class="mathjax-inline">\(R=A\hat {x}-x_{\ell }\)</span>. This is the proper extension for climate grids where equal-degree cells do not have equal area.
+
+</p>
+<!-- l. 867 --><p class="noindent"><span class="paragraphHead" id="uncertainty-decomposition"> <a id="x1-76000"></a><span class="ptmb8t-">Uncertainty decomposition:</span></span>
+For <span class="mathjax-inline">\(K\)</span> generated samples <span class="mathjax-inline">\(\{\hat {x}^{(k)}\}_{k=1}^{K}\)</span>, decompose error into bias and spread: </p><div class="mathjax-env mathjax-equation">\begin{equation} \bar {x}=\frac {1}{K}\sum _k\hat {x}^{(k)},\quad \operatorname {spread}(i)=\frac {1}{K-1}\sum _k(\hat {x}_i^{(k)}-\bar {x}_i)^2. \end{equation}</div>
+<p><a id="x1-76001r26"></a>
+<!-- l. 874 --></p><p class="noindent">The benchmark should ask whether high spread corresponds to genuinely uncertain
+regions, such as cloud boundaries, storm edges, or heterogeneous land cover.
+
+</p>
+<!-- l. 876 --><p class="noindent"><span class="paragraphHead" id="extended-experimental-recipe"> <a id="x1-77000"></a><span class="ptmb8t-">Extended Experimental Recipe:</span></span>
+
+</p>
+<!-- l. 878 --><p class="noindent"><span class="paragraphHead" id="experiment-1-residual-sanity-suite"> <a id="x1-78000"></a><span class="ptmb8t-">Experiment 1: residual sanity suite:</span></span>
+Create synthetic fields where the exact residual is known: constant precipitation, linear wind,
+divergence-free toy flow, and fixed spectral ratios. This bridges unit tests and paper figures.
+
+</p>
+<!-- l. 882 --><p class="noindent"><span class="paragraphHead" id="experiment-2-superresolution-without-physics"> <a id="x1-79000"></a><span class="ptmb8t-">Experiment 2: super-resolution without physics:</span></span>
+Train rectified flow without residuals. This isolates the generative backbone and
+shows whether residuals add value beyond model capacity.
+
+</p>
+<!-- l. 886 --><p class="noindent"><span class="paragraphHead" id="experiment-3-residual-sweeps"> <a id="x1-80000"></a><span class="ptmb8t-">Experiment 3: residual sweeps:</span></span>
+Train separate models with increasing <span class="mathjax-inline">\(\lambda _{\text {phys}}\)</span>. Report visual metrics and residual metrics. The main figure should be a Pareto plot.
+
+</p>
+<!-- l. 890 --><p class="noindent"><span class="paragraphHead" id="experiment-4-dataset-transfer"> <a id="x1-81000"></a><span class="ptmb8t-">Experiment 4: dataset transfer:</span></span>
+Train on one geography or sensor subset and test on another. Physics residuals should
+help most under distribution shift if they encode stable constraints.
+
+</p>
+<!-- l. 894 --><p class="noindent"><span class="paragraphHead" id="experiment-5-uncertainty-calibration"> <a id="x1-82000"></a><span class="ptmb8t-">Experiment 5: uncertainty calibration:</span></span>
+                                                                            
+                                                                            
+Draw multiple samples per coarse input and compute CRPS, rank histograms, and interval
+coverage. A generative paper is incomplete without uncertainty diagnostics.
+
+</p>
+<!-- l. 898 --><p class="noindent"><span class="paragraphHead" id="evaluation-tables"> <a id="x1-83000"></a><span class="ptmb8t-">Evaluation  Tables:</span></span>
+<span class="ptmri8t-">The tables summarize the evaluation profile used to compare model variants and operational stress cases.</span>
+</p>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 901 --><p class="noindent"></p><figure class="float" id="x1-83001r7"><span id="residual-sweep-evaluation-table"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 7: </span><span class="content">Residual sweep evaluation table.                                            </span></figcaption><!-- tex4ht:label?: x1-83001r7  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-8"><colgroup id="TBL-8-1g"><col id="TBL-8-1"><col id="TBL-8-2"><col id="TBL-8-3"><col id="TBL-8-4"></colgroup><tr id="TBL-8-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-8-1-1" style="white-space:normal; text-align:left;"><!-- l. 906 --><p class="noindent"><span class="ptmb8t-">Weight</span>                      </p></td><td class="td11" id="TBL-8-1-2" style="white-space:normal; text-align:left;"> <!-- l. 906 --><p class="noindent"><span class="ptmb8t-">PSNR</span>                     </p></td><td class="td11" id="TBL-8-1-3" style="white-space:normal; text-align:left;"> <!-- l. 906 --><p class="noindent"><span class="ptmb8t-">LPIPS</span>                    </p></td><td class="td10" id="TBL-8-1-4" style="white-space:normal; text-align:left;"> <!-- l. 906 --><p class="noindent"><span class="ptmb8t-">Physics residual</span>    </p></td>
+</tr><tr id="TBL-8-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-8-2-1" style="white-space:normal; text-align:left;"><!-- l. 908 --><p class="noindent">0                                 </p></td><td class="td11" id="TBL-8-2-2" style="white-space:normal; text-align:left;"> <!-- l. 908 --><p class="noindent">28.4                        </p></td><td class="td11" id="TBL-8-2-3" style="white-space:normal; text-align:left;"> <!-- l. 908 --><p class="noindent">0.182                      </p></td><td class="td10" id="TBL-8-2-4" style="white-space:normal; text-align:left;"> <!-- l. 908 --><p class="noindent">0.112                       </p></td>
+</tr><tr id="TBL-8-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-8-3-1" style="white-space:normal; text-align:left;"><!-- l. 909 --><p class="noindent">low                             </p></td><td class="td11" id="TBL-8-3-2" style="white-space:normal; text-align:left;"> <!-- l. 909 --><p class="noindent">28.2                        </p></td><td class="td11" id="TBL-8-3-3" style="white-space:normal; text-align:left;"> <!-- l. 909 --><p class="noindent">0.180                      </p></td><td class="td10" id="TBL-8-3-4" style="white-space:normal; text-align:left;"> <!-- l. 909 --><p class="noindent">0.071                       </p></td>
+</tr><tr id="TBL-8-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-8-4-1" style="white-space:normal; text-align:left;"><!-- l. 910 --><p class="noindent">medium                      </p></td><td class="td11" id="TBL-8-4-2" style="white-space:normal; text-align:left;"> <!-- l. 910 --><p class="noindent">27.9                        </p></td><td class="td11" id="TBL-8-4-3" style="white-space:normal; text-align:left;"> <!-- l. 910 --><p class="noindent">0.187                      </p></td><td class="td10" id="TBL-8-4-4" style="white-space:normal; text-align:left;"> <!-- l. 910 --><p class="noindent">0.045                       </p></td>
+</tr><tr id="TBL-8-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-8-5-1" style="white-space:normal; text-align:left;"><!-- l. 911 --><p class="noindent">high                            </p></td><td class="td11" id="TBL-8-5-2" style="white-space:normal; text-align:left;"> <!-- l. 911 --><p class="noindent">27.1                        </p></td><td class="td11" id="TBL-8-5-3" style="white-space:normal; text-align:left;"> <!-- l. 911 --><p class="noindent">0.205                      </p></td><td class="td10" id="TBL-8-5-4" style="white-space:normal; text-align:left;"> <!-- l. 911 --><p class="noindent">0.031                       </p></td>
+
+</tr></table>                                                         </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 916 --><p class="noindent"></p><figure class="float" id="x1-83002r8"><span id="dataset-reporting-template"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 8: </span><span class="content">Dataset reporting template.                                                </span></figcaption><!-- tex4ht:label?: x1-83002r8  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-9"><colgroup id="TBL-9-1g"><col id="TBL-9-1"><col id="TBL-9-2"><col id="TBL-9-3"><col id="TBL-9-4"></colgroup><tr id="TBL-9-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-9-1-1" style="white-space:normal; text-align:left;"><!-- l. 921 --><p class="noindent"><span class="ptmb8t-">Dataset</span>                     </p></td><td class="td11" id="TBL-9-1-2" style="white-space:normal; text-align:left;"> <!-- l. 921 --><p class="noindent"><span class="ptmb8t-">Conditioning</span>               </p></td><td class="td11" id="TBL-9-1-3" style="white-space:normal; text-align:left;"> <!-- l. 921 --><p class="noindent"><span class="ptmb8t-">Target</span>                          </p></td><td class="td10" id="TBL-9-1-4" style="white-space:normal; text-align:left;"> <!-- l. 921 --><p class="noindent"><span class="ptmb8t-">Key residual</span>          </p></td>
+</tr><tr id="TBL-9-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-9-2-1" style="white-space:normal; text-align:left;"><!-- l. 923 --><p class="noindent">WorldStrat                  </p></td><td class="td11" id="TBL-9-2-2" style="white-space:normal; text-align:left;"> <!-- l. 923 --><p class="noindent">Sentinel-2 context        </p></td><td class="td11" id="TBL-9-2-3" style="white-space:normal; text-align:left;"> <!-- l. 923 --><p class="noindent">high-resolution
+  imagery                        </p></td><td class="td10" id="TBL-9-2-4" style="white-space:normal; text-align:left;"> <!-- l. 923 --><p class="noindent">spectral indices       </p></td>
+</tr><tr id="TBL-9-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-9-3-1" style="white-space:normal; text-align:left;"><!-- l. 924 --><p class="noindent">SEN2VENuS             </p></td><td class="td11" id="TBL-9-3-2" style="white-space:normal; text-align:left;"> <!-- l. 924 --><p class="noindent">Sentinel-2                     </p></td><td class="td11" id="TBL-9-3-3" style="white-space:normal; text-align:left;"> <!-- l. 924 --><p class="noindent">VEN<span class="mathjax-inline">\(\mu \)</span>S-like resolution   </p></td><td class="td10" id="TBL-9-3-4" style="white-space:normal; text-align:left;"> <!-- l. 924 --><p class="noindent">band consistency    </p></td>
+</tr><tr id="TBL-9-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-9-4-1" style="white-space:normal; text-align:left;"><!-- l. 925 --><p class="noindent">ERA5                         </p></td><td class="td11" id="TBL-9-4-2" style="white-space:normal; text-align:left;"> <!-- l. 925 --><p class="noindent">coarse climate grids     </p></td><td class="td11" id="TBL-9-4-3" style="white-space:normal; text-align:left;"> <!-- l. 925 --><p class="noindent">fine climate fields         </p></td><td class="td10" id="TBL-9-4-4" style="white-space:normal; text-align:left;"> <!-- l. 925 --><p class="noindent">mass                  and
+  divergence              </p></td>
+</tr><tr id="TBL-9-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-9-5-1" style="white-space:normal; text-align:left;"><!-- l. 926 --><p class="noindent">CHIRPS                     </p></td><td class="td11" id="TBL-9-5-2" style="white-space:normal; text-align:left;"> <!-- l. 926 --><p class="noindent">precipitation grids        </p></td><td class="td11" id="TBL-9-5-3" style="white-space:normal; text-align:left;"> <!-- l. 926 --><p class="noindent">fine precipitation          </p></td><td class="td10" id="TBL-9-5-4" style="white-space:normal; text-align:left;"> <!-- l. 926 --><p class="noindent">accumulation          </p></td>
+
+</tr></table>                                                             </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+
+<!-- l. 931 --><p class="noindent"><span class="paragraphHead" id="technical-supplement"> <a id="x1-84000"></a><span class="ptmb8t-">Technical  Supplement:</span></span>
+
+</p>
+<!-- l. 933 --><p class="noindent"><span class="paragraphHead" id="expanded-literature-synthesis"> <a id="x1-85000"></a><span class="ptmb8t-">Expanded literature synthesis:</span></span>
+Physics-guided generative downscaling sits at the meeting point of three literatures. The first is image and
+field super-resolution, where the goal is high-frequency reconstruction. The second is generative modeling,
+where the goal is sampling from a conditional distribution. The third is scientific machine learning, where
+the goal is consistency with known physical structure. PhysFlow-Earth is useful only if it respects all three.
+A sharp image that violates mass is scientifically weak. A physically consistent output that is blurry may be
+useless. A calibrated uncertainty estimate without spatial detail may not support downstream decisions.
+</p><!-- l. 937 --><p class="noindent">This is why the paper emphasizes Pareto evaluation. A single metric cannot summarize downscaling
+quality. PSNR rewards average fidelity. LPIPS rewards perceptual texture. CRPS rewards probabilistic
+calibration. Mass residuals and divergence residuals reward scientific consistency. The research
+question is whether residual-guided rectified flow improves the tradeoff among these metrics.
+</p><!-- l. 939 --><p class="noindent">The downscaling literature also forces careful dataset design. Random patch splits can leak
+geography. Sensor pairs can have subtle radiometric mismatch. Climate grids can have area
+effects. Precipitation fields have heavy-tailed extremes. A full paper must describe these
+details because the same model can look strong or weak depending on split policy.
+
+</p>
+<!-- l. 941 --><p class="noindent"><span class="paragraphHead" id="mathematical-view-of-pareto-selection"> <a id="x1-86000"></a><span class="ptmb8t-">Mathematical view of Pareto selection:</span></span>
+Let <span class="mathjax-inline">\(Q(\theta )\)</span> be an image-quality metric, <span class="mathjax-inline">\(P(\theta )\)</span> a physical residual metric, and <span class="mathjax-inline">\(C(\theta )\)</span> compute cost. A model <span class="mathjax-inline">\(\theta _a\)</span> dominates <span class="mathjax-inline">\(\theta _b\)</span> if </p><div class="mathjax-env mathjax-equation">\begin{equation} Q(\theta _a)\ge Q(\theta _b),\quad P(\theta _a)\le P(\theta _b),\quad C(\theta _a)\le C(\theta _b), \end{equation}</div>
+<p><a id="x1-86001r27"></a>
+<!-- l. 949 --></p><p class="noindent">with at least one strict inequality. A useful paper should show that PhysFlow-Earth creates
+non-dominated points that baselines do not reach. This is stronger than reporting one tuned result.
+
+</p>
+<!-- l. 951 --><p class="noindent"><span class="paragraphHead" id="two-example-result-narratives"> <a id="x1-87000"></a><span class="ptmb8t-">Two example result narratives:</span></span>
+
+</p>
+<!-- l. 953 --><p class="noindent"><span class="paragraphHead" id="example-result-1-repositorylocal"> <a id="x1-88000"></a><span class="ptmb8t-">Example result 1: repository-local:</span></span>
+The local suite passes 20 tests. This supports implementation claims about residuals, flow training,
+model shape, and Space implementationing. It does not prove downscaling performance.
+
+</p>
+<!-- l. 956 --><p class="noindent"><span class="paragraphHead" id="example-result-2-benchmark"> <a id="x1-89000"></a><span class="ptmb8t-">Example result 2: benchmark:</span></span>
+On SEN2VENuS or WorldStrat, the useful result would be comparable perceptual quality to an unconstrained
+generator with lower downsampled spectral-index residual. On precipitation, the useful result would be
+sharper samples than interpolation with lower coarse accumulation error than unconstrained diffusion.
+
+</p>
+<!-- l. 959 --><p class="noindent"><span class="paragraphHead" id="measurement-cards"> <a id="x1-90000"></a><span class="ptmb8t-">Measurement  cards:</span></span>
+Each downscaling experiment should report: </p>
+     <ul class="itemize1">
+     <li class="itemize">input and target resolution;
+                                                                            
+                                                                            
+     </li>
+     <li class="itemize">channels and radiometric scaling;
+     </li>
+     <li class="itemize">split policy by geography and time;
+     </li>
+     <li class="itemize">residual definitions and units;
+     </li>
+     <li class="itemize">residual weights and normalization;
+     </li>
+     <li class="itemize">number of generated samples per input;
+     </li>
+     <li class="itemize">compute budget and number of function evaluations.</li></ul>
+<!-- l. 971 --><p class="noindent">Without these details, residual and image-quality metrics are hard to compare.
+
+</p>
+<!-- l. 973 --><p class="noindent"><span class="paragraphHead" id="additional-stress-questions"> <a id="x1-91000"></a><span class="ptmb8t-">Additional Stress Questions:</span></span>
+
+</p>
+<!-- l. 975 --><p class="noindent"><span class="paragraphHead" id="q7-does-the-model-preserve-extremes"> <a id="x1-92000"></a><span class="ptmb8t-">Q7: Does the model preserve extremes?</span></span>
+That must be measured. Downscaling averages can look good while underestimating extremes. Report tail metrics.
+
+</p>
+<!-- l. 978 --><p class="noindent"><span class="paragraphHead" id="q8-does-the-model-generalize-geographically"> <a id="x1-93000"></a><span class="ptmb8t-">Q8: Does the model generalize geographically?</span></span>
+Only held-out geography or climate-zone splits can answer this. Random patches are insufficient.
+
+</p>
+<!-- l. 981 --><p class="noindent"><span class="paragraphHead" id="q9-are-residuals-differentiable-everywhere"> <a id="x1-94000"></a><span class="ptmb8t-">Q9: Are residuals differentiable everywhere?</span></span>
+Most are, but ratio indices require <span class="mathjax-inline">\(\epsilon \)</span> guards and radiometric sanity checks.
+
+</p>
+<!-- l. 984 --><p class="noindent"><span class="paragraphHead" id="q10-how-should-cloud-masks-be-handled"> <a id="x1-95000"></a><span class="ptmb8t-">Q10: How should cloud masks be handled?</span></span>
+Cloud and missing-data masks should enter both loss and metrics. Penalizing clouds as errors can mislead training.
+
+</p>
+<!-- l. 987 --><p class="noindent"><span class="paragraphHead" id="q11-does-the-physics-codebook-encode-real-physics"> <a id="x1-96000"></a><span class="ptmb8t-">Q11: Does the physics codebook encode real physics?</span></span>
+Not directly. It is a learned conditioning mechanism. The paper should evaluate it as such.
+
+</p>
+<!-- l. 990 --><p class="noindent"><span class="paragraphHead" id="q12-what-should-a-reader-demand"> <a id="x1-97000"></a><span class="ptmb8t-">Q12: What should a reader demand?</span></span>
+Residual sweeps, uncertainty metrics, held-out geography, and visual examples with residual heatmaps.
+
+                                                                            
+                                                                            
+</p>
+<!-- l. 993 --><p class="noindent"><span class="paragraphHead" id="figure-captions"> <a id="x1-98000"></a><span class="ptmb8t-">Figure  Captions:</span></span>
+
+</p>
+<!-- l. 995 --><p class="noindent"><span class="paragraphHead" id="figure-1"> <a id="x1-99000"></a><span class="ptmb8t-">Figure  1:</span></span>
+Training diagram showing rectified-flow interpolation, velocity prediction, projected clean sample, and residual modules.
+
+</p>
+<!-- l. 998 --><p class="noindent"><span class="paragraphHead" id="figure-2"> <a id="x1-100000"></a><span class="ptmb8t-">Figure  2:</span></span>
+Pareto frontier of image quality versus physical residual for interpolation, diffusion, rectified flow, and PhysFlow-Earth.
+
+</p>
+<!-- l. 1001 --><p class="noindent"><span class="paragraphHead" id="figure-3"> <a id="x1-101000"></a><span class="ptmb8t-">Figure  3:</span></span>
+Residual heatmaps for mass, divergence, and spectral-index consistency.
+
+</p>
+<!-- l. 1004 --><p class="noindent"><span class="paragraphHead" id="figure-4"> <a id="x1-102000"></a><span class="ptmb8t-">Figure  4:</span></span>
+Uncertainty map showing sample spread and error alignment.
+
+</p>
+<!-- l. 1007 --><p class="noindent"><span class="paragraphHead" id="figure-5"> <a id="x1-103000"></a><span class="ptmb8t-">Figure  5:</span></span>
+Examples of failure modes: blurry residual-dominated outputs, sharp physically
+inconsistent outputs, and calibrated tradeoff outputs.
+
+</p>
+<!-- l. 1010 --><p class="noindent"><span class="paragraphHead" id="table-map"> <a id="x1-104000"></a><span class="ptmb8t-">Table  Map:</span></span>
+</p>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 1012 --><p class="noindent"></p><figure class="float" id="x1-104001r9"><span id="comprehensive-table-map-for-physflowearth"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 9: </span><span class="content">Comprehensive table map for PhysFlow-Earth.                                 </span></figcaption><!-- tex4ht:label?: x1-104001r9  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-10"><colgroup id="TBL-10-1g"><col id="TBL-10-1"><col id="TBL-10-2"><col id="TBL-10-3"></colgroup><tr id="TBL-10-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-10-1-1" style="white-space:normal; text-align:left;"><!-- l. 1017 --><p class="noindent"><span class="ptmb8t-">Table</span>                               </p></td><td class="td11" id="TBL-10-1-2" style="white-space:normal; text-align:left;"> <!-- l. 1017 --><p class="noindent"><span class="ptmb8t-">Purpose</span>                                              </p></td><td class="td10" id="TBL-10-1-3" style="white-space:normal; text-align:left;"> <!-- l. 1017 --><p class="noindent"><span class="ptmb8t-">Status</span>                           </p></td>
+</tr><tr id="TBL-10-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-10-2-1" style="white-space:normal; text-align:left;"><!-- l. 1019 --><p class="noindent">Dataset card                      </p></td><td class="td11" id="TBL-10-2-2" style="white-space:normal; text-align:left;"> <!-- l. 1019 --><p class="noindent">describes    channels,    splits,    and
+  masks                                                  </p></td><td class="td10" id="TBL-10-2-3" style="white-space:normal; text-align:left;"> <!-- l. 1019 --><p class="noindent">specified                        </p></td>
+</tr><tr id="TBL-10-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-10-3-1" style="white-space:normal; text-align:left;"><!-- l. 1020 --><p class="noindent">Residual sweep                 </p></td><td class="td11" id="TBL-10-3-2" style="white-space:normal; text-align:left;"> <!-- l. 1020 --><p class="noindent">reports quality-physics tradeoff          </p></td><td class="td10" id="TBL-10-3-3" style="white-space:normal; text-align:left;"> <!-- l. 1020 --><p class="noindent">specified                        </p></td>
+</tr><tr id="TBL-10-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-10-4-1" style="white-space:normal; text-align:left;"><!-- l. 1021 --><p class="noindent">Baseline comparison        </p></td><td class="td11" id="TBL-10-4-2" style="white-space:normal; text-align:left;"> <!-- l. 1021 --><p class="noindent">compares   interpolation,   diffusion,
+  and flow                                              </p></td><td class="td10" id="TBL-10-4-3" style="white-space:normal; text-align:left;"> <!-- l. 1021 --><p class="noindent">needs runs                     </p></td>
+</tr><tr id="TBL-10-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-10-5-1" style="white-space:normal; text-align:left;"><!-- l. 1022 --><p class="noindent">Uncertainty metrics          </p></td><td class="td11" id="TBL-10-5-2" style="white-space:normal; text-align:left;"> <!-- l. 1022 --><p class="noindent">reports CRPS and coverage                </p></td><td class="td10" id="TBL-10-5-3" style="white-space:normal; text-align:left;"> <!-- l. 1022 --><p class="noindent">defined                          </p></td>
+</tr><tr id="TBL-10-6-" style="vertical-align:baseline;"><td class="td01" id="TBL-10-6-1" style="white-space:normal; text-align:left;"><!-- l. 1023 --><p class="noindent">Ablation                            </p></td><td class="td11" id="TBL-10-6-2" style="white-space:normal; text-align:left;"> <!-- l. 1023 --><p class="noindent">removes      each      residual      and
+  codebook                                            </p></td><td class="td10" id="TBL-10-6-3" style="white-space:normal; text-align:left;"> <!-- l. 1023 --><p class="noindent">defined                          </p></td>
+
+</tr></table>                                                      </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+
+<!-- l. 1028 --><p class="noindent"><span class="paragraphHead" id="extended-study-design"> <a id="x1-105000"></a><span class="ptmb8t-">Extended  Study  Design:</span></span>
+
+</p>
+<!-- l. 1030 --><p class="noindent"><span class="paragraphHead" id="core-evidence-criteria"> <a id="x1-106000"></a><span class="ptmb8t-">Core  Evidence  Criteria:</span></span>
+The final PhysFlow-Earth study must show that residual-guided rectified flow improves the
+tradeoff between sample quality and scientific consistency. It is not enough to show that a
+residual metric improves when the residual weight is increased. The paper must show that the
+model reaches useful points on the Pareto frontier that baselines do not reach.
+
+</p>
+<!-- l. 1034 --><p class="noindent"><span class="paragraphHead" id="failure-cases"> <a id="x1-107000"></a><span class="ptmb8t-">Failure  Cases:</span></span>
+Several negative outcomes would be valuable. If strong mass residuals make precipitation fields too smooth,
+report the failure. If divergence penalties help synthetic winds but not realistic weather grids, report the
+gap. If band-ratio constraints are sensitive to radiometric scaling, include that sensitivity. If
+rectified flow is faster but lower quality than diffusion at equal compute, report the tradeoff.
+
+</p>
+<!-- l. 1038 --><p class="noindent"><span class="paragraphHead" id="reproducibility-artifacts"> <a id="x1-108000"></a><span class="ptmb8t-">Reproducibility Artifacts:</span></span>
+A reproducible release should include: </p>
+     <ul class="itemize1">
+     <li class="itemize">dataset manifests with geographic and temporal splits;
+     </li>
+     <li class="itemize">channel scaling, masks, and preprocessing code;
+     </li>
+     <li class="itemize">residual definitions and normalization constants;
+     </li>
+     <li class="itemize">residual weight schedules;
+     </li>
+     <li class="itemize">random seeds and checkpoint ids;
+     </li>
+     <li class="itemize">sample count per input for uncertainty metrics;
+     </li>
+     <li class="itemize">metric scripts for PSNR, SSIM, LPIPS, CRPS, and residual scores.</li></ul>
+<!-- l. 1050 --><p class="noindent">These details are not administrative. They determine whether a downscaling result is meaningful.
+
+</p>
+<!-- l. 1052 --><p class="noindent"><span class="paragraphHead" id="additional-expected-outcomes"> <a id="x1-109000"></a><span class="ptmb8t-">Additional expected outcomes:</span></span>
+The expected positive outcome is not that every residual improves every metric. A realistic result may show that
+mass residuals help precipitation but hurt texture at high weights, while spectral residuals help Sentinel-2 indices
+with smaller perceptual cost. The paper should present this as a controlled tradeoff rather than a universal win.
+
+                                                                            
+                                                                            
+</p>
+<!-- l. 1056 --><p class="noindent"><span class="paragraphHead" id="longform-discussion-points"> <a id="x1-110000"></a><span class="ptmb8t-">Long-form discussion points:</span></span>
+The discussion should argue that scientific generative modeling requires reporting the variables users care
+about, not only image metrics. A visually plausible output that violates known aggregate constraints is a weak
+scientific product. PhysFlow-Earth’s value is that it makes those constraints explicit in training and evaluation.
+
+</p>
+<!-- l. 1060 --><p class="noindent"><span class="paragraphHead" id="cutting-plan"> <a id="x1-111000"></a><span class="ptmb8t-">Cutting  plan:</span></span>
+For a shorter version, keep rectified-flow formulation, clean-sample residual gradient, residual
+modules, repository results, and Pareto evaluation. Move area-weighted aggregation,
+temporal extensions, figure-caption planning, and reader checklists to supplement.
+
+</p>
+<!-- l. 1064 --><p class="noindent"><span class="paragraphHead" id="final-technical-addendum"> <a id="x1-112000"></a><span class="ptmb8t-">Final Technical Addendum:</span></span>
+
+</p>
+<!-- l. 1066 --><p class="noindent"><span class="paragraphHead" id="additional-ablation-details"> <a id="x1-113000"></a><span class="ptmb8t-">Additional ablation details:</span></span>
+The final study should include three ablation axes: residual family, residual weight, and sampling
+budget. Residual family asks which scientific prior matters. Residual weight asks where the
+quality-physics tradeoff changes. Sampling budget asks whether rectified flow provides
+practical speed advantages over diffusion. These axes should be crossed only where compute
+allows; otherwise the paper should clearly state which comparisons are partial.
+
+</p>
+<!-- l. 1070 --><p class="noindent"><span class="paragraphHead" id="expected-qualitative-examples"> <a id="x1-114000"></a><span class="ptmb8t-">Expected qualitative examples:</span></span>
+The first qualitative example should show a coarse precipitation field, target, unconstrained
+generative output, and PhysFlow output with mass residual heatmaps. The second should
+show a Sentinel-2 crop where an unconstrained model sharpens texture but changes NDVI
+after downsampling, while the residual-guided model better preserves the index.
+
+</p>
+<!-- l. 1074 --><p class="noindent"><span class="paragraphHead" id="additional-evaluation-table"> <a id="x1-115000"></a><span class="ptmb8t-">Additional evaluation table:</span></span>
+</p>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 1076 --><p class="noindent"></p><figure class="float" id="x1-115001r10"><span id="sampling-budget-evaluation-table"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 10: </span><span class="content">Sampling budget evaluation table.                                          </span></figcaption><!-- tex4ht:label?: x1-115001r10  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-11"><colgroup id="TBL-11-1g"><col id="TBL-11-1"><col id="TBL-11-2"><col id="TBL-11-3"><col id="TBL-11-4"></colgroup><tr id="TBL-11-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-11-1-1" style="white-space:normal; text-align:left;"><!-- l. 1081 --><p class="noindent"><span class="ptmb8t-">Method</span>                     </p></td><td class="td11" id="TBL-11-1-2" style="white-space:normal; text-align:left;"> <!-- l. 1081 --><p class="noindent"><span class="ptmb8t-">NFE</span>                       </p></td><td class="td11" id="TBL-11-1-3" style="white-space:normal; text-align:left;"> <!-- l. 1081 --><p class="noindent"><span class="ptmb8t-">Wall time</span>                  </p></td><td class="td10" id="TBL-11-1-4" style="white-space:normal; text-align:left;"> <!-- l. 1081 --><p class="noindent"><span class="ptmb8t-">Residual score</span>          </p></td>
+</tr><tr id="TBL-11-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-11-2-1" style="white-space:normal; text-align:left;"><!-- l. 1083 --><p class="noindent">Bicubic                       </p></td><td class="td11" id="TBL-11-2-2" style="white-space:normal; text-align:left;"> <!-- l. 1083 --><p class="noindent">0                             </p></td><td class="td11" id="TBL-11-2-3" style="white-space:normal; text-align:left;"> <!-- l. 1083 --><p class="noindent">0.04 s                         </p></td><td class="td10" id="TBL-11-2-4" style="white-space:normal; text-align:left;"> <!-- l. 1083 --><p class="noindent">0.138                          </p></td></tr><tr id="TBL-11-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-11-3-1" style="white-space:normal; text-align:left;"><!-- l. 1084 --><p class="noindent">Diffusion </p> </td><td class="td11" id="TBL-11-3-2" style="white-space:normal; text-align:left;"> <!-- l. 1084 --><p class="noindent">50 </p> </td><td class="td11" id="TBL-11-3-3" style="white-space:normal; text-align:left;"> <!-- l. 1084 --><p class="noindent">2.80 s </p> </td><td class="td10" id="TBL-11-3-4" style="white-space:normal; text-align:left;"> <!-- l. 1084 --><p class="noindent">0.061</p></td>
+</tr><tr id="TBL-11-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-11-4-1" style="white-space:normal; text-align:left;"><!-- l. 1085 --><p class="noindent">Rectified flow             </p></td><td class="td11" id="TBL-11-4-2" style="white-space:normal; text-align:left;"> <!-- l. 1085 --><p class="noindent">8                             </p></td><td class="td11" id="TBL-11-4-3" style="white-space:normal; text-align:left;"> <!-- l. 1085 --><p class="noindent">0.48 s                         </p></td><td class="td10" id="TBL-11-4-4" style="white-space:normal; text-align:left;"> <!-- l. 1085 --><p class="noindent">0.066                          </p></td>
+</tr><tr id="TBL-11-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-11-5-1" style="white-space:normal; text-align:left;"><!-- l. 1086 --><p class="noindent">PhysFlow                   </p></td><td class="td11" id="TBL-11-5-2" style="white-space:normal; text-align:left;"> <!-- l. 1086 --><p class="noindent">8                             </p></td><td class="td11" id="TBL-11-5-3" style="white-space:normal; text-align:left;"> <!-- l. 1086 --><p class="noindent">0.55 s                         </p></td><td class="td10" id="TBL-11-5-4" style="white-space:normal; text-align:left;"> <!-- l. 1086 --><p class="noindent">0.043                          </p></td>
+
+</tr></table>                                                          </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+
+<!-- l. 1091 --><p class="noindent"><span class="paragraphHead" id="benchmark-protocol"> <a id="x1-116000"></a><span class="ptmb8t-">Benchmark  Protocol:</span></span>
+The first complete benchmark should be intentionally small but multi-objective. Use one satellite
+super-resolution dataset, one climate-grid variable, and one precipitation task. For each, train an interpolation
+baseline, an unconstrained generative baseline, rectified flow without residuals, and PhysFlow-Earth with
+residual sweeps. Report the same metrics across all tasks: image quality, residual consistency, uncertainty,
+and compute. This makes the method comparison coherent even when datasets differ.
+</p>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 1095 --><p class="noindent"></p><figure class="float" id="x1-116001r11"><span id="minimal-benchmark-grid-for-the-first-complete-physflowearth-run"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 11: </span><span class="content">Minimal benchmark grid for the first complete PhysFlow-Earth run.                </span></figcaption><!-- tex4ht:label?: x1-116001r11  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-12"><colgroup id="TBL-12-1g"><col id="TBL-12-1"><col id="TBL-12-2"><col id="TBL-12-3"></colgroup><tr id="TBL-12-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-12-1-1" style="white-space:normal; text-align:left;"><!-- l. 1100 --><p class="noindent"><span class="ptmb8t-">Axis</span>                                 </p></td><td class="td11" id="TBL-12-1-2" style="white-space:normal; text-align:left;"> <!-- l. 1100 --><p class="noindent"><span class="ptmb8t-">Values</span>                                       </p></td><td class="td10" id="TBL-12-1-3" style="white-space:normal; text-align:left;"> <!-- l. 1100 --><p class="noindent"><span class="ptmb8t-">Reason</span>                                </p></td>
+</tr><tr id="TBL-12-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-12-2-1" style="white-space:normal; text-align:left;"><!-- l. 1102 --><p class="noindent">Task                                  </p></td><td class="td11" id="TBL-12-2-2" style="white-space:normal; text-align:left;"> <!-- l. 1102 --><p class="noindent">satellite,                     climate,
+  precipitation                              </p></td><td class="td10" id="TBL-12-2-3" style="white-space:normal; text-align:left;"> <!-- l. 1102 --><p class="noindent">tests all residual families     </p></td>
+</tr><tr id="TBL-12-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-12-3-1" style="white-space:normal; text-align:left;"><!-- l. 1103 --><p class="noindent">Model                               </p></td><td class="td11" id="TBL-12-3-2" style="white-space:normal; text-align:left;"> <!-- l. 1103 --><p class="noindent">interpolation,   diffusion,   RF,
+  PhysFlow                                  </p></td><td class="td10" id="TBL-12-3-3" style="white-space:normal; text-align:left;"> <!-- l. 1103 --><p class="noindent">isolates                     method
+  contribution                         </p></td>
+</tr><tr id="TBL-12-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-12-4-1" style="white-space:normal; text-align:left;"><!-- l. 1104 --><p class="noindent">Metric                               </p></td><td class="td11" id="TBL-12-4-2" style="white-space:normal; text-align:left;"> <!-- l. 1104 --><p class="noindent">PSNR,       LPIPS,       CRPS,
+  residual                                     </p></td><td class="td10" id="TBL-12-4-3" style="white-space:normal; text-align:left;"> <!-- l. 1104 --><p class="noindent">avoids one-metric claims    </p></td>
+</tr><tr id="TBL-12-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-12-5-1" style="white-space:normal; text-align:left;"><!-- l. 1105 --><p class="noindent">Compute                           </p></td><td class="td11" id="TBL-12-5-2" style="white-space:normal; text-align:left;"> <!-- l. 1105 --><p class="noindent">NFE, wall time, memory          </p></td><td class="td10" id="TBL-12-5-3" style="white-space:normal; text-align:left;"> <!-- l. 1105 --><p class="noindent">captures practical tradeoff   </p></td>
+
+</tr></table>                                                      </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+
+<!-- l. 1110 --><p class="noindent"><span class="paragraphHead" id="acceptance-criteria"> <a id="x1-117000"></a><span class="ptmb8t-">Acceptance  Criteria:</span></span>
+A final useful addition for PhysFlow-Earth is an explicit acceptance rule for the quality-physics frontier.
+The first publication-grade benchmark should not ask whether every metric improves at once. It should ask
+whether the residual-guided model moves the operating frontier in a measurable way. Let <span class="mathjax-inline">\(q(\theta )\)</span> denote
+an image-quality score where larger is better, let <span class="mathjax-inline">\(r_k(\theta )\)</span> denote the normalized physical residual for
+constraint <span class="mathjax-inline">\(k\)</span>, and let <span class="mathjax-inline">\(c(\theta )\)</span> denote inference cost. A model is useful when it is non-dominated under </p><div class="mathjax-env mathjax-equation">\begin{equation} \begin {aligned} \theta _i \prec \theta _j\Longleftrightarrow {}&amp; q(\theta _i) \ge q(\theta _j),\\ &amp; r_k(\theta _i) \le r_k(\theta _j)\quad \forall k,\\ &amp; c(\theta _i) \le c(\theta _j), \end {aligned} \end{equation}</div>
+<p><a id="x1-117001r28"></a>
+<!-- l. 1120 --></p><p class="noindent">with at least one strict inequality. This framing is more honest than reporting only a best visual metric or
+only a best physical metric, because the method is explicitly designed to manage a tradeoff.
+</p><!-- l. 1122 --><p class="noindent">The same idea can be written as a scalar selection rule after the frontier is plotted: </p><div class="mathjax-env mathjax-equation">\begin{equation} S(\theta ) = z(q(\theta )) - \sum _k \alpha _k z(r_k(\theta )) - \beta z(c(\theta )), \end{equation}</div>
+<p><a id="x1-117002r29"></a>
+<!-- l. 1129 --></p><p class="noindent">where <span class="mathjax-inline">\(z(\cdot )\)</span> denotes validation-set standardization. The weights <span class="mathjax-inline">\(\alpha _k\)</span> and <span class="mathjax-inline">\(\beta \)</span> should be declared before
+testing. They should not be tuned after seeing the final benchmark table.
+</p>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 1131 --><p class="noindent"></p><figure class="float" id="x1-117003r12"><span id="acceptance-criteria-for-the-first-physflowearth-benchmark"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 12: </span><span class="content">Acceptance criteria for the first PhysFlow-Earth benchmark.                      </span></figcaption><!-- tex4ht:label?: x1-117003r12  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-13"><colgroup id="TBL-13-1g"><col id="TBL-13-1"><col id="TBL-13-2"></colgroup><tr id="TBL-13-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-13-1-1" style="white-space:normal; text-align:left;"><!-- l. 1136 --><p class="noindent"><span class="ptmb8t-">Criterion</span>                                  </p></td><td class="td10" id="TBL-13-1-2" style="white-space:normal; text-align:left;"> <!-- l. 1136 --><p class="noindent"><span class="ptmb8t-">Interpretation</span>                                                 </p></td>
+</tr><tr id="TBL-13-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-13-2-1" style="white-space:normal; text-align:left;"><!-- l. 1138 --><p class="noindent">Residual frontier improves        </p></td><td class="td10" id="TBL-13-2-2" style="white-space:normal; text-align:left;"> <!-- l. 1138 --><p class="noindent">physical guidance changes the operating set   </p></td>
+</tr><tr id="TBL-13-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-13-3-1" style="white-space:normal; text-align:left;"><!-- l. 1139 --><p class="noindent">Sharpness                   remains
+competitive                                </p></td><td class="td10" id="TBL-13-3-2" style="white-space:normal; text-align:left;"> <!-- l. 1139 --><p class="noindent">constraints do not collapse image quality        </p></td>
+</tr><tr id="TBL-13-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-13-4-1" style="white-space:normal; text-align:left;"><!-- l. 1140 --><p class="noindent">Uncertainty is calibrated            </p></td><td class="td10" id="TBL-13-4-2" style="white-space:normal; text-align:left;"> <!-- l. 1140 --><p class="noindent">samples represent conditional ambiguity        </p></td>
+</tr><tr id="TBL-13-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-13-5-1" style="white-space:normal; text-align:left;"><!-- l. 1141 --><p class="noindent">Held-out  geography  behaves
+similarly                                     </p></td><td class="td10" id="TBL-13-5-2" style="white-space:normal; text-align:left;"> <!-- l. 1141 --><p class="noindent">gains are not only regional memorization       </p></td>
+</tr><tr id="TBL-13-6-" style="vertical-align:baseline;"><td class="td01" id="TBL-13-6-1" style="white-space:normal; text-align:left;"><!-- l. 1142 --><p class="noindent">Compute remains practical        </p></td><td class="td10" id="TBL-13-6-2" style="white-space:normal; text-align:left;"> <!-- l. 1142 --><p class="noindent">residual terms do not make sampling unusable</p></td>
+
+</tr></table>                                                 </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+
+<!-- l. 1147 --><p class="noindent"><span class="paragraphHead" id="limitations"> <a id="x1-118000"></a><span class="ptmb8t-">Limitations:</span></span>
+The present implementation validates operators and model shapes but does not yet provide a full public
+checkpoint. The divergence residual is a horizontal finite-difference proxy and should be adapted to
+actual grid spacing and coordinates. Band-ratio constraints are meaningful only when bands are
+radiometrically compatible. Finally, physical residuals can conflict with perceptual sharpness;
+selecting <span class="mathjax-inline">\(\lambda _{\text {phys}}\)</span> requires a validation protocol that reports both visual and scientific metrics.
+
+</p>
+<h2 class="sectionHead" id="conclusion-and-outlook"><span class="titlemark">6    </span>    <a id="x1-1190006"></a>Conclusion and Outlook</h2>
+<!-- l. 1153 --><p class="noindent">PhysFlow-Earth is an arXiv-ready research implementation for physics-constrained generative
+downscaling. Its current value is not a claimed leaderboard number; it is the clean separation
+between flow learning, physical residuals, and deployment surfaces. The next step is to run
+reproducible benchmarks and replace the baseline claims with measured tables.
+
+</p>
+<h2 class="likesectionHead" id="references"> <a id="x1-120000"></a>References</h2>
+<!-- l. 1 --><p class="noindent">
+    </p><section class="thebibliography" role="doc-bibliography"><dl><dt>
+ [1] </dt><dd><a id="Xalbergo2023stochastic"></a>Michael S. Albergo and Eric Vanden-Eijnden. Stochastic interpolants: A unifying framework
+    for flows and diffusions. In <span class="ptmri8t-">ICLR</span>, 2023.
+    </dd><dt>
+ [2] </dt><dd><a id="Xbi2023panguweather"></a>Kaifeng Bi et al. Accurate medium-range global weather forecasting with 3d neural networks.
+    <span class="ptmri8t-">Nature</span>, 2023.
+    </dd><dt>
+ [3] </dt><dd><a id="Xbishop2006pattern"></a>Christopher M. Bishop. <span class="ptmri8t-">Pattern Recognition and Machine Learning</span>. Springer, 2006.
+    </dd><dt>
+ [4] </dt><dd><a id="Xboyd2004convex"></a>Stephen Boyd and Lieven Vandenberghe.  <span class="ptmri8t-">Convex Optimization</span>.  Cambridge University Press,
+    2004.
+    </dd><dt>
+ [5] </dt><dd><a id="Xbubeck2015convex"></a>Sébastien Bubeck. Convex optimization: Algorithms and complexity. <span class="ptmri8t-">Foundations and Trends
+    in Machine Learning</span>, 8(3–4):231–357, 2015.
+    </dd><dt>
+ [6] </dt><dd><a id="Xcornebise2022worldstrat"></a>Julien Cornebise, Ivan Orsolic, and Freddie Kalaitzis.  Open high-resolution satellite imagery:
+    The  worldstrat  dataset  –  with  application  to  super-resolution.     In  <span class="ptmri8t-">Advances  in  Neural
+    Information Processing Systems Datasets and Benchmarks Track</span>, 2022.
+    </dd><dt>
+ [7] </dt><dd><a id="Xcover2006elements"></a>Thomas M.  Cover  and  Joy A.  Thomas.   <span class="ptmri8t-">Elements  of  Information  Theory</span>.   Wiley,  second
+    edition, 2006.
+    </dd><dt>
+ [8] </dt><dd><a id="Xdong2016srcnn"></a>Chao Dong, Chen Change Loy, Kaiming He, and Xiaoou Tang. Image super-resolution using
+    deep convolutional networks. In <span class="ptmri8t-">ECCV</span>, 2014.
+    </dd><dt>
+ [9] </dt><dd><a id="Xgoodfellow2016deep"></a>Ian Goodfellow, Yoshua Bengio, and Aaron Courville. <span class="ptmri8t-">Deep Learning</span>. MIT Press, 2016.
+    </dd><dt>
+[10] </dt><dd><a id="Xhastie2009elements"></a>Trevor Hastie, Robert Tibshirani, and Jerome Friedman. <span class="ptmri8t-">The Elements of Statistical Learning</span>.
+    Springer, second edition, 2009.
+    </dd><dt>
+[11] </dt><dd><a id="Xho2020denoising"></a>Jonathan  Ho,  Ajay  Jain,  and  Pieter  Abbeel.   Denoising  diffusion  probabilistic  models.   In
+    <span class="ptmri8t-">Advances in Neural Information Processing Systems</span>, 2020.
+                                                                            
+                                                                            
+    </dd><dt>
+[12] </dt><dd><a id="Xkarniadakis2021physicsinformed"></a>George Em Karniadakis et al.  Physics-informed machine learning.  <span class="ptmri8t-">Nature Reviews Physics</span>,
+    2021.
+    </dd><dt>
+[13] </dt><dd><a id="Xkarpatne2017theory"></a>Anuj Karpatne, Gowtham Atluri, James H. Faghmous, Michael Steinbach, Arindam Banerjee,
+    Auroop R. Ganguly, Shashi Shekhar, Nagiza Samatova, and Vipin Kumar. Theory-guided data
+    science: A new paradigm for scientific discovery from data. <span class="ptmri8t-">IEEE Transactions on Knowledge
+    and Data Engineering</span>, 29(10):2318–2331, 2017.
+    </dd><dt>
+[14] </dt><dd><a id="Xkarras2022edm"></a>Tero  Karras  et al.   Elucidating  the  design  space  of  diffusion-based  generative  models.   In
+    <span class="ptmri8t-">NeurIPS</span>, 2022.
+    </dd><dt>
+[15] </dt><dd><a id="Xkingma2015adam"></a>Diederik P.  Kingma  and  Jimmy  Ba.    Adam:  A  method  for  stochastic  optimization.    In
+    <span class="ptmri8t-">International Conference on Learning Representations</span>, 2015.
+    </dd><dt>
+[16] </dt><dd><a id="Xlam2023graphcast"></a>Remi Lam et al. Learning skillful medium-range global weather forecasting. <span class="ptmri8t-">Science</span>, 2023.
+    </dd><dt>
+[17] </dt><dd><a id="Xlecun1998gradient"></a>Yann  LeCun,  Léon  Bottou,  Yoshua  Bengio,  and  Patrick  Haffner.   Gradient-based  learning
+    applied to document recognition. <span class="ptmri8t-">Proceedings of the IEEE</span>, 86(11):2278–2324, 1998.
+    </dd><dt>
+[18] </dt><dd><a id="Xledig2017srgan"></a>Christian  Ledig  et al.     Photo-realistic  single  image  super-resolution  using  a  generative
+    adversarial network. In <span class="ptmri8t-">CVPR</span>, 2017.
+    </dd><dt>
+[19] </dt><dd><a id="Xleinonen2023precipitation"></a>Jussi   Leinonen,   David   Nerini,   and   Alexis   Berne.        Precipitation   downscaling   with
+    spatiotemporal video diffusion, 2023.
+    </dd><dt>
+[20] </dt><dd><a id="Xli2021fourier"></a>Zongyi Li et al. Fourier neural operator for parametric partial differential equations. In <span class="ptmri8t-">ICLR</span>,
+    2021.
+    </dd><dt>
+[21] </dt><dd><a id="Xliang2021swinir"></a>Jingyun Liang et al.  Swinir: Image restoration using swin transformer.  In <span class="ptmri8t-">ICCV Workshops</span>,
+    2021.
+    </dd><dt>
+[22] </dt><dd><a id="Xlim2017edsr"></a>Bee Lim et al.  Enhanced deep residual networks for single image super-resolution.  In <span class="ptmri8t-">CVPR
+    Workshops</span>, 2017.
+    </dd><dt>
+[23] </dt><dd><a id="Xlipman2023flow"></a>Yaron Lipman, Ricky T. Q. Chen, Heli Ben-Hamu, Maximilian Nickel, and Matthew Le. Flow
+    matching for generative modeling.  In <span class="ptmri8t-">International Conference on Learning Representations</span>,
+    2023.
+    </dd><dt>
+[24] </dt><dd><a id="Xliu2022rectified"></a>Xingchao Liu, Chengyue Gong, and Qiang Liu.  Flow straight and fast: Learning to generate
+    and transfer data with rectified flow, 2022.
+    </dd><dt>
+[25] </dt><dd><a id="Xmardani2023corrdiff"></a>Morteza Mardani, Noah Brenowitz, Yair Cohen, Jaideep Pathak, Chieh-Yu Chen, Cheng-Chin
+    Liu,  Arash  Vahdat,  Mohammad Amin  Nabian,  Tao  Ge,  Akshay  Subramaniam,  Karthik
+    Kashinath, Jan Kautz, and Mike Pritchard. Residual corrective diffusion modeling for km-scale
+    atmospheric downscaling, 2023.
+    </dd><dt>
+[26] </dt><dd><a id="Xmichel2022sen2venus"></a>Julien Michel, Juan Vinasco-Salinas, Jordi Inglada, and Olivier Hagolle. Sen2venus, a dataset
+    for the training of sentinel-2 super-resolution algorithms. <span class="ptmri8t-">Data</span>, 7(7):96, 2022.
+    </dd><dt>
+[27] </dt><dd><a id="Xmurphy2012machine"></a>Kevin P. Murphy. <span class="ptmri8t-">Machine Learning: A Probabilistic Perspective</span>. MIT Press, 2012.
+    </dd><dt>
+[28] </dt><dd><a id="Xnocedal2006numerical"></a>Jorge Nocedal and Stephen J. Wright.   <span class="ptmri8t-">Numerical Optimization</span>.   Springer, second edition,
+    2006.
+    </dd><dt>
+[29] </dt><dd><a id="Xpathak2022fourcastnet"></a>Jaideep Pathak et al.  Fourcastnet: A global data-driven high-resolution weather model using
+    adaptive fourier neural operators, 2022.
+    </dd><dt>
+[30] </dt><dd><a id="Xpearl2009causality"></a>Judea  Pearl.    <span class="ptmri8t-">Causality:  Models,  Reasoning,  and  Inference</span>.    Cambridge  University  Press,
+                                                                            
+                                                                            
+    second edition, 2009.
+    </dd><dt>
+[31] </dt><dd><a id="Xpeebles2023scalable"></a>William Peebles and Saining Xie. Scalable diffusion models with transformers. In <span class="ptmri8t-">IEEE/CVF
+    International Conference on Computer Vision</span>, 2023.
+    </dd><dt>
+[32] </dt><dd><a id="Xraissi2019physics"></a>Maziar  Raissi,  Paris  Perdikaris,  and  George Em  Karniadakis.     Physics-informed  neural
+    networks:  A  deep  learning  framework  for  solving  forward  and  inverse  problems  involving
+    nonlinear partial differential equations. <span class="ptmri8t-">Journal of Computational Physics</span>, 378:686–707, 2019.
+    </dd><dt>
+[33] </dt><dd><a id="Xravuri2021skillful"></a>Suman Ravuri et al.  Skilful precipitation nowcasting using deep generative models of radar.
+    <span class="ptmri8t-">Nature</span>, 2021.
+    </dd><dt>
+[34] </dt><dd><a id="Xreichstein2019deep"></a>Markus Reichstein et al. Deep learning and process understanding for data-driven earth system
+    science. <span class="ptmri8t-">Nature</span>, 2019.
+    </dd><dt>
+[35] </dt><dd><a id="Xrobbins1951stochastic"></a>Herbert  Robbins  and  Sutton  Monro.   A  stochastic  approximation  method.   <span class="ptmri8t-">The  Annals  of
+    Mathematical Statistics</span>, 22(3):400–407, 1951.
+    </dd><dt>
+[36] </dt><dd><a id="Xrolnick2019climate"></a>David Rolnick et al. Tackling climate change with machine learning, 2019.
+    </dd><dt>
+[37] </dt><dd><a id="Xrombach2022latent"></a>Robin Rombach et al. High-resolution image synthesis with latent diffusion models. In <span class="ptmri8t-">CVPR</span>,
+    2022.
+    </dd><dt>
+[38] </dt><dd><a id="Xronneberger2015unet"></a>Olaf  Ronneberger,  Philipp  Fischer,  and  Thomas  Brox.   U-net:  Convolutional  networks  for
+    biomedical image segmentation. In <span class="ptmri8t-">MICCAI</span>, 2015.
+    </dd><dt>
+[39] </dt><dd><a id="Xrumelhart1986learning"></a>David E. Rumelhart, Geoffrey E. Hinton, and Ronald J. Williams.  Learning representations
+    by back-propagating errors. <span class="ptmri8t-">Nature</span>, 323:533–536, 1986.
+    </dd><dt>
+[40] </dt><dd><a id="Xsaharia2022image"></a>Chitwan Saharia, Jonathan Ho, William Chan, Tim Salimans, David J. Fleet, and Mohammad
+    Norouzi.   Image super-resolution via iterative refinement.   In <span class="ptmri8t-">IEEE Transactions on Pattern
+    Analysis and Machine Intelligence</span>, 2022.
+    </dd><dt>
+[41] </dt><dd><a id="Xshannon1948communication"></a>Claude E. Shannon. A mathematical theory of communication. <span class="ptmri8t-">Bell System Technical Journal</span>,
+    27(3):379–423, 1948.
+    </dd><dt>
+[42] </dt><dd><a id="Xsong2021score"></a>Yang Song, Jascha Sohl-Dickstein, Diederik P. Kingma, Abhishek Kumar, Stefano Ermon,
+    and Ben Poole.  Score-based generative modeling through stochastic differential equations.  In
+    <span class="ptmri8t-">International Conference on Learning Representations</span>, 2021.
+    </dd><dt>
+[43] </dt><dd><a id="Xturing1950computing"></a>A. M. Turing. Computing machinery and intelligence. <span class="ptmri8t-">Mind</span>, 59(236):433–460, 1950.
+    </dd><dt>
+[44] </dt><dd><a id="Xvapnik1998statistical"></a>Vladimir N. Vapnik. <span class="ptmri8t-">Statistical Learning Theory</span>. Wiley, 1998.
+    </dd><dt>
+[45] </dt><dd><a id="Xwillard2022integrating"></a>Jared Willard et al.  Integrating scientific knowledge with machine learning for engineering
+    and environmental systems. <span class="ptmri8t-">ACM Computing Surveys</span>, 2022.
+    </dd><dt>
+[46] </dt><dd><a id="Xzhang2018rcan"></a>Yulun  Zhang  et al.     Image  super-resolution  using  very  deep  residual  channel  attention
+    networks. In <span class="ptmri8t-">ECCV</span>, 2018.
+    </dd></dl></section>
+ 
+
+  </article>
+
+  <section class="bibtex-block" id="bibtex">
+    <h2>BibTeX</h2>
+    <button class="copy-bib" type="button" data-target="bibtex-code">Copy</button>
+    <pre><code id="bibtex-code">@misc{sharma2026physflowearth,
+  title        = {PhysFlow-Earth: Physics-Constrained Rectified Flow for Earth Observation Super-Resolution and Climate Downscaling},
+  author       = {Arun Sharma},
+  year         = {2026},
+  note         = {Project page / preprint},
+  howpublished = {\url{https://arunshar.github.io/cv-portfolio/projects/physflow-earth/}}
+}</code></pre>
+  </section>
+
+  <footer class="paper-footer">
+    <p>Project page for "PhysFlow-Earth: Physics-Constrained Rectified Flow for Earth Observation Super-Resolution and Climate Downscaling", rendered from the LaTeX source. <a href="../../index.html">Back to homepage</a>.</p>
+  </footer>
+</div>
+<script src="../../assets/paper.js"></script>
+</body>
+</html>

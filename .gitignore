@@ -1,0 +1,18 @@
+# build + transient
+tools/_build/
+tools/_external/
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+
+# tex4ht / latex aux that may appear next to sources
+*.aux
+*.4ct
+*.4tc
+*.dvi
+*.idv
+*.lg
+*.tmp
+*.xref
+*.dlog

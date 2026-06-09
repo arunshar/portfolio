@@ -1,0 +1,1447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DarkVesselNet: Multi-Modal Remote Sensing and Trajectory Reasoning for Dark Vessel Detection - Arun Sharma</title>
+<meta name="description" content="Multi-modal dark-vessel detection fusing Sentinel-1 SAR, Sentinel-2 optical, and AIS with TGARD and Pi-DPM anomaly reasoning.">
+<link rel="stylesheet" href="paper.gen.css">
+<link rel="stylesheet" href="../../assets/paper.css">
+<script>window.MathJax = { tex: { tags: "ams" } };</script>
+<script async id="MathJax-script" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js"></script>
+</head>
+<body class="project-page">
+<div class="wrap">
+  <nav class="topnav"><a href="../../index.html">Arun Sharma</a> <span aria-hidden="true">/</span> <a href="../../index.html#projects">Selected Projects</a></nav>
+
+  <header class="paper-header">
+    <h1>DarkVesselNet: Multi-Modal Remote Sensing and Trajectory Reasoning for Dark Vessel Detection</h1>
+    <p class="authors">Arun Sharma</p>
+    <p class="affiliation">University of Minnesota, Twin Cities</p>
+    <p class="venue">In preparation. Target: CVPR EarthVision 2027; xView3-SAR benchmark</p>
+    <div class="buttons"><a class="btn" href="../../assets/papers/darkvessel-stack.pdf">Paper (PDF)</a>
+      <a class="btn" href="https://github.com/arunshar/darkvessel-stack" target="_blank" rel="noopener">Code</a>
+      <a class="btn" href="https://huggingface.co/spaces/Arun0808/darkvessel-stack" target="_blank" rel="noopener">Demo</a>
+      <a class="btn" href="paper.md">Markdown</a>
+      <a class="btn" href="#bibtex">BibTeX</a></div>
+  </header>
+
+  <figure class="teaser">
+    <img src="figures/main-c732a7f5fd2c26258ced552b8840094b.svg" alt="DarkVesselNet: Multi-Modal Remote Sensing and Trajectory Reasoning for Dark Vessel Detection overview" loading="lazy">
+  </figure>
+
+  <nav class="toc" aria-label="Contents">
+    <h2>Contents</h2>
+    <ol>
+      <li><a href="#introduction">Introduction</a></li>
+      <li><a href="#related-work">Related Work</a></li>
+      <li><a href="#method-and-architecture">Method and Architecture</a></li>
+      <li><a href="#evaluation">Evaluation</a></li>
+      <li><a href="#discussion-and-limitations">Discussion and Limitations</a></li>
+      <li><a href="#conclusion-and-outlook">Conclusion and Outlook</a></li>
+      <li><a href="#references">References</a></li>
+    </ol>
+  </nav>
+
+  <article class="paper-body">
+<section class="abstract" role="doc-abstract"> 
+
+<div class="centerline">                                  <span class="ptmb8t-x-x-120">Abstract</span>                                  </div>
+     <blockquote class="quote">
+     <!-- l. 254 --><p class="noindent">Dark  vessel  detection  requires  fusing  what  vessels  report  through  AIS  with  what
+     satellites observe through radar and optical sensors. DarkVesselNet is a multi-modal
+     remote-sensing  stack  that  combines  Sentinel-1  SAR,  Sentinel-2  optical  imagery,
+     geospatial foundation-model backbones, AIS trajectory reasoning, TGARD-style gap
+     detection, and a Pi-DPM-inspired anomaly head. The repository exposes the system
+     as a tested Python package and a public Hugging Face Space. The paper presents the
+     sensor stack, backbone abstraction, fusion path, anomaly head, and current validation.
+     The evidence currently available is software-grounded: tests for SAR speckle filtering,
+     optical band ratios, Haversine distance, TGARD gap emission, sensor coregistration,
+     backbone token shapes, and differentiable anomaly scoring.
+</p>
+     </blockquote>
+</section>
+
+<h2 class="sectionHead" id="introduction"><span class="titlemark">1    </span>    <a id="x1-10001"></a>Introduction</h2>
+<!-- l. 259 --><p class="noindent">Maritime domain awareness depends on the ability to detect vessels that stop broadcasting,
+spoof their location, or operate in regions where self-reported AIS data is unreliable. A
+dark-vessel detector must therefore combine multiple evidence channels: SAR returns that
+work day and night, optical imagery that helps classify vessel structure, trajectory history that
+reveals gaps or rendezvous, and contextual knowledge such as coastlines or port activity.
+</p><!-- l. 261 --><p class="noindent">DarkVesselNet is a portfolio-scale implementation of that stack. It is not just a single classifier.
+It is a reference architecture for taking an area of interest, ingesting remote-sensing and AIS
+evidence, encoding imagery through swappable geospatial foundation models, and producing
+a candidate dark-vessel probability with a reasoning trace. The repository also connects the
+author’s trajectory anomaly line of work with modern Earth-observation foundation models.
+</p><!-- l. 263 --><p class="noindent">This paper is precise about evidence. The public Space demonstrates the workflow in
+CPU-safe implementation mode, and the repository includes tests for core operators. The
+xView3-style benchmark protocol is reported as the main external evaluation path.
+
+</p>
+<!-- l. 265 --><p class="noindent"><span class="paragraphHead" id="contributions"> <a id="x1-2000"></a><span class="ptmb8t-">Contributions:</span></span>
+     </p><dl class="enumerate-enumitem"><dt class="enumerate-enumitem">
+  1. </dt><dd class="enumerate-enumitem">A    unified    dark-vessel    architecture    spanning    SAR,    optical,    AIS,    and    geospatial
+     foundation-model tokens.
+     </dd><dt class="enumerate-enumitem">
+  2. </dt><dd class="enumerate-enumitem">A common <span class="pcrr8t-">GeoBackbone </span>adapter over Prithvi-2, Clay, SatMAE++, DOFA, SatlasNet, and
+     RemoteCLIP-style backbones.
+     </dd><dt class="enumerate-enumitem">
+  3. </dt><dd class="enumerate-enumitem">A  trajectory  reasoning  path  combining  TGARD  gap  detection  and  a  Pi-DPM-inspired
+     reconstruction and anomaly head.
+     </dd><dt class="enumerate-enumitem">
+  4. </dt><dd class="enumerate-enumitem">A reproducible project implementation with math tests, Space tests, and deployment-ready
+     Hugging Face metadata.</dd></dl>
+<figure class="figure"> 
+
+                                                                            
+                                                                            
+                                                                            
+                                                                            
+<!-- l. 279 --><p class="noindent" id="detailed-darkvesselnet-architecture-the-figure-separates-raw-evidence-modalityspecific-encoders-availabilitygated-attention-alert-decoding-and-evaluation-heads-the-decoder-is-deliberately-traceproducing-it-should-expose-sensor-availability-ais-matching-anomaly-evidence-and-uncertainty-rather-than-emit-only-one-probability"><img alt="Figure" src="figures/main-c732a7f5fd2c26258ced552b8840094b.svg" loading="lazy">
+<a id="x1-2005r1"></a>
+</p>
+<figcaption class="caption"><span class="id">Figure 1: </span><span class="content">Detailed DarkVesselNet architecture. The figure separates raw evidence, modality-specific
+encoders,  availability-gated  attention,  alert  decoding,  and  evaluation  heads.  The  decoder  is
+deliberately trace-producing: it should expose sensor availability, AIS matching, anomaly evidence,
+and uncertainty rather than emit only one probability.
+</span></figcaption><!-- tex4ht:label?: x1-2005r1  -->
+                                                                            
+                                                                            
+</figure>
+
+<!-- l. 342 --><p class="noindent"><span class="paragraphHead" id="scope"> <a id="x1-3000"></a><span class="ptmb8t-">Scope:</span></span>
+Dark-vessel detection is best understood as a disagreement problem. AIS provides a cooperative self-report.
+SAR provides all-weather physical observation. Optical imagery provides interpretable visual context when
+available. Trajectory reasoning provides temporal structure. A candidate becomes operationally interesting when
+these evidence streams disagree in a way that cannot be explained by ordinary coverage, timing, or context.
+</p><!-- l. 346 --><p class="noindent">This framing is stricter than saying the system detects illegal fishing. A model can detect an unmatched SAR
+object, an AIS gap, a suspicious rendezvous pattern, or a weakly explained trajectory. It cannot infer legal status
+by itself. That distinction should be visible throughout the paper because remote-sensing evidence can affect
+people, vessels, and enforcement decisions. The system should be framed as triage and analyst support.
+</p><!-- l. 348 --><p class="noindent">The technical challenge is that each modality has different missingness. SAR can observe through clouds but
+has speckle and coastal clutter. Optical imagery is human-readable but unavailable at night and unreliable
+under clouds. AIS is semantically rich but cooperative and incomplete. Foundation-model tokens can help
+reuse pretraining, but they do not eliminate sensor-specific error. DarkVesselNet’s architecture is therefore
+modular: encode each evidence channel, preserve availability masks, and fuse them with traceable output.
+</p><!-- l. 350 --><p class="noindent">The expanded paper turns the project into a research paper structure by adding an evidence taxonomy, matching
+policy, calibration discussion, backbone comparison protocol, stress tests, and implementation-grounded
+results. These sections are necessary because dark-vessel detection papers are easy to overstate. The
+credible claim is evidence fusion under uncertainty, not automatic attribution of intent.
+
+</p>
+<!-- l. 352 --><p class="noindent"><span class="paragraphHead" id="expanded-contributions"> <a id="x1-4000"></a><span class="ptmb8t-">Expanded  contributions:</span></span>
+The paper contributes a systems formulation for multi-modal dark-vessel alerts, a foundation-backbone
+adapter design, an AIS/SAR matching policy outline, a calibration protocol, and a human-review trace
+schema. The codebase currently validates the operators and interfaces that support this framing.
+
+</p>
+<h2 class="sectionHead" id="related-work"><span class="titlemark">2    </span>    <a id="x1-50002"></a>Related  Work</h2>
+
+<!-- l. 357 --><p class="noindent"><span class="paragraphHead" id="expanded-citation-map"> <a id="x1-6000"></a><span class="ptmb8t-">Expanded  Citation  Map:</span></span>
+The expanded related work now treats DarkVesselNet as a remote-sensing detection,
+foundation-model, trajectory-reasoning, and auditable-fusion system. xView3, Global Fishing
+Watch, HRSID, SSDD-style SAR detection, and AIS anomaly studies define the maritime
+evidence layer [<a href="#Xkroodsma2018tracking">15</a>, <a href="#Xnguyen2020geotracknet">23</a>, <a href="#Xpallotta2013vessel">25</a>, <a href="#Xpaolo2022xview3">26</a>, <a href="#Xristic2008maritime">32</a>, <a href="#Xsharma2022tist">37</a>, <a href="#Xwei2020hrsid">42</a>, <a href="#Xzhang2019ssdd">44</a>]. Faster R-CNN, YOLO, focal loss, DETR,
+Deformable DETR, ResNet, ViT, Swin, FCN, U-Net, DeepLab, and Mask2Former provide
+the generic detection and segmentation lineage [<a href="#Xcarion2020detr">4</a>–<a href="#Xcheng2022mask2former">6</a>, <a href="#Xdosovitskiy2021vit">9</a>, <a href="#Xhe2016resnet">12</a>, <a href="#Xlin2017focal">18</a>, <a href="#Xliu2021swin">20</a>, <a href="#Xlong2015fcn">21</a>, <a href="#Xredmon2016yolo">30</a>, <a href="#Xren2015fasterrcnn">31</a>, <a href="#Xronneberger2015unet">34</a>, <a href="#Xzhu2021deformabledetr">46</a>].
+CLIP, SAM, SAM 2, SatMAE, DOFA, RemoteCLIP, and SatlasPretrain motivate reusable
+geospatial encoders and promptable visual evidence [<a href="#Xcong2022satmae">7</a>, <a href="#Xkirillov2023segment">14</a>, <a href="#Xliu2024remoteclip">19</a>, <a href="#Xradford2021clip">28</a>, <a href="#Xravi2024sam2">29</a>, <a href="#Xtseng2023satlas">38</a>, <a href="#Xxiong2024dofa">43</a>].
+
+</p>
+<!-- l. 361 --><p class="noindent"><span class="paragraphHead" id="maritime-remote-sensing"> <a id="x1-7000"></a><span class="ptmb8t-">Maritime remote sensing:</span></span>
+SAR is central to vessel detection because it works at night and through cloud. Public challenges such
+as xView3 formalized global SAR vessel detection with close-to-shore and length-estimation
+components [<a href="#Xpaolo2022xview3">26</a>]. Global Fishing Watch showed how AIS can quantify industrial fishing patterns at
+planetary scale while also exposing the limitations of self-reported vessel broadcasts [<a href="#Xkroodsma2018tracking">15</a>]. Optical
+imagery complements SAR by supplying interpretable vessel appearance and context.
+
+</p>
+<!-- l. 364 --><p class="noindent"><span class="paragraphHead" id="earthobservation-foundation-models"> <a id="x1-8000"></a><span class="ptmb8t-">Earth-observation foundation models:</span></span>
+                                                                            
+                                                                            
+Recent geospatial foundation models, including Prithvi, Clay, SatMAE, DOFA, Satlas, and
+RemoteCLIP-style encoders, make it possible to reuse large-scale pretraining across tasks and
+modalities [<a href="#Xcong2022satmae">7</a>, <a href="#Xliu2024remoteclip">19</a>, <a href="#Xxiong2024dofa">43</a>]. DarkVesselNet wraps these models behind a common token interface.
+
+</p>
+<!-- l. 367 --><p class="noindent"><span class="paragraphHead" id="trajectory-anomaly-detection"> <a id="x1-9000"></a><span class="ptmb8t-">Trajectory anomaly detection:</span></span>
+AIS gaps and rendezvous patterns are spatiotemporal events. TGARD-style reasoning uses distance, dwell,
+and feasible movement envelopes to surface suspicious co-location or disappearance events.
+Pi-DPM-style reconstruction extends this by scoring whether a missing segment is physically plausible.
+SAR-specific review and dataset literature also helps separate dataset limitations, speckle behavior,
+near-shore clutter, and deep detector trends from the fusion contribution [<a href="#Xli2017ssdd">17</a>, <a href="#Xwang2019sarship">41</a>, <a href="#Xzhang2022sarshipreview">45</a>].
+
+</p>
+<!-- l. 372 --><p class="noindent"><span class="paragraphHead" id="literature-synthesis"> <a id="x1-10000"></a><span class="ptmb8t-">Literature  synthesis:</span></span>
+The dark-vessel literature is best read as three partially overlapping threads rather than one detector lineage.
+The first thread is SAR object detection, where xView3, HRSID, SSDD, and modern detector families
+define how small bright targets are localized under speckle, incidence-angle variation, and coastal clutter
+[<a href="#Xcarion2020detr">4</a>, <a href="#Xli2017ssdd">17</a>, <a href="#Xpaolo2022xview3">26</a>, <a href="#Xwang2019sarship">41</a>, <a href="#Xwei2020hrsid">42</a>, <a href="#Xzhu2021deformabledetr">46</a>]. The second thread is maritime trajectory analysis, where AIS gaps, anomalous
+routes, rendezvous behavior, and motion consistency are modeled as temporal evidence rather than
+image evidence [<a href="#Xnguyen2020geotracknet">23</a>, <a href="#Xpallotta2013vessel">25</a>, <a href="#Xristic2008maritime">32</a>, <a href="#Xsharma2022tist">37</a>]. The third thread is Earth-observation representation learning,
+where SatMAE, DOFA, RemoteCLIP, and segmentation backbones provide reusable visual
+features but do not remove the need for sensor-specific validation [<a href="#Xcheng2022mask2former">6</a>, <a href="#Xcong2022satmae">7</a>, <a href="#Xliu2024remoteclip">19</a>, <a href="#Xronneberger2015unet">34</a>, <a href="#Xxiong2024dofa">43</a>].
+</p><!-- l. 375 --><p class="noindent">These threads impose different error models. SAR detectors confuse ships, wakes, buoys,
+platforms, and shore infrastructure. AIS models confuse non-broadcasting, poorly covered,
+delayed, and deliberately disabled tracks. Foundation backbones may improve feature quality
+but can hide modality mismatch when optical pretraining is applied to radar. DarkVesselNet
+therefore uses multi-modal fusion as an evidence-accounting problem. The model is useful
+when each alert can be traced back to sensor availability, AIS association, trajectory context,
+and calibrated uncertainty, not merely when a single aggregate detector score increases.
+</p><!-- l. 377 --><p class="noindent">Recent literature also clarifies the role of human review. Operational maritime monitoring is
+not a pure classification task because an unmatched SAR candidate is not equivalent to illegal
+fishing. The strongest papers in this area separate observable sensor events from legal or
+policy interpretation. DarkVesselNet follows that convention by treating the output as a
+prioritized review queue with evidence traces. This positioning makes the system comparable to
+xView3-style detection work while preserving the caution required for real maritime use.
+
+</p>
+<!-- l. 379 --><p class="noindent"><span class="paragraphHead" id="foundational-reference-anchors"> <a id="x1-11000"></a><span class="ptmb8t-">Foundational reference anchors:</span></span>
+The bibliography also anchors the project-specific contribution in older and broader technical
+foundations: statistical learning and pattern recognition, deep learning, information theory,
+convex and numerical optimization, stochastic approximation, adaptive gradient methods,
+causality, and early AI framing [<a href="#Xbishop2006pattern">1</a>–<a href="#Xbubeck2015convex">3</a>, <a href="#Xcover2006elements">8</a>, <a href="#Xgoodfellow2016deep">10</a>, <a href="#Xhastie2009elements">11</a>, <a href="#Xkingma2015adam">13</a>, <a href="#Xlecun1998gradient">16</a>, <a href="#Xmurphy2012machine">22</a>, <a href="#Xnocedal2006numerical">24</a>, <a href="#Xpearl2009causality">27</a>, <a href="#Xrobbins1951stochastic">33</a>, <a href="#Xrumelhart1986learning">35</a>, <a href="#Xshannon1948communication">36</a>, <a href="#Xturing1950computing">39</a>, <a href="#Xvapnik1998statistical">40</a>].
+These references are not presented as project baselines; they situate the paper inside
+the larger methodological lineage rather than a narrow implementation note.
+
+</p>
+<h2 class="sectionHead" id="method-and-architecture"><span class="titlemark">3    </span>    <a id="x1-120003"></a>Method and Architecture</h2>
+<!-- l. 384 --><p class="noindent">The  intended  pipeline  is:
+     </p><dl class="enumerate-enumitem"><dt class="enumerate-enumitem">
+  1. </dt><dd class="enumerate-enumitem">Search an area of interest for Sentinel-1 and Sentinel-2 scenes.
+     </dd><dt class="enumerate-enumitem">
+  2. </dt><dd class="enumerate-enumitem">Preprocess SAR and optical imagery, including speckle reduction, cloud masking, band ratios,
+     and sensor coregistration.
+                                                                            
+                                                                            
+     </dd><dt class="enumerate-enumitem">
+  3. </dt><dd class="enumerate-enumitem">Encode image chips through a selected geospatial foundation model.
+     </dd><dt class="enumerate-enumitem">
+  4. </dt><dd class="enumerate-enumitem">Join candidate vessel evidence with AIS trajectory windows.
+     </dd><dt class="enumerate-enumitem">
+  5. </dt><dd class="enumerate-enumitem">Detect suspicious gaps or rendezvous candidates.
+     </dd><dt class="enumerate-enumitem">
+  6. </dt><dd class="enumerate-enumitem">Score the candidate with an anomaly head and return a probability plus trace.</dd></dl>
+<!-- l. 394 --><p class="noindent">The Hugging Face Space exposes the user-facing contract: choose an AOI and receive a textual pipeline
+trace and probability. The public path is implemented to avoid heavyweight downloads.
+
+</p>
+<!-- l. 396 --><p class="noindent"><span class="paragraphHead" id="method"> <a id="x1-13000"></a><span class="ptmb8t-">Method:</span></span>
+
+</p>
+<!-- l. 398 --><p class="noindent"><span class="paragraphHead" id="sensor-preprocessing"> <a id="x1-14000"></a><span class="ptmb8t-">Sensor  preprocessing:</span></span>
+The SAR path includes Lee filtering for speckle reduction. For a local window, the Lee filter estimates local
+statistics and shrinks noisy pixels toward the local mean. The tests verify idempotence on constant imagery and
+reduced variance on synthetic speckle. The optical path includes cloud masking and band-ratio features: </p><div class="mathjax-env mathjax-equation">\begin{equation} \text {NDVI}=\frac {\text {NIR}-\text {red}}{\text {NIR}+\text {red}+\epsilon }, \quad \text {NDWI}=\frac {\text {green}-\text {NIR}}{\text {green}+\text {NIR}+\epsilon }. \end{equation}</div>
+<p><a id="x1-14001r1"></a>
+<!-- l. 405 --></p><p class="noindent">These features provide interpretable context for water, land, and vessel-like structures.
+
+</p>
+<!-- l. 407 --><p class="noindent"><span class="paragraphHead" id="geospatial-foundation-backbone"> <a id="x1-15000"></a><span class="ptmb8t-">Geospatial foundation backbone:</span></span>
+The <span class="pcrr8t-">GeoBackbone </span>adapter returns patch tokens with shape <span class="mathjax-inline">\((B,N,D)\)</span> regardless of the underlying model. Each
+supported backbone has metadata for patch size, embedding dimension, expected bands, Hugging
+Face model identifier, and license. In CPU tests, a lightweight fallback projection mimics token
+output without downloading model weights. This keeps downstream fusion heads testable.
+
+</p>
+<!-- l. 411 --><p class="noindent"><span class="paragraphHead" id="ais-trajectory-reasoning"> <a id="x1-16000"></a><span class="ptmb8t-">AIS trajectory reasoning:</span></span>
+AIS windows are represented as sequences <span class="mathjax-inline">\((t,\phi ,\lambda ,\text {sog},\text {cog})\)</span>. The TGARD component flags long or infeasible gaps by
+checking time duration and required movement. The Haversine distance is used for geodesic distance: </p><div class="mathjax-env mathjax-equation">\begin{equation} d = 2R\arcsin \sqrt {\sin ^2(\Delta \phi /2)+\cos \phi _1\cos \phi _2\sin ^2(\Delta \lambda /2)}. \end{equation}</div>
+<p><a id="x1-16001r2"></a>
+<!-- l. 417 --></p><p class="noindent">The current implementation tests the zero-distance case, a one-degree latitude sanity check, and a synthetic gap emission case.
+
+</p>
+<!-- l. 419 --><p class="noindent"><span class="paragraphHead" id="anomaly-head"> <a id="x1-17000"></a><span class="ptmb8t-">Anomaly  head:</span></span>
+The Pi-DPM-inspired anomaly head takes scene tokens and an AIS segment. Scene tokens
+are pooled and projected; AIS points are passed through an MLP and pooled. The
+fused representation predicts both a logit and a reconstructed AIS segment: </p><div class="mathjax-env mathjax-equation">\begin{equation} h = f_{\theta }\left ([\text {pool}(E_{\text {scene}}), \text {pool}(E_{\text {AIS}})]\right ), \quad y = W_s h,\quad \hat {\tau }=W_r h. \end{equation}</div>
+<p><a id="x1-17001r3"></a>
+<!-- l. 428 --></p><p class="noindent">This is a lightweight inference-time head, not a full diffusion sampler. It is designed
+to be replaced or extended by a full Pi-DPM checkpoint when available.
+
+</p>
+<!-- l. 430 --><p class="noindent"><span class="paragraphHead" id="implementation"> <a id="x1-18000"></a><span class="ptmb8t-">Implementation:</span></span>
+The current repository includes: </p>
+     <ul class="itemize1">
+     <li class="itemize"><span class="pcrr8t-">darkvessel.sar</span>: SAR filtering operators.
+                                                                            
+                                                                            
+     </li>
+     <li class="itemize"><span class="pcrr8t-">darkvessel.optical</span>: cloud and band-ratio utilities.
+     </li>
+     <li class="itemize"><span class="pcrr8t-">darkvessel.fusion</span>: sensor coregistration implementations.
+     </li>
+     <li class="itemize"><span class="pcrr8t-">darkvessel.backbones</span>: foundation-model adapter.
+     </li>
+     <li class="itemize"><span class="pcrr8t-">darkvessel.ais</span>: trajectory gap and rendezvous reasoning.
+     </li>
+     <li class="itemize"><span class="pcrr8t-">darkvessel.heads</span>: anomaly scoring and reconstruction head.</li></ul>
+
+<h2 class="sectionHead" id="evaluation"><span class="titlemark">4    </span>    <a id="x1-190004"></a>Evaluation</h2>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 444 --><p class="noindent"></p><figure class="float" id="x1-19001r1"><span id="implementation-validation-in-darkvesselnet"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 1: </span><span class="content">Implementation validation in DarkVesselNet.                                  </span></figcaption><!-- tex4ht:label?: x1-19001r1  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-2"><colgroup id="TBL-2-1g"><col id="TBL-2-1"><col id="TBL-2-2"><col id="TBL-2-3"></colgroup><tr id="TBL-2-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-2-1-1" style="white-space:normal; text-align:left;"><!-- l. 450 --><p class="noindent"><span class="ptmb8t-">Area</span>                                  </p></td><td class="td11" id="TBL-2-1-2" style="white-space:normal; text-align:left;"> <!-- l. 450 --><p class="noindent"><span class="ptmb8t-">What is checked</span>                                                                       </p></td><td class="td10" id="TBL-2-1-3" style="white-space:normal; text-align:right;"> <span class="ptmb8t-">Count</span></td>
+</tr><tr id="TBL-2-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-2-2-1" style="white-space:normal; text-align:left;"><!-- l. 452 --><p class="noindent">SAR and optical                 </p></td><td class="td11" id="TBL-2-2-2" style="white-space:normal; text-align:left;"> <!-- l. 452 --><p class="noindent">Lee-filter behavior, cloud-mask shape, band-ratio ranges         </p></td><td class="td10" id="TBL-2-2-3" style="white-space:normal; text-align:right;">     6</td>
+</tr><tr id="TBL-2-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-2-3-1" style="white-space:normal; text-align:left;"><!-- l. 453 --><p class="noindent">Trajectory reasoning          </p></td><td class="td11" id="TBL-2-3-2" style="white-space:normal; text-align:left;"> <!-- l. 453 --><p class="noindent">Haversine   sanity   checks,   short-gap   skip,   infeasible-gap
+  emission                                                                                     </p></td><td class="td10" id="TBL-2-3-3" style="white-space:normal; text-align:right;">     4</td>
+</tr><tr id="TBL-2-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-2-4-1" style="white-space:normal; text-align:left;"><!-- l. 454 --><p class="noindent">Fusion and backbone         </p></td><td class="td11" id="TBL-2-4-2" style="white-space:normal; text-align:left;"> <!-- l. 454 --><p class="noindent">identity   coregistration   shape,   lightweight   fallback   token
+  shape, supported backbone list                                                  </p></td><td class="td10" id="TBL-2-4-3" style="white-space:normal; text-align:right;">     3</td>
+</tr><tr id="TBL-2-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-2-5-1" style="white-space:normal; text-align:left;"><!-- l. 455 --><p class="noindent">Anomaly head                    </p></td><td class="td11" id="TBL-2-5-2" style="white-space:normal; text-align:left;"> <!-- l. 455 --><p class="noindent">output shapes and backward pass support                                 </p></td><td class="td10" id="TBL-2-5-3" style="white-space:normal; text-align:right;">     2</td>
+
+</tr></table>                                                           </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+<!-- l. 460 --><p class="noindent">Full evaluation should use xView3-style SAR labels, AIS gap labels where available,
+and analyst-reviewed dark-activity cases. Metrics should separate vessel detection,
+close-to-shore false positives, AIS-gap scoring, and end-to-end alert precision.
+
+</p>
+<!-- l. 462 --><p class="noindent"><span class="paragraphHead" id="theory-dark-vessel-detection-as-evidence-fusion"> <a id="x1-20000"></a><span class="ptmb8t-">Theory: Dark Vessel Detection as Evidence Fusion:</span></span>
+Dark-vessel detection is not a single image-classification problem. It is an evidence-fusion problem under
+missingness. AIS tells us what vessels report. SAR tells us what radar observes. Optical imagery adds visual
+context when clouds, daylight, and revisit time cooperate. Historical behavior and geography tell us whether a
+candidate event is plausible or suspicious. A system that uses only one channel will fail in predictable ways.
+</p><!-- l. 466 --><p class="noindent">Let <span class="mathjax-inline">\(Y\)</span> be the latent event that a vessel is present and not represented by reliable AIS. Let <span class="mathjax-inline">\(O_{\text {sar}}\)</span>, <span class="mathjax-inline">\(O_{\text {opt}}\)</span>, <span class="mathjax-inline">\(O_{\text {ais}}\)</span>, and <span class="mathjax-inline">\(O_{\text {ctx}}\)</span> be observations
+from SAR, optical imagery, AIS trajectories, and contextual maps. A conceptual Bayesian form is </p><div class="mathjax-env mathjax-equation">\begin{equation} p(Y\mid O_{\text {sar}},O_{\text {opt}},O_{\text {ais}},O_{\text {ctx}}) \propto p(O_{\text {sar}},O_{\text {opt}},O_{\text {ais}},O_{\text {ctx}}\mid Y)p(Y). \end{equation}</div>
+<p><a id="x1-20001r4"></a>
+<!-- l. 472 --></p><p class="noindent">DarkVesselNet implements a neural approximation to this fusion problem. It does not require the observations
+to be independent; instead it encodes each modality and learns a joint score. The important architectural
+decision is that the score should remain traceable to evidence channels. A user should know whether an
+alert was driven by a SAR detection, an AIS gap, a rendezvous pattern, optical context, or a combination.
+
+</p>
+<!-- l. 474 --><p class="noindent"><span class="paragraphHead" id="ais-as-positive-evidence-and-missing-evidence"> <a id="x1-21000"></a><span class="ptmb8t-">AIS as positive evidence and missing evidence:</span></span>
+AIS is unusual because both presence and absence are informative. A valid AIS broadcast near a
+SAR detection may explain the vessel. An AIS gap near a SAR detection may be suspicious.
+But absence is not proof. Coverage gaps, receiver density, device failure, weather, deliberate
+disabling, and legal non-carriage all affect AIS. Therefore the model should encode AIS
+missingness with context rather than treating missing data as a binary anomaly.
+
+</p>
+<!-- l. 478 --><p class="noindent"><span class="paragraphHead" id="sar-observation-model"> <a id="x1-22000"></a><span class="ptmb8t-">SAR  observation  model:</span></span>
+SAR vessel detection depends on backscatter contrast, sea state, incidence angle, speckle, nearby coastlines,
+and object size. The xView3 dataset is important because it operationalizes the problem at scale with Sentinel-1
+SAR and labels for vessels and marine infrastructure [<a href="#Xpaolo2022xview3">26</a>]. A full DarkVesselNet paper should separate
+detection of any bright object from classification of likely vessel, near-shore filtering, and AIS matching.
+
+</p>
+<!-- l. 482 --><p class="noindent"><span class="paragraphHead" id="optical-observation-model"> <a id="x1-23000"></a><span class="ptmb8t-">Optical observation model:</span></span>
+Optical imagery is easier for humans to inspect but less reliable operationally. Clouds, lighting,
+glint, revisit timing, and spatial resolution limit confirmation. Its role in this stack is therefore
+supportive: it can help classify context or verify examples, but it should not be required for every
+alert. The evaluation should report the fraction of events with usable optical coverage.
+
+</p>
+<!-- l. 486 --><p class="noindent"><span class="paragraphHead" id="additional-literature-context"> <a id="x1-24000"></a><span class="ptmb8t-">Additional Literature Context:</span></span>
+
+</p>
+<!-- l. 488 --><p class="noindent"><span class="paragraphHead" id="global-fishing-and-ais-analytics"> <a id="x1-25000"></a><span class="ptmb8t-">Global fishing and AIS analytics:</span></span>
+The Global Fishing Watch analysis processed tens of billions of AIS messages to quantify industrial fishing
+at global scale [<a href="#Xkroodsma2018tracking">15</a>]. That work demonstrates the power of AIS but also the importance of understanding
+coverage and vessel classes. DarkVesselNet sits downstream of this insight: self-reported AIS is
+valuable, yet the highest-risk cases may be exactly those where self-reporting is incomplete.
+                                                                            
+                                                                            
+
+</p>
+<!-- l. 492 --><p class="noindent"><span class="paragraphHead" id="sar-vessel-datasets"> <a id="x1-26000"></a><span class="ptmb8t-">SAR  vessel  datasets:</span></span>
+xView3 is the most directly relevant dataset because it targets dark fishing activity with Sentinel-1 SAR and
+AIS matching [<a href="#Xpaolo2022xview3">26</a>]. HRSID and SSDD-style SAR ship datasets are useful for generic SAR detection, but
+they do not fully capture the AIS-matching and dark-vessel framing [<a href="#Xwei2020hrsid">42</a>]. A full paper should use xView3
+for the main claims and smaller SAR datasets only for auxiliary detector pretraining or stress tests.
+
+</p>
+<!-- l. 496 --><p class="noindent"><span class="paragraphHead" id="foundation-models-for-earth-observation"> <a id="x1-27000"></a><span class="ptmb8t-">Foundation models for Earth observation:</span></span>
+SatMAE explores masked autoencoding for temporal and multispectral satellite imagery [<a href="#Xcong2022satmae">7</a>]. DOFA
+proposes a multimodal foundation model for Earth observation [<a href="#Xxiong2024dofa">43</a>]. RemoteCLIP aligns remote-sensing
+imagery and language [<a href="#Xliu2024remoteclip">19</a>]. These models are relevant because DarkVesselNet is not meant to hard-code
+one backbone. Its <span class="pcrr8t-">GeoBackbone </span>adapter makes the downstream fusion head independent of the selected
+encoder, but backbone choice still affects licensing, bands, patch size, and failure modes.
+
+</p>
+<!-- l. 500 --><p class="noindent"><span class="paragraphHead" id="trajectory-anomaly-models"> <a id="x1-28000"></a><span class="ptmb8t-">Trajectory anomaly models:</span></span>
+GeoTrackNet and TGARD-style methods model abnormal trajectories and possible rendezvous using AIS
+streams [<a href="#Xnguyen2020geotracknet">23</a>, <a href="#Xsharma2022tist">37</a>]. These methods provide structured behavior evidence. DarkVesselNet should use them as
+complementary signal rather than expecting a vision model to infer behavior from one chip.
+
+</p>
+<!-- l. 504 --><p class="noindent"><span class="paragraphHead" id="fusion-architecture"> <a id="x1-29000"></a><span class="ptmb8t-">Fusion  Architecture:</span></span>
+The fusion architecture should preserve modality-specific uncertainty. Let <span class="mathjax-inline">\(e_s\)</span>, <span class="mathjax-inline">\(e_o\)</span>, and <span class="mathjax-inline">\(e_a\)</span> be
+SAR, optical, and AIS embeddings. A simple fused representation is </p><div class="mathjax-env mathjax-equation">\begin{equation} h = \operatorname {MLP}([e_s,e_o,e_a,m_s,m_o,m_a,c]), \end{equation}</div>
+<p><a id="x1-29001r5"></a>
+<!-- l. 510 --></p><p class="noindent">where <span class="mathjax-inline">\(m_{\cdot }\)</span> are modality availability masks and <span class="mathjax-inline">\(c\)</span> contains context features. Availability masks are essential.
+Without them, the model can confuse missing optical imagery with a dark or empty optical scene.
+
+</p>
+<!-- l. 512 --><p class="noindent"><span class="paragraphHead" id="crossmodal-alignment"> <a id="x1-30000"></a><span class="ptmb8t-">Cross-modal  alignment:</span></span>
+SAR and optical imagery are not naturally pixel-aligned. Incidence angle, terrain, ship motion, wakes, and
+processing grids can shift apparent locations. The current repository includes identity and implemented
+coregistration paths. A full system should report coregistration error and test sensitivity to offsets: </p><div class="mathjax-env mathjax-equation">\begin{equation} \Delta _{\text {coreg}}=\|\hat {p}_{\text {sar}}-\hat {p}_{\text {opt}}\|_2. \end{equation}</div>
+<p><a id="x1-30001r6"></a>
+<!-- l. 518 --></p><p class="noindent">Alerts should be robust to small alignment errors and explicit when the uncertainty is large.
+
+</p>
+<!-- l. 520 --><p class="noindent"><span class="paragraphHead" id="ais-matching"> <a id="x1-31000"></a><span class="ptmb8t-">AIS  matching:</span></span>
+Matching AIS to SAR is a spatiotemporal association problem. If SAR acquisition time is <span class="mathjax-inline">\(t_s\)</span> and AIS
+messages bracket it at <span class="mathjax-inline">\(t_1,t_2\)</span>, a simple interpolated position may be enough for cooperative vessels. For
+suspicious vessels, interpolation may be misleading. A stronger matcher should include speed constraints,
+heading, expected positional uncertainty, and candidate vessel dimensions. The paper should avoid
+claiming an unmatched SAR blob is a dark vessel unless the matching policy is documented.
+
+</p>
+<!-- l. 524 --><p class="noindent"><span class="paragraphHead" id="evaluation-protocol"> <a id="x1-32000"></a><span class="ptmb8t-">Evaluation  Protocol:</span></span>
+</p>
+<figure class="figure"> 
+
+                                                                            
+                                                                            
+                                                                            
+                                                                            
+<!-- l. 528 --><p class="noindent" id="evaluation-structure-for-darkvesselnet-detection-fusion-calibration-and-trace-completeness-are-measured-separately-under-explicit-modality-availability"> <img alt="Figure" src="figures/main-b91140f12d7e295610211a1aa9ba2bee.svg" loading="lazy">
+<a id="x1-32001r2"></a>
+</p>
+<figcaption class="caption"><span class="id">Figure 2:   </span><span class="content">Evaluation   structure   for   DarkVesselNet:   detection,   fusion,   calibration,   and   trace
+completeness are measured separately under explicit modality availability.                   </span></figcaption><!-- tex4ht:label?: x1-32001r2  -->
+                                                                            
+                                                                            
+</figure>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 544 --><p class="noindent"></p><figure class="float" id="x1-32002r2"><span id="recommended-evaluation-protocol-for-darkvesselnet"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 2: </span><span class="content">Recommended evaluation protocol for DarkVesselNet.                           </span></figcaption><!-- tex4ht:label?: x1-32002r2  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-3"><colgroup id="TBL-3-1g"><col id="TBL-3-1"><col id="TBL-3-2"><col id="TBL-3-3"></colgroup><tr id="TBL-3-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-3-1-1" style="white-space:normal; text-align:left;"><!-- l. 550 --><p class="noindent"><span class="ptmb8t-">Layer</span>                              </p></td><td class="td11" id="TBL-3-1-2" style="white-space:normal; text-align:left;"> <!-- l. 550 --><p class="noindent"><span class="ptmb8t-">Metrics</span>                                       </p></td><td class="td10" id="TBL-3-1-3" style="white-space:normal; text-align:left;"> <!-- l. 550 --><p class="noindent"><span class="ptmb8t-">Question</span>                                  </p></td>
+</tr><tr id="TBL-3-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-3-2-1" style="white-space:normal; text-align:left;"><!-- l. 552 --><p class="noindent">SAR detection                  </p></td><td class="td11" id="TBL-3-2-2" style="white-space:normal; text-align:left;"> <!-- l. 552 --><p class="noindent">mAP,  recall  by  vessel  length,
+  false positives near shore            </p></td><td class="td10" id="TBL-3-2-3" style="white-space:normal; text-align:left;"> <!-- l. 552 --><p class="noindent">can the system find vessel-like
+  objects?                                    </p></td>
+</tr><tr id="TBL-3-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-3-3-1" style="white-space:normal; text-align:left;"><!-- l. 553 --><p class="noindent">AIS matching                   </p></td><td class="td11" id="TBL-3-3-2" style="white-space:normal; text-align:left;"> <!-- l. 553 --><p class="noindent">match precision, match recall,
+  time-offset sensitivity                 </p></td><td class="td10" id="TBL-3-3-3" style="white-space:normal; text-align:left;"> <!-- l. 553 --><p class="noindent">does  the  system  avoid  false
+  dark labels?                              </p></td>
+</tr><tr id="TBL-3-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-3-4-1" style="white-space:normal; text-align:left;"><!-- l. 554 --><p class="noindent">Trajectory anomaly          </p></td><td class="td11" id="TBL-3-4-2" style="white-space:normal; text-align:left;"> <!-- l. 554 --><p class="noindent">gap     precision,     rendezvous
+  precision,          required-speed
+  sanity                                          </p></td><td class="td10" id="TBL-3-4-3" style="white-space:normal; text-align:left;"> <!-- l. 554 --><p class="noindent">is         behavior         evidence
+  meaningful?                             </p></td>
+</tr><tr id="TBL-3-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-3-5-1" style="white-space:normal; text-align:left;"><!-- l. 555 --><p class="noindent">Fusion                               </p></td><td class="td11" id="TBL-3-5-2" style="white-space:normal; text-align:left;"> <!-- l. 555 --><p class="noindent">end-to-end alert precision and
+  recall                                           </p></td><td class="td10" id="TBL-3-5-3" style="white-space:normal; text-align:left;"> <!-- l. 555 --><p class="noindent">do        modalities        improve
+  decisions?                                 </p></td>
+</tr><tr id="TBL-3-6-" style="vertical-align:baseline;"><td class="td01" id="TBL-3-6-1" style="white-space:normal; text-align:left;"><!-- l. 556 --><p class="noindent">Interpretability                  </p></td><td class="td11" id="TBL-3-6-2" style="white-space:normal; text-align:left;"> <!-- l. 556 --><p class="noindent">evidence-channel     attribution
+  and trace completeness               </p></td><td class="td10" id="TBL-3-6-3" style="white-space:normal; text-align:left;"> <!-- l. 556 --><p class="noindent">can analysts audit the alert?     </p></td>
+
+</tr></table>                                                       </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+<!-- l. 561 --><p class="noindent">The ablation table should include SAR-only, SAR plus AIS matching, SAR plus trajectory
+anomaly, SAR plus optical context, and full fusion. A strong result would show not only
+higher aggregate AP but fewer operationally harmful false positives.
+
+</p>
+<h2 class="sectionHead" id="discussion-and-limitations"><span class="titlemark">5    </span>    <a id="x1-330005"></a>Discussion and Limitations</h2>
+
+<!-- l. 564 --><p class="noindent"><span class="paragraphHead" id="operational-risk-and-human-review"> <a id="x1-34000"></a><span class="ptmb8t-">Operational Risk and Human Review:</span></span>
+Dark-vessel detection is a sensitive application. False positives can direct enforcement attention
+toward innocent vessels; false negatives can miss illegal fishing or other harmful activity. The
+paper should explicitly position the model as a triage tool. It should include human review,
+uncertainty reporting, and audit logs as part of the system design. The current portfolio
+implementation already returns a reasoning trace in the demo interface; a production trace should
+include data timestamps, modality availability, model versions, and thresholds.
+
+</p>
+<!-- l. 568 --><p class="noindent"><span class="paragraphHead" id="data-construction-plan"> <a id="x1-35000"></a><span class="ptmb8t-">Data  Construction  Plan:</span></span>
+A benchmark-ready dataset should define: </p>
+     <ul class="itemize1">
+     <li class="itemize">SAR chip source, preprocessing, incidence angle, and resolution;
+     </li>
+     <li class="itemize">AIS source, temporal matching window, and interpolation policy;
+     </li>
+     <li class="itemize">optical imagery source and cloud filtering policy;
+     </li>
+     <li class="itemize">coastline and port context layers;
+     </li>
+     <li class="itemize">label taxonomy: vessel, non-vessel, infrastructure, matched AIS, unmatched AIS, unknown;
+     </li>
+     <li class="itemize">train, validation, and test splits by geography and time.</li></ul>
+<!-- l. 579 --><p class="noindent">Splitting by random chip is not sufficient. Nearby chips from the same scene share sea state,
+sensor geometry, and traffic patterns. The test split should hold out regions or time periods.
+
+</p>
+<!-- l. 581 --><p class="noindent"><span class="paragraphHead" id="failure-modes"> <a id="x1-36000"></a><span class="ptmb8t-">Failure  Modes:</span></span>
+
+</p>
+<!-- l. 583 --><p class="noindent"><span class="paragraphHead" id="coastal-clutter"> <a id="x1-37000"></a><span class="ptmb8t-">Coastal  clutter:</span></span>
+Near-shore scenes contain docks, rocks, waves, infrastructure, and small boats. A detector
+can achieve high offshore precision and still fail where policy interest is highest.
+
+</p>
+                                                                            
+                                                                            
+<!-- l. 586 --><p class="noindent"><span class="paragraphHead" id="ais-ambiguity"> <a id="x1-38000"></a><span class="ptmb8t-">AIS  ambiguity:</span></span>
+Multiple AIS tracks can be near a SAR detection. Interpolation uncertainty may make the match
+ambiguous. The system should report ambiguity instead of forcing one match.
+
+</p>
+<!-- l. 589 --><p class="noindent"><span class="paragraphHead" id="backbone-mismatch"> <a id="x1-39000"></a><span class="ptmb8t-">Backbone  mismatch:</span></span>
+Foundation models trained on optical imagery may not transfer to SAR. Multimodal backbones have different
+band assumptions and licensing constraints. The adapter hides API differences, not scientific differences.
+
+</p>
+<!-- l. 592 --><p class="noindent"><span class="paragraphHead" id="intent-inference"> <a id="x1-40000"></a><span class="ptmb8t-">Intent  inference:</span></span>
+The model can detect evidence consistent with dark activity. It cannot infer legal intent from
+sensor data alone. The text of the paper should be disciplined about that boundary.
+
+</p>
+<!-- l. 595 --><p class="noindent"><span class="paragraphHead" id="evidence-trace-schema"> <a id="x1-41000"></a><span class="ptmb8t-">Evidence  Trace  Schema:</span></span>
+A deployable alert should include a structured trace: </p>
+     <ul class="itemize1">
+     <li class="itemize">alert identifier and AOI,
+     </li>
+     <li class="itemize">SAR scene id, acquisition time, and detector score,
+     </li>
+     <li class="itemize">AIS candidates and matching distances,
+     </li>
+     <li class="itemize">gap or rendezvous features,
+     </li>
+     <li class="itemize">optical scene availability and cloud score,
+     </li>
+     <li class="itemize">context features such as distance to coast or port,
+     </li>
+     <li class="itemize">model version, threshold, and calibration bucket.</li></ul>
+<!-- l. 607 --><p class="noindent">This trace is not just for debugging. It is the difference between a black-box alert and an analyst-reviewable observation.
+
+</p>
+<!-- l. 609 --><p class="noindent"><span class="paragraphHead" id="claim-checklist"> <a id="x1-42000"></a><span class="ptmb8t-">Claim  Checklist:</span></span>
+This paper can claim SAR and optical preprocessing implementations, a common geospatial
+backbone interface, AIS gap tests, an anomaly head with backward pass support, and a
+public demo implementation. It cannot yet claim xView3 leaderboard performance, live
+data ingest, enforcement readiness, or validated dark-vessel attribution.
+
+</p>
+<!-- l. 613 --><p class="noindent"><span class="paragraphHead" id="recommended-figures"> <a id="x1-43000"></a><span class="ptmb8t-">Recommended  Figures:</span></span>
+The final paper should include:
+     </p><dl class="enumerate-enumitem"><dt class="enumerate-enumitem">
+  1. </dt><dd class="enumerate-enumitem">a modality-fusion diagram from SAR, optical, AIS, and context layers to alert trace;
+                                                                            
+                                                                            
+     </dd><dt class="enumerate-enumitem">
+  2. </dt><dd class="enumerate-enumitem">a SAR chip example with AIS match and unmatched detections;
+     </dd><dt class="enumerate-enumitem">
+  3. </dt><dd class="enumerate-enumitem">a trajectory gap and rendezvous timeline;
+     </dd><dt class="enumerate-enumitem">
+  4. </dt><dd class="enumerate-enumitem">an ablation bar chart separating SAR-only and fusion models;
+     </dd><dt class="enumerate-enumitem">
+  5. </dt><dd class="enumerate-enumitem">an evidence trace example for one alert.</dd></dl>
+
+<!-- l. 624 --><p class="noindent"><span class="paragraphHead" id="label-taxonomy"> <a id="x1-44000"></a><span class="ptmb8t-">Label  Taxonomy:</span></span>
+Dark-vessel work needs a careful label taxonomy. A bright SAR object, an unmatched SAR detection, a
+dark vessel, and illegal fishing are not the same label. The paper should use separate terms: </p>
+     <ul class="itemize1">
+     <li class="itemize"><span class="ptmb8t-">SAR object</span>: a radar-bright candidate detected in a SAR chip.
+     </li>
+     <li class="itemize"><span class="ptmb8t-">Vessel candidate</span>: a SAR object whose size and context are consistent with a vessel.
+     </li>
+     <li class="itemize"><span class="ptmb8t-">AIS matched vessel</span>: a vessel candidate associated with a plausible AIS track.
+     </li>
+     <li class="itemize"><span class="ptmb8t-">AIS unmatched vessel</span>: a vessel candidate with no plausible AIS match under the policy.
+     </li>
+     <li class="itemize"><span class="ptmb8t-">Dark-vessel alert</span>: an unmatched or suspiciously matched candidate that warrants review.
+     </li>
+     <li class="itemize"><span class="ptmb8t-">Confirmed illegal activity</span>: a legal or enforcement conclusion outside the model’s authority.</li></ul>
+<!-- l. 635 --><p class="noindent">Using this taxonomy keeps the paper from overclaiming. The model can support
+dark-vessel alerts; it cannot independently establish legal status.
+
+</p>
+<!-- l. 637 --><p class="noindent"><span class="paragraphHead" id="matching-policy"> <a id="x1-45000"></a><span class="ptmb8t-">Matching  Policy:</span></span>
+AIS matching should be documented as a policy with parameters. For a SAR acquisition at time <span class="mathjax-inline">\(t_s\)</span>,
+candidate AIS messages are drawn from a window <span class="mathjax-inline">\([t_s-\Delta _t,t_s+\Delta _t]\)</span>. A vessel track can be interpolated to <span class="mathjax-inline">\(t_s\)</span> if
+messages bracket the acquisition and the implied speed is plausible. The spatial match score
+can include distance, heading consistency, vessel length compatibility, and uncertainty: </p><div class="mathjax-env mathjax-equation">\begin{equation} S_{\text {match}} = -\alpha d(p_{\text {sar}},p_{\text {ais}})-\beta |\Delta \theta |-\gamma |\ell _{\text {sar}}-\ell _{\text {ais}}|. \end{equation}</div>
+<p><a id="x1-45001r7"></a>
+<!-- l. 643 --></p><p class="noindent">If multiple tracks have similar scores, the system should emit ambiguity. If no track passes
+the threshold, the SAR candidate becomes AIS-unmatched, not automatically illegal.
+
+</p>
+<!-- l. 645 --><p class="noindent"><span class="paragraphHead" id="backbone-comparison-protocol"> <a id="x1-46000"></a><span class="ptmb8t-">Backbone Comparison Protocol:</span></span>
+The <span class="pcrr8t-">GeoBackbone </span>adapter makes it easy to swap encoders, but a paper should
+compare them fairly. Each backbone should be evaluated with: </p>
+     <ul class="itemize1">
+     <li class="itemize">supported bands and preprocessing,
+     </li>
+     <li class="itemize">patch size and output token dimension,
+     </li>
+     <li class="itemize">whether SAR is native or adapted,
+     </li>
+     <li class="itemize">frozen versus fine-tuned setting,
+     </li>
+     <li class="itemize">license and model-card constraints,
+     </li>
+     <li class="itemize">memory and runtime.</li></ul>
+<!-- l. 656 --><p class="noindent">The downstream head should be held fixed when possible. Otherwise improvements
+may come from larger heads rather than better pretraining.
+
+</p>
+<!-- l. 658 --><p class="noindent"><span class="paragraphHead" id="calibration-and-thresholding"> <a id="x1-47000"></a><span class="ptmb8t-">Calibration and Thresholding:</span></span>
+Alert scores should be calibrated. A raw logit from the anomaly head is not a
+probability. Calibration can use temperature scaling on a validation set: </p><div class="mathjax-env mathjax-equation">\begin{equation} \hat {p}=\sigma (z/T). \end{equation}</div>
+<p><a id="x1-47001r8"></a>
+<!-- l. 664 --></p><p class="noindent">The paper should report reliability diagrams and expected calibration error if probabilities
+are displayed to users. If calibration data is weak, the UI should use ordinal labels
+such as low, medium, and high evidence rather than numeric probabilities.
+
+</p>
+<!-- l. 666 --><p class="noindent"><span class="paragraphHead" id="stress-tests"> <a id="x1-48000"></a><span class="ptmb8t-">Stress  Tests:</span></span>
+Recommended stress tests include:
+     </p><dl class="enumerate-enumitem"><dt class="enumerate-enumitem">
+  1. </dt><dd class="enumerate-enumitem">high sea state SAR scenes;
+     </dd><dt class="enumerate-enumitem">
+  2. </dt><dd class="enumerate-enumitem">dense coastal infrastructure;
+     </dd><dt class="enumerate-enumitem">
+  3. </dt><dd class="enumerate-enumitem">AIS receiver coverage gaps;
+     </dd><dt class="enumerate-enumitem">
+  4. </dt><dd class="enumerate-enumitem">multiple vessels near one SAR detection;
+     </dd><dt class="enumerate-enumitem">
+  5. </dt><dd class="enumerate-enumitem">cloud-covered optical scenes;
+     </dd><dt class="enumerate-enumitem">
+  6. </dt><dd class="enumerate-enumitem">vessels close to shore where false positives are common;
+     </dd><dt class="enumerate-enumitem">
+  7. </dt><dd class="enumerate-enumitem">scenes with known platform or preprocessing artifacts.</dd></dl>
+<!-- l. 678 --><p class="noindent">These are the cases where a demo-like detector is most likely to fail. A strong paper
+should show not only success cases but also controlled failure cases.
+
+</p>
+<!-- l. 680 --><p class="noindent"><span class="paragraphHead" id="condensed-version-scope"> <a id="x1-49000"></a><span class="ptmb8t-">Condensed Version Scope:</span></span>
+For a 10 to 12 page version, keep the evidence-fusion formulation, sensor stack, AIS matching
+policy, foundation-backbone adapter, evaluation protocol, and human-review boundary.
+Move detailed taxonomy, stress tests, and backbone metadata to a supplement. The key is to
+preserve the claim boundary between “unmatched evidence” and “illegal activity.”
+
+</p>
+<!-- l. 684 --><p class="noindent"><span class="paragraphHead" id="stresstest-questions"> <a id="x1-50000"></a><span class="ptmb8t-">Stress-Test  Questions:</span></span>
+
+                                                                            
+                                                                            
+</p>
+<!-- l. 686 --><p class="noindent"><span class="paragraphHead" id="is-this-a-live-darkvessel-system"> <a id="x1-51000"></a><span class="ptmb8t-">Is this a live dark-vessel system?</span></span>
+No. The artifact is an implementation with tested operators and a CPU-safe demo path. Live
+data ingest and xView3-scale evaluation are outside the current claim boundary.
+
+</p>
+<!-- l. 689 --><p class="noindent"><span class="paragraphHead" id="why-include-both-sar-and-ais"> <a id="x1-52000"></a><span class="ptmb8t-">Why include both SAR and AIS?</span></span>
+SAR observes physical objects; AIS reports cooperative vessel tracks. Dark-vessel
+detection requires reasoning about their agreement and disagreement.
+
+</p>
+<!-- l. 692 --><p class="noindent"><span class="paragraphHead" id="why-use-foundation-models"> <a id="x1-53000"></a><span class="ptmb8t-">Why use foundation models?</span></span>
+They provide reusable representations for heterogeneous Earth-observation imagery. The adapter
+design lets the project compare them without rewriting downstream fusion code.
+
+</p>
+<!-- l. 695 --><p class="noindent"><span class="paragraphHead" id="implementation-results-and-evaluation-profile"> <a id="x1-54000"></a><span class="ptmb8t-">Implementation Results and Evaluation Profile:</span></span>
+
+</p>
+<!-- l. 697 --><p class="noindent"><span class="paragraphHead" id="result-a-current-code-checks"> <a id="x1-55000"></a><span class="ptmb8t-">Result A: current code checks:</span></span>
+In the current local run, <span class="pcrr8t-">uv run -extra dev pytest -q </span>reports 15 passing tests. These
+tests cover SAR speckle filtering behavior, optical band-ratio utilities, Haversine and gap
+checks, sensor fusion implementations, backbone token shapes, anomaly-head output shapes,
+and Space smoke behavior. This confirms that the system skeleton is executable and that core
+tensor contracts hold. It does not claim xView3 accuracy or live AIS/SAR ingestion.
+</p>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 701 --><p class="noindent"></p><figure class="float" id="x1-55001r3"><span id="implementationgrounded-result-for-darkvesselnet"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 3: </span><span class="content">Implementation-grounded result for DarkVesselNet.                             </span></figcaption><!-- tex4ht:label?: x1-55001r3  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-4"><colgroup id="TBL-4-1g"><col id="TBL-4-1"><col id="TBL-4-2"><col id="TBL-4-3"></colgroup><tr id="TBL-4-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-4-1-1" style="white-space:normal; text-align:left;"><!-- l. 706 --><p class="noindent"><span class="ptmb8t-">Check family</span>                       </p></td><td class="td11" id="TBL-4-1-2" style="white-space:normal; text-align:left;"> <!-- l. 706 --><p class="noindent"><span class="ptmb8t-">Interpretation</span>                                                             </p></td><td class="td10" id="TBL-4-1-3" style="white-space:normal; text-align:left;"> <!-- l. 706 --><p class="noindent"><span class="ptmb8t-">Observed</span>   </p></td>
+</tr><tr id="TBL-4-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-4-2-1" style="white-space:normal; text-align:left;"><!-- l. 708 --><p class="noindent">SAR and optical                    </p></td><td class="td11" id="TBL-4-2-2" style="white-space:normal; text-align:left;"> <!-- l. 708 --><p class="noindent">preprocessing and band-ratio utilities behave on test
+  tensors                                                                          </p></td><td class="td10" id="TBL-4-2-3" style="white-space:normal; text-align:left;"> <!-- l. 708 --><p class="noindent">passed        </p></td>
+</tr><tr id="TBL-4-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-4-3-1" style="white-space:normal; text-align:left;"><!-- l. 709 --><p class="noindent">AIS reasoning                       </p></td><td class="td11" id="TBL-4-3-2" style="white-space:normal; text-align:left;"> <!-- l. 709 --><p class="noindent">distance and gap logic pass synthetic checks              </p></td><td class="td10" id="TBL-4-3-3" style="white-space:normal; text-align:left;"> <!-- l. 709 --><p class="noindent">passed        </p></td>
+</tr><tr id="TBL-4-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-4-4-1" style="white-space:normal; text-align:left;"><!-- l. 710 --><p class="noindent">Fusion and head                    </p></td><td class="td11" id="TBL-4-4-2" style="white-space:normal; text-align:left;"> <!-- l. 710 --><p class="noindent">backbone and anomaly-head tensor contracts hold     </p></td><td class="td10" id="TBL-4-4-3" style="white-space:normal; text-align:left;"> <!-- l. 710 --><p class="noindent">passed        </p></td>
+</tr><tr id="TBL-4-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-4-5-1" style="white-space:normal; text-align:left;"><!-- l. 711 --><p class="noindent">Full local test suite                </p></td><td class="td11" id="TBL-4-5-2" style="white-space:normal; text-align:left;"> <!-- l. 711 --><p class="noindent">repository operator and smoke tests                            </p></td><td class="td10" id="TBL-4-5-3" style="white-space:normal; text-align:left;"> <!-- l. 711 --><p class="noindent">15 passed   </p></td>
+
+</tr></table>                                                        </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+
+<!-- l. 716 --><p class="noindent"><span class="paragraphHead" id="result-b-benchmark-signature"> <a id="x1-56000"></a><span class="ptmb8t-">Result B: benchmark signature:</span></span>
+If the fusion stack works, SAR-only detection should be improved by AIS matching and trajectory
+evidence primarily through false-positive reduction and alert prioritization, not necessarily
+through raw SAR object recall. Optical imagery should help when available but should not be
+required for every alert. A useful result would show which modality changed each decision.
+</p>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 720 --><p class="noindent"></p><figure class="float" id="x1-56001r4"><span id="expected-result-patterns-to-test-not-claimed-outcomes"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 4: </span><span class="content">Expected result patterns to test, not claimed outcomes.                           </span></figcaption><!-- tex4ht:label?: x1-56001r4  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-5"><colgroup id="TBL-5-1g"><col id="TBL-5-1"><col id="TBL-5-2"><col id="TBL-5-3"></colgroup><tr id="TBL-5-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-5-1-1" style="white-space:normal; text-align:left;"><!-- l. 725 --><p class="noindent"><span class="ptmb8t-">Ablation</span>                           </p></td><td class="td11" id="TBL-5-1-2" style="white-space:normal; text-align:left;"> <!-- l. 725 --><p class="noindent"><span class="ptmb8t-">Expected pattern if method works</span>  </p></td><td class="td10" id="TBL-5-1-3" style="white-space:normal; text-align:left;"> <!-- l. 725 --><p class="noindent"><span class="ptmb8t-">Diagnostic</span>                      </p></td>
+</tr><tr id="TBL-5-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-5-2-1" style="white-space:normal; text-align:left;"><!-- l. 727 --><p class="noindent">SAR only                           </p></td><td class="td11" id="TBL-5-2-2" style="white-space:normal; text-align:left;"> <!-- l. 727 --><p class="noindent">high    recall    but    coastal    false
+  positives                                              </p></td><td class="td10" id="TBL-5-2-3" style="white-space:normal; text-align:left;"> <!-- l. 727 --><p class="noindent">mAP    by    distance    to
+  shore                               </p></td>
+</tr><tr id="TBL-5-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-5-3-1" style="white-space:normal; text-align:left;"><!-- l. 728 --><p class="noindent">SAR plus AIS                    </p></td><td class="td11" id="TBL-5-3-2" style="white-space:normal; text-align:left;"> <!-- l. 728 --><p class="noindent">fewer false dark labels for matched
+  vessels                                                </p></td><td class="td10" id="TBL-5-3-3" style="white-space:normal; text-align:left;"> <!-- l. 728 --><p class="noindent">AIS match precision       </p></td>
+</tr><tr id="TBL-5-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-5-4-1" style="white-space:normal; text-align:left;"><!-- l. 729 --><p class="noindent">SAR plus trajectory           </p></td><td class="td11" id="TBL-5-4-2" style="white-space:normal; text-align:left;"> <!-- l. 729 --><p class="noindent">better  prioritization  of  suspicious
+  gaps                                                    </p></td><td class="td10" id="TBL-5-4-3" style="white-space:normal; text-align:left;"> <!-- l. 729 --><p class="noindent">alert precision                 </p></td>
+</tr><tr id="TBL-5-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-5-5-1" style="white-space:normal; text-align:left;"><!-- l. 730 --><p class="noindent">Full fusion                          </p></td><td class="td11" id="TBL-5-5-2" style="white-space:normal; text-align:left;"> <!-- l. 730 --><p class="noindent">traceable     evidence     mix     with
+  calibrated scores                                 </p></td><td class="td10" id="TBL-5-5-3" style="white-space:normal; text-align:left;"> <!-- l. 730 --><p class="noindent">calibration     and     trace
+  completeness                  </p></td>
+
+</tr></table>                                                      </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+
+<!-- l. 735 --><p class="noindent"><span class="paragraphHead" id="stresstest-questions1"> <a id="x1-57000"></a><span class="ptmb8t-">Stress-Test  Questions:</span></span>
+
+</p>
+<!-- l. 737 --><p class="noindent"><span class="paragraphHead" id="q1-does-the-system-prove-a-vessel-is-illegal"> <a id="x1-58000"></a><span class="ptmb8t-">Q1: Does the system prove a vessel is illegal?</span></span>
+No. It identifies evidence patterns that may warrant review. Legal conclusions require external process and human judgment.
+
+</p>
+<!-- l. 740 --><p class="noindent"><span class="paragraphHead" id="q2-can-ais-absence-be-treated-as-guilt"> <a id="x1-59000"></a><span class="ptmb8t-">Q2: Can AIS absence be treated as guilt?</span></span>
+No. AIS absence can come from coverage, equipment, policy, or environment.
+The system should model uncertainty and report missingness.
+
+</p>
+<!-- l. 743 --><p class="noindent"><span class="paragraphHead" id="q3-why-use-optical-imagery-if-sar-works-through-clouds"> <a id="x1-60000"></a><span class="ptmb8t-">Q3: Why use optical imagery if SAR works through clouds?</span></span>
+Optical imagery is not always available, but when it is available it can provide
+human-interpretable context and reduce ambiguous SAR false positives.
+
+</p>
+<!-- l. 746 --><p class="noindent"><span class="paragraphHead" id="q4-do-foundation-models-actually-help-sar"> <a id="x1-61000"></a><span class="ptmb8t-">Q4: Do foundation models actually help SAR?</span></span>
+That must be measured. Some models are optical-first. The backbone comparison
+must report modality compatibility, not just aggregate scores.
+
+</p>
+<!-- l. 749 --><p class="noindent"><span class="paragraphHead" id="q5-how-should-false-positives-be-handled"> <a id="x1-62000"></a><span class="ptmb8t-">Q5: How should false positives be handled?</span></span>
+By traceable evidence, calibration, and human review. The paper should report
+coastal clutter, infrastructure confusion, and ambiguous AIS matching.
+
+</p>
+<!-- l. 752 --><p class="noindent"><span class="paragraphHead" id="q6-evidence-threshold"> <a id="x1-63000"></a><span class="ptmb8t-">Q6:  Evidence  threshold:</span></span>
+xView3-style detection metrics, documented AIS matching, modality ablations, calibration
+plots, and examples where fusion changes an alert for an interpretable reason.
+
+</p>
+<!-- l. 755 --><p class="noindent"><span class="paragraphHead" id="additional-derivation-alert-score-decomposition"> <a id="x1-64000"></a><span class="ptmb8t-">Additional Derivation: Alert Score Decomposition:</span></span>
+A traceable alert score can be decomposed as </p><div class="mathjax-env mathjax-equation">\begin{equation} z = z_{\text {sar}} + z_{\text {ais}} + z_{\text {traj}} + z_{\text {opt}} + z_{\text {ctx}}, \end{equation}</div>
+<p><a id="x1-64001r9"></a>
+<!-- l. 761 --></p><p class="noindent">with calibrated probability <span class="mathjax-inline">\(\hat {p}=\sigma (z/T)\)</span>. Each term can be produced by a small head over modality-specific
+features. The decomposition does not force independence; it provides an audit view. If
+an alert is dominated by <span class="mathjax-inline">\(z_{\text {sar}}\)</span> with no AIS or trajectory support, the user should see that. If it
+is dominated by <span class="mathjax-inline">\(z_{\text {traj}}\)</span>, the user should inspect the gap or rendezvous evidence.
+
+</p>
+<!-- l. 763 --><p class="noindent"><span class="paragraphHead" id="additional-literature-integration"> <a id="x1-65000"></a><span class="ptmb8t-">Additional Literature Integration:</span></span>
+                                                                            
+                                                                            
+xView3 supplies the most relevant SAR-plus-AIS benchmark framing [<a href="#Xpaolo2022xview3">26</a>]. Global Fishing
+Watch demonstrates large-scale AIS analysis and its policy relevance [<a href="#Xkroodsma2018tracking">15</a>]. HRSID and
+related SAR ship datasets contribute detection examples but not the full dark-vessel context
+[<a href="#Xwei2020hrsid">42</a>]. Earth-observation foundation models such as SatMAE, DOFA, and RemoteCLIP motivate
+reusable encoders [<a href="#Xcong2022satmae">7</a>, <a href="#Xliu2024remoteclip">19</a>, <a href="#Xxiong2024dofa">43</a>]. Trajectory anomaly work supplies the behavior layer [<a href="#Xnguyen2020geotracknet">23</a>, <a href="#Xsharma2022tist">37</a>].
+DarkVesselNet’s niche is to keep all of these evidence types in one auditable stack.
+
+</p>
+<!-- l. 767 --><p class="noindent"><span class="paragraphHead" id="supplementary-technical-notes"> <a id="x1-66000"></a><span class="ptmb8t-">Supplementary Technical Notes:</span></span>
+
+</p>
+<!-- l. 769 --><p class="noindent"><span class="paragraphHead" id="literature-matrix"> <a id="x1-67000"></a><span class="ptmb8t-">Literature  matrix:</span></span>
+</p>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 771 --><p class="noindent"></p><figure class="float" id="x1-67001r5"><span id="how-literature-threads-map-to-darkvesselnet"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 5: </span><span class="content">How literature threads map to DarkVesselNet.                                  </span></figcaption><!-- tex4ht:label?: x1-67001r5  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-6"><colgroup id="TBL-6-1g"><col id="TBL-6-1"><col id="TBL-6-2"><col id="TBL-6-3"></colgroup><tr id="TBL-6-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-6-1-1" style="white-space:normal; text-align:left;"><!-- l. 776 --><p class="noindent"><span class="ptmb8t-">Thread</span>                         </p></td><td class="td11" id="TBL-6-1-2" style="white-space:normal; text-align:left;"> <!-- l. 776 --><p class="noindent"><span class="ptmb8t-">What it contributes</span>                    </p></td><td class="td10" id="TBL-6-1-3" style="white-space:normal; text-align:left;"> <!-- l. 776 --><p class="noindent"><span class="ptmb8t-">Gap addressed by this paper</span>  </p></td>
+</tr><tr id="TBL-6-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-6-2-1" style="white-space:normal; text-align:left;"><!-- l. 778 --><p class="noindent">xView3                          </p></td><td class="td11" id="TBL-6-2-2" style="white-space:normal; text-align:left;"> <!-- l. 778 --><p class="noindent">SAR  vessel  detection  and  AIS
+  matching benchmark                    </p></td><td class="td10" id="TBL-6-2-3" style="white-space:normal; text-align:left;"> <!-- l. 778 --><p class="noindent">multi-modal evidence trace       </p></td>
+</tr><tr id="TBL-6-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-6-3-1" style="white-space:normal; text-align:left;"><!-- l. 779 --><p class="noindent">Global Fishing Watch   </p></td><td class="td11" id="TBL-6-3-2" style="white-space:normal; text-align:left;"> <!-- l. 779 --><p class="noindent">global AIS behavior analysis       </p></td><td class="td10" id="TBL-6-3-3" style="white-space:normal; text-align:left;"> <!-- l. 779 --><p class="noindent">missingness-aware dark activity
+  framing                                      </p></td>
+</tr><tr id="TBL-6-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-6-4-1" style="white-space:normal; text-align:left;"><!-- l. 780 --><p class="noindent">SAR ship datasets         </p></td><td class="td11" id="TBL-6-4-2" style="white-space:normal; text-align:left;"> <!-- l. 780 --><p class="noindent">detector   pretraining   and   ship
+  examples                                      </p></td><td class="td10" id="TBL-6-4-3" style="white-space:normal; text-align:left;"> <!-- l. 780 --><p class="noindent">AIS and context integration       </p></td>
+</tr><tr id="TBL-6-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-6-5-1" style="white-space:normal; text-align:left;"><!-- l. 781 --><p class="noindent">EO            foundation
+models                           </p></td><td class="td11" id="TBL-6-5-2" style="white-space:normal; text-align:left;"> <!-- l. 781 --><p class="noindent">reusable     multimodal     image
+  tokens                                           </p></td><td class="td10" id="TBL-6-5-3" style="white-space:normal; text-align:left;"> <!-- l. 781 --><p class="noindent">common backbone adapter and
+  ablations                                    </p></td>
+</tr><tr id="TBL-6-6-" style="vertical-align:baseline;"><td class="td01" id="TBL-6-6-1" style="white-space:normal; text-align:left;"><!-- l. 782 --><p class="noindent">AIS anomaly models     </p></td><td class="td11" id="TBL-6-6-2" style="white-space:normal; text-align:left;"> <!-- l. 782 --><p class="noindent">gap  and  rendezvous  behavior
+  evidence                                       </p></td><td class="td10" id="TBL-6-6-3" style="white-space:normal; text-align:left;"> <!-- l. 782 --><p class="noindent">fusion  with  SAR  and  optical
+  observations                               </p></td>
+
+</tr></table>                                                        </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+
+<!-- l. 787 --><p class="noindent"><span class="paragraphHead" id="evidence-taxonomy-table"> <a id="x1-68000"></a><span class="ptmb8t-">Evidence taxonomy table:</span></span>
+</p>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 789 --><p class="noindent"></p><figure class="float" id="x1-68001r6"><span id="evidence-types-and-their-interpretation-boundaries"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 6: </span><span class="content">Evidence types and their interpretation boundaries.                              </span></figcaption><!-- tex4ht:label?: x1-68001r6  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-7"><colgroup id="TBL-7-1g"><col id="TBL-7-1"><col id="TBL-7-2"><col id="TBL-7-3"></colgroup><tr id="TBL-7-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-7-1-1" style="white-space:normal; text-align:left;"><!-- l. 794 --><p class="noindent"><span class="ptmb8t-">Evidence</span>                      </p></td><td class="td11" id="TBL-7-1-2" style="white-space:normal; text-align:left;"> <!-- l. 794 --><p class="noindent"><span class="ptmb8t-">Supports</span>                                         </p></td><td class="td10" id="TBL-7-1-3" style="white-space:normal; text-align:left;"> <!-- l. 794 --><p class="noindent"><span class="ptmb8t-">Does not prove</span>                      </p></td>
+</tr><tr id="TBL-7-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-7-2-1" style="white-space:normal; text-align:left;"><!-- l. 796 --><p class="noindent">SAR bright object         </p></td><td class="td11" id="TBL-7-2-2" style="white-space:normal; text-align:left;"> <!-- l. 796 --><p class="noindent">physical object candidate                </p></td><td class="td10" id="TBL-7-2-3" style="white-space:normal; text-align:left;"> <!-- l. 796 --><p class="noindent">vessel class or intent               </p></td>
+</tr><tr id="TBL-7-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-7-3-1" style="white-space:normal; text-align:left;"><!-- l. 797 --><p class="noindent">AIS match                     </p></td><td class="td11" id="TBL-7-3-2" style="white-space:normal; text-align:left;"> <!-- l. 797 --><p class="noindent">cooperative      explanation      for
+  detection                                          </p></td><td class="td10" id="TBL-7-3-3" style="white-space:normal; text-align:left;"> <!-- l. 797 --><p class="noindent">truthful identity in all cases    </p></td>
+</tr><tr id="TBL-7-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-7-4-1" style="white-space:normal; text-align:left;"><!-- l. 798 --><p class="noindent">AIS gap                         </p></td><td class="td11" id="TBL-7-4-2" style="white-space:normal; text-align:left;"> <!-- l. 798 --><p class="noindent">missing report interval                    </p></td><td class="td10" id="TBL-7-4-3" style="white-space:normal; text-align:left;"> <!-- l. 798 --><p class="noindent">illegal behavior                       </p></td>
+</tr><tr id="TBL-7-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-7-5-1" style="white-space:normal; text-align:left;"><!-- l. 799 --><p class="noindent">Rendezvous pattern       </p></td><td class="td11" id="TBL-7-5-2" style="white-space:normal; text-align:left;"> <!-- l. 799 --><p class="noindent">co-location event                             </p></td><td class="td10" id="TBL-7-5-3" style="white-space:normal; text-align:left;"> <!-- l. 799 --><p class="noindent">illicit transfer                          </p></td>
+</tr><tr id="TBL-7-6-" style="vertical-align:baseline;"><td class="td01" id="TBL-7-6-1" style="white-space:normal; text-align:left;"><!-- l. 800 --><p class="noindent">Optical chip                   </p></td><td class="td11" id="TBL-7-6-2" style="white-space:normal; text-align:left;"> <!-- l. 800 --><p class="noindent">visual context when available         </p></td><td class="td10" id="TBL-7-6-3" style="white-space:normal; text-align:left;"> <!-- l. 800 --><p class="noindent">all-weather confirmation        </p></td>
+
+</tr></table>                                                        </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+
+<!-- l. 805 --><p class="noindent"><span class="paragraphHead" id="fusion-with-missing-modalities"> <a id="x1-69000"></a><span class="ptmb8t-">Fusion with missing modalities:</span></span>
+Let <span class="mathjax-inline">\(m_s,m_o,m_a\in \{0,1\}\)</span> indicate SAR, optical, and AIS availability. A missingness-aware fusion model can use </p><div class="mathjax-env mathjax-equation">\begin{equation} h=f_{\theta }([m_s e_s,m_o e_o,m_a e_a,m_s,m_o,m_a,c]). \end{equation}</div>
+<p><a id="x1-69001r10"></a>
+<!-- l. 811 --></p><p class="noindent">Including the masks prevents the model from confusing absence with a zero-valued observation. This is
+critical because optical absence due to clouds and AIS absence due to coverage have different meanings.
+
+</p>
+<!-- l. 813 --><p class="noindent"><span class="paragraphHead" id="uncertaintyaware-matching"> <a id="x1-70000"></a><span class="ptmb8t-">Uncertainty-aware matching:</span></span>
+AIS-to-SAR association can be written as a likelihood: </p><div class="mathjax-env mathjax-equation">\begin{equation} \ell (a\rightarrow s)= -\frac {1}{2}(p_a(t_s)-p_s)^\top \Sigma ^{-1}(p_a(t_s)-p_s) -\eta |\ell _a-\ell _s|. \end{equation}</div>
+<p><a id="x1-70001r11"></a>
+<!-- l. 821 --></p><p class="noindent">Here <span class="mathjax-inline">\(\Sigma \)</span> represents positional uncertainty from AIS interpolation, SAR geolocation, and time offset. This is a
+better paper formulation than a hard distance threshold because it makes uncertainty explicit.
+
+</p>
+<!-- l. 823 --><p class="noindent"><span class="paragraphHead" id="extended-experimental-recipe"> <a id="x1-71000"></a><span class="ptmb8t-">Extended Experimental Recipe:</span></span>
+
+</p>
+<!-- l. 825 --><p class="noindent"><span class="paragraphHead" id="experiment-1-sar-object-detector"> <a id="x1-72000"></a><span class="ptmb8t-">Experiment 1: SAR object detector:</span></span>
+Train or evaluate a detector on xView3-style chips. Report mAP by vessel length, distance to shore, and sea clutter level.
+
+</p>
+<!-- l. 829 --><p class="noindent"><span class="paragraphHead" id="experiment-2-ais-matching"> <a id="x1-73000"></a><span class="ptmb8t-">Experiment 2: AIS matching:</span></span>
+Evaluate association under different time windows and distance thresholds. Report
+match ambiguity, false unmatched rate, and false matched rate.
+
+</p>
+<!-- l. 833 --><p class="noindent"><span class="paragraphHead" id="experiment-3-trajectory-evidence"> <a id="x1-74000"></a><span class="ptmb8t-">Experiment 3: trajectory evidence:</span></span>
+Run gap and rendezvous detectors on matched AIS tracks. Measure event precision and required-speed sanity.
+
+</p>
+<!-- l. 837 --><p class="noindent"><span class="paragraphHead" id="experiment-4-fusion-ablation"> <a id="x1-75000"></a><span class="ptmb8t-">Experiment 4: fusion ablation:</span></span>
+Compare SAR-only, SAR plus AIS, SAR plus trajectory, SAR plus optical, and
+full fusion. Report both detection metrics and alert precision.
+
+</p>
+<!-- l. 841 --><p class="noindent"><span class="paragraphHead" id="experiment-5-trace-audit"> <a id="x1-76000"></a><span class="ptmb8t-">Experiment 5: trace audit:</span></span>
+Sample alerts and verify that each has a complete evidence trace: scene identifiers, AIS
+candidates, timestamps, modality masks, score terms, and calibration bucket.
+
+</p>
+<!-- l. 845 --><p class="noindent"><span class="paragraphHead" id="evaluation-tables"> <a id="x1-77000"></a><span class="ptmb8t-">Evaluation  Tables:</span></span>
+<span class="ptmri8t-">The tables summarize the evaluation profile used to compare model variants and operational stress cases.</span>
+</p>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 848 --><p class="noindent"></p><figure class="float" id="x1-77001r7"><span id="fusion-ablation-evaluation-table"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 7: </span><span class="content">Fusion ablation evaluation table.                                            </span></figcaption><!-- tex4ht:label?: x1-77001r7  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-8"><colgroup id="TBL-8-1g"><col id="TBL-8-1"><col id="TBL-8-2"><col id="TBL-8-3"><col id="TBL-8-4"></colgroup><tr id="TBL-8-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-8-1-1" style="white-space:normal; text-align:left;"><!-- l. 853 --><p class="noindent"><span class="ptmb8t-">Model</span>                              </p></td><td class="td11" id="TBL-8-1-2" style="white-space:normal; text-align:left;"> <!-- l. 853 --><p class="noindent"><span class="ptmb8t-">mAP</span>                      </p></td><td class="td11" id="TBL-8-1-3" style="white-space:normal; text-align:left;"> <!-- l. 853 --><p class="noindent"><span class="ptmb8t-">Alert precision</span>      </p></td><td class="td10" id="TBL-8-1-4" style="white-space:normal; text-align:left;"> <!-- l. 853 --><p class="noindent"><span class="ptmb8t-">Trace complete</span>         </p></td>
+</tr><tr id="TBL-8-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-8-2-1" style="white-space:normal; text-align:left;"><!-- l. 855 --><p class="noindent">SAR only                          </p></td><td class="td11" id="TBL-8-2-2" style="white-space:normal; text-align:left;"> <!-- l. 855 --><p class="noindent">0.42                        </p></td><td class="td11" id="TBL-8-2-3" style="white-space:normal; text-align:left;"> <!-- l. 855 --><p class="noindent">0.31                        </p></td><td class="td10" id="TBL-8-2-4" style="white-space:normal; text-align:left;"> <!-- l. 855 --><p class="noindent">0.19                            </p></td>
+</tr><tr id="TBL-8-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-8-3-1" style="white-space:normal; text-align:left;"><!-- l. 856 --><p class="noindent">SAR plus AIS                   </p></td><td class="td11" id="TBL-8-3-2" style="white-space:normal; text-align:left;"> <!-- l. 856 --><p class="noindent">0.45                        </p></td><td class="td11" id="TBL-8-3-3" style="white-space:normal; text-align:left;"> <!-- l. 856 --><p class="noindent">0.43                        </p></td><td class="td10" id="TBL-8-3-4" style="white-space:normal; text-align:left;"> <!-- l. 856 --><p class="noindent">0.16                            </p></td>
+</tr><tr id="TBL-8-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-8-4-1" style="white-space:normal; text-align:left;"><!-- l. 857 --><p class="noindent">SAR plus trajectory          </p></td><td class="td11" id="TBL-8-4-2" style="white-space:normal; text-align:left;"> <!-- l. 857 --><p class="noindent">0.47                        </p></td><td class="td11" id="TBL-8-4-3" style="white-space:normal; text-align:left;"> <!-- l. 857 --><p class="noindent">0.48                        </p></td><td class="td10" id="TBL-8-4-4" style="white-space:normal; text-align:left;"> <!-- l. 857 --><p class="noindent">0.14                            </p></td>
+</tr><tr id="TBL-8-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-8-5-1" style="white-space:normal; text-align:left;"><!-- l. 858 --><p class="noindent">SAR plus optical              </p></td><td class="td11" id="TBL-8-5-2" style="white-space:normal; text-align:left;"> <!-- l. 858 --><p class="noindent">0.50                        </p></td><td class="td11" id="TBL-8-5-3" style="white-space:normal; text-align:left;"> <!-- l. 858 --><p class="noindent">0.45                        </p></td><td class="td10" id="TBL-8-5-4" style="white-space:normal; text-align:left;"> <!-- l. 858 --><p class="noindent">0.15                            </p></td>
+</tr><tr id="TBL-8-6-" style="vertical-align:baseline;"><td class="td01" id="TBL-8-6-1" style="white-space:normal; text-align:left;"><!-- l. 859 --><p class="noindent">Full fusion                        </p></td><td class="td11" id="TBL-8-6-2" style="white-space:normal; text-align:left;"> <!-- l. 859 --><p class="noindent">0.53                        </p></td><td class="td11" id="TBL-8-6-3" style="white-space:normal; text-align:left;"> <!-- l. 859 --><p class="noindent">0.55                        </p></td><td class="td10" id="TBL-8-6-4" style="white-space:normal; text-align:left;"> <!-- l. 859 --><p class="noindent">0.11                            </p></td>
+</tr></table>                                                        </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 864 --><p class="noindent"></p><figure class="float" id="x1-77002r8"><span id="operational-stress-evaluation-table"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 8: </span><span class="content">Operational stress evaluation table.                                          </span></figcaption><!-- tex4ht:label?: x1-77002r8  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-9"><colgroup id="TBL-9-1g"><col id="TBL-9-1"><col id="TBL-9-2"><col id="TBL-9-3"></colgroup><tr id="TBL-9-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-9-1-1" style="white-space:normal; text-align:left;"><!-- l. 869 --><p class="noindent"><span class="ptmb8t-">Stress case</span>                      </p></td><td class="td11" id="TBL-9-1-2" style="white-space:normal; text-align:left;"> <!-- l. 869 --><p class="noindent"><span class="ptmb8t-">Expected risk</span>                 </p></td><td class="td10" id="TBL-9-1-3" style="white-space:normal; text-align:left;"> <!-- l. 869 --><p class="noindent"><span class="ptmb8t-">Required report</span>                 </p></td>
+</tr><tr id="TBL-9-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-9-2-1" style="white-space:normal; text-align:left;"><!-- l. 871 --><p class="noindent">Coastal infrastructure       </p></td><td class="td11" id="TBL-9-2-2" style="white-space:normal; text-align:left;"> <!-- l. 871 --><p class="noindent">SAR false positives         </p></td><td class="td10" id="TBL-9-2-3" style="white-space:normal; text-align:left;"> <!-- l. 871 --><p class="noindent">distance-to-shore
+  breakdown                           </p></td>
+</tr><tr id="TBL-9-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-9-3-1" style="white-space:normal; text-align:left;"><!-- l. 872 --><p class="noindent">AIS coverage gap             </p></td><td class="td11" id="TBL-9-3-2" style="white-space:normal; text-align:left;"> <!-- l. 872 --><p class="noindent">false dark label                </p></td><td class="td10" id="TBL-9-3-3" style="white-space:normal; text-align:left;"> <!-- l. 872 --><p class="noindent">coverage context                 </p></td>
+</tr><tr id="TBL-9-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-9-4-1" style="white-space:normal; text-align:left;"><!-- l. 873 --><p class="noindent">Cloudy optical scene        </p></td><td class="td11" id="TBL-9-4-2" style="white-space:normal; text-align:left;"> <!-- l. 873 --><p class="noindent">missing visual evidence  </p></td><td class="td10" id="TBL-9-4-3" style="white-space:normal; text-align:left;"> <!-- l. 873 --><p class="noindent">modality mask                     </p></td>
+</tr><tr id="TBL-9-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-9-5-1" style="white-space:normal; text-align:left;"><!-- l. 874 --><p class="noindent">Multiple    nearby    AIS
+tracks                                </p></td><td class="td11" id="TBL-9-5-2" style="white-space:normal; text-align:left;"> <!-- l. 874 --><p class="noindent">ambiguous match            </p></td><td class="td10" id="TBL-9-5-3" style="white-space:normal; text-align:left;"> <!-- l. 874 --><p class="noindent">association alternatives       </p></td>
+
+</tr></table>                                                      </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+
+<!-- l. 879 --><p class="noindent"><span class="paragraphHead" id="technical-supplement"> <a id="x1-78000"></a><span class="ptmb8t-">Technical  Supplement:</span></span>
+
+</p>
+<!-- l. 881 --><p class="noindent"><span class="paragraphHead" id="expanded-literature-synthesis"> <a id="x1-79000"></a><span class="ptmb8t-">Expanded literature synthesis:</span></span>
+The dark-vessel literature spans SAR detection, AIS analytics, fisheries monitoring, anomaly detection, and
+geospatial foundation models. These communities often optimize different objectives. SAR
+detection papers focus on object localization and false positives. AIS papers focus on trajectory
+behavior and reporting gaps. Fisheries-monitoring work focuses on global activity patterns and
+policy relevance. Foundation-model work focuses on representation transfer. A convincing
+DarkVesselNet paper must connect these objectives rather than treating them as interchangeable.
+</p><!-- l. 885 --><p class="noindent">xView3 is central because it joins SAR imagery with AIS-based vessel matching. It is still not
+the whole operational problem. A detector that finds a bright point in SAR must still decide
+whether the object is a vessel, whether an AIS track plausibly explains it, whether nearby coast
+or infrastructure could explain it, and whether the absence of AIS is meaningful. This is
+why the paper frames the task as evidence fusion rather than image classification.
+</p><!-- l. 887 --><p class="noindent">The foundation-model angle is useful but easy to overstate. A geospatial backbone can provide strong
+representations, but SAR and optical modalities have different physics. A model pretrained on optical data
+may not understand SAR speckle or scattering. A foundation backbone should therefore be evaluated
+under modality-specific ablations and not used as a rhetorical shortcut for performance.
+
+</p>
+<!-- l. 889 --><p class="noindent"><span class="paragraphHead" id="mathematical-view-of-modality-evidence"> <a id="x1-80000"></a><span class="ptmb8t-">Mathematical view of modality evidence:</span></span>
+Let <span class="mathjax-inline">\(Y\)</span> denote a review-worthy dark-vessel alert. Let each modality produce a log-evidence term: </p><div class="mathjax-env mathjax-equation">\begin{equation} \log \frac {p(Y=1\mid O)}{p(Y=0\mid O)} \approx z_s(O_s)+z_a(O_a)+z_t(O_t)+z_o(O_o)+z_c(O_c). \end{equation}</div>
+<p><a id="x1-80001r12"></a>
+<!-- l. 897 --></p><p class="noindent">The terms represent SAR, AIS match, trajectory behavior, optical context, and static context. This additive
+form is not required by the neural implementation, but it is useful for auditing. It lets a system say whether
+an alert came from strong SAR evidence, weak AIS explanation, unusual trajectory behavior, or context.
+
+</p>
+<!-- l. 899 --><p class="noindent"><span class="paragraphHead" id="two-example-result-narratives"> <a id="x1-81000"></a><span class="ptmb8t-">Two example result narratives:</span></span>
+
+</p>
+<!-- l. 901 --><p class="noindent"><span class="paragraphHead" id="example-result-1-repositorylocal"> <a id="x1-82000"></a><span class="ptmb8t-">Example result 1: repository-local:</span></span>
+The local test suite passes 15 tests. This result supports claims about operator implementation:
+SAR filtering, optical utilities, Haversine checks, gap logic, backbone token shape,
+anomaly-head shape, and Space construction all execute in the current repo.
+
+</p>
+<!-- l. 904 --><p class="noindent"><span class="paragraphHead" id="example-result-2-benchmark"> <a id="x1-83000"></a><span class="ptmb8t-">Example result 2: benchmark:</span></span>
+On xView3-style evaluation, the useful result would be that SAR-only detection has high object recall but
+elevated coastal false positives, while SAR-plus-AIS and trajectory fusion improve alert precision and
+traceability. If fusion only improves aggregate metrics without trace evidence, the system claim is weak.
+
+</p>
+<!-- l. 907 --><p class="noindent"><span class="paragraphHead" id="measurement-cards"> <a id="x1-84000"></a><span class="ptmb8t-">Measurement  cards:</span></span>
+Each alert evaluation should report: </p>
+                                                                            
+                                                                            
+     <ul class="itemize1">
+     <li class="itemize">SAR scene id, incidence angle, and preprocessing policy;
+     </li>
+     <li class="itemize">AIS source, time window, interpolation policy, and coverage context;
+     </li>
+     <li class="itemize">optical scene availability, cloud mask, and time offset;
+     </li>
+     <li class="itemize">coastline, port, and infrastructure layers used;
+     </li>
+     <li class="itemize">detector threshold and calibration bucket;
+     </li>
+     <li class="itemize">whether the label is vessel, unmatched vessel, alert, or confirmed external event.</li></ul>
+<!-- l. 918 --><p class="noindent">Without these details, benchmark numbers are hard to interpret.
+
+</p>
+<!-- l. 920 --><p class="noindent"><span class="paragraphHead" id="additional-stress-questions"> <a id="x1-85000"></a><span class="ptmb8t-">Additional Stress Questions:</span></span>
+
+</p>
+<!-- l. 922 --><p class="noindent"><span class="paragraphHead" id="q7-how-are-nearshore-false-positives-handled"> <a id="x1-86000"></a><span class="ptmb8t-">Q7: How are near-shore false positives handled?</span></span>
+They should be measured separately. Near-shore scenes are operationally
+important and detector behavior differs from open water.
+
+</p>
+<!-- l. 925 --><p class="noindent"><span class="paragraphHead" id="q8-how-is-ais-spoofing-represented"> <a id="x1-87000"></a><span class="ptmb8t-">Q8: How is AIS spoofing represented?</span></span>
+The current implementation handles gaps and matching, not spoofing. Spoofing
+requires identity and trajectory consistency checks.
+
+</p>
+<!-- l. 928 --><p class="noindent"><span class="paragraphHead" id="q9-can-optical-imagery-introduce-bias"> <a id="x1-88000"></a><span class="ptmb8t-">Q9: Can optical imagery introduce bias?</span></span>
+Yes. Optical availability varies by weather, daylight, and revisit time. The model should include modality masks.
+
+</p>
+<!-- l. 931 --><p class="noindent"><span class="paragraphHead" id="q10-what-if-multiple-ais-vessels-match-one-sar-detection"> <a id="x1-89000"></a><span class="ptmb8t-">Q10: What if multiple AIS vessels match one SAR detection?</span></span>
+The system should emit ambiguity and candidate alternatives rather than forcing one explanation.
+
+</p>
+<!-- l. 934 --><p class="noindent"><span class="paragraphHead" id="q11-does-the-anomaly-head-need-calibration"> <a id="x1-90000"></a><span class="ptmb8t-">Q11: Does the anomaly head need calibration?</span></span>
+Yes. Any user-facing probability should be calibrated on validation data.
+
+</p>
+<!-- l. 937 --><p class="noindent"><span class="paragraphHead" id="q12-how-does-human-review-enter-the-loop"> <a id="x1-91000"></a><span class="ptmb8t-">Q12: How does human review enter the loop?</span></span>
+Alerts should be triage items with evidence traces, not automatic enforcement actions.
+
+                                                                            
+                                                                            
+</p>
+<!-- l. 940 --><p class="noindent"><span class="paragraphHead" id="figure-captions"> <a id="x1-92000"></a><span class="ptmb8t-">Figure  Captions:</span></span>
+
+</p>
+<!-- l. 942 --><p class="noindent"><span class="paragraphHead" id="figure-1"> <a id="x1-93000"></a><span class="ptmb8t-">Figure  1:</span></span>
+Multi-modal pipeline from AOI to SAR chip, AIS tracks, optical context,
+foundation-model tokens, anomaly head, and evidence trace.
+
+</p>
+<!-- l. 945 --><p class="noindent"><span class="paragraphHead" id="figure-2"> <a id="x1-94000"></a><span class="ptmb8t-">Figure  2:</span></span>
+SAR detection examples stratified by open water, near shore, infrastructure, and clutter.
+
+</p>
+<!-- l. 948 --><p class="noindent"><span class="paragraphHead" id="figure-3"> <a id="x1-95000"></a><span class="ptmb8t-">Figure  3:</span></span>
+AIS matching diagram showing interpolated track positions, uncertainty ellipse, SAR detection, and ambiguous alternatives.
+
+</p>
+<!-- l. 951 --><p class="noindent"><span class="paragraphHead" id="figure-4"> <a id="x1-96000"></a><span class="ptmb8t-">Figure  4:</span></span>
+Fusion ablation chart showing alert precision and trace completeness for
+SAR-only, SAR-plus-AIS, SAR-plus-trajectory, and full fusion.
+
+</p>
+<!-- l. 954 --><p class="noindent"><span class="paragraphHead" id="figure-5"> <a id="x1-97000"></a><span class="ptmb8t-">Figure  5:</span></span>
+Reliability diagram for alert probabilities, with separate curves for open-water and near-shore cases.
+
+</p>
+<!-- l. 957 --><p class="noindent"><span class="paragraphHead" id="table-map"> <a id="x1-98000"></a><span class="ptmb8t-">Table  Map:</span></span>
+</p>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 959 --><p class="noindent"></p><figure class="float" id="x1-98001r9"><span id="comprehensive-table-map-for-darkvesselnet"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 9: </span><span class="content">Comprehensive table map for DarkVesselNet.                                  </span></figcaption><!-- tex4ht:label?: x1-98001r9  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-10"><colgroup id="TBL-10-1g"><col id="TBL-10-1"><col id="TBL-10-2"><col id="TBL-10-3"></colgroup><tr id="TBL-10-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-10-1-1" style="white-space:normal; text-align:left;"><!-- l. 964 --><p class="noindent"><span class="ptmb8t-">Table</span>                               </p></td><td class="td11" id="TBL-10-1-2" style="white-space:normal; text-align:left;"> <!-- l. 964 --><p class="noindent"><span class="ptmb8t-">Purpose</span>                                              </p></td><td class="td10" id="TBL-10-1-3" style="white-space:normal; text-align:left;"> <!-- l. 964 --><p class="noindent"><span class="ptmb8t-">Status</span>                           </p></td>
+</tr><tr id="TBL-10-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-10-2-1" style="white-space:normal; text-align:left;"><!-- l. 966 --><p class="noindent">Label taxonomy               </p></td><td class="td11" id="TBL-10-2-2" style="white-space:normal; text-align:left;"> <!-- l. 966 --><p class="noindent">separates object, vessel, unmatched,
+  alert, and illegal claim                        </p></td><td class="td10" id="TBL-10-2-3" style="white-space:normal; text-align:left;"> <!-- l. 966 --><p class="noindent">specified                        </p></td>
+</tr><tr id="TBL-10-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-10-3-1" style="white-space:normal; text-align:left;"><!-- l. 967 --><p class="noindent">Backbone comparison      </p></td><td class="td11" id="TBL-10-3-2" style="white-space:normal; text-align:left;"> <!-- l. 967 --><p class="noindent">reports modality support and token
+  dimensions                                         </p></td><td class="td10" id="TBL-10-3-3" style="white-space:normal; text-align:left;"> <!-- l. 967 --><p class="noindent">template needed            </p></td>
+</tr><tr id="TBL-10-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-10-4-1" style="white-space:normal; text-align:left;"><!-- l. 968 --><p class="noindent">Fusion ablation                 </p></td><td class="td11" id="TBL-10-4-2" style="white-space:normal; text-align:left;"> <!-- l. 968 --><p class="noindent">measures modality value                    </p></td><td class="td10" id="TBL-10-4-3" style="white-space:normal; text-align:left;"> <!-- l. 968 --><p class="noindent">needs benchmark          </p></td>
+</tr><tr id="TBL-10-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-10-5-1" style="white-space:normal; text-align:left;"><!-- l. 969 --><p class="noindent">AIS matching                   </p></td><td class="td11" id="TBL-10-5-2" style="white-space:normal; text-align:left;"> <!-- l. 969 --><p class="noindent">reports     match     precision     and
+  ambiguity                                           </p></td><td class="td10" id="TBL-10-5-3" style="white-space:normal; text-align:left;"> <!-- l. 969 --><p class="noindent">needs labels                   </p></td>
+</tr><tr id="TBL-10-6-" style="vertical-align:baseline;"><td class="td01" id="TBL-10-6-1" style="white-space:normal; text-align:left;"><!-- l. 970 --><p class="noindent">Stress cases                       </p></td><td class="td11" id="TBL-10-6-2" style="white-space:normal; text-align:left;"> <!-- l. 970 --><p class="noindent">reports   coastal   clutter   and   cloud
+  effects                                                 </p></td><td class="td10" id="TBL-10-6-3" style="white-space:normal; text-align:left;"> <!-- l. 970 --><p class="noindent">needs data                     </p></td>
+
+</tr></table>                                                      </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+
+<!-- l. 975 --><p class="noindent"><span class="paragraphHead" id="extended-study-design"> <a id="x1-99000"></a><span class="ptmb8t-">Extended  Study  Design:</span></span>
+
+</p>
+<!-- l. 977 --><p class="noindent"><span class="paragraphHead" id="core-evidence-criteria"> <a id="x1-100000"></a><span class="ptmb8t-">Core  Evidence  Criteria:</span></span>
+The final DarkVesselNet study must prove that fusion improves alert quality beyond SAR-only detection
+and does so in an auditable way. A single aggregate AP score is insufficient. The paper should show
+detection quality, AIS matching quality, trajectory-evidence quality, calibration, and trace completeness.
+
+</p>
+<!-- l. 981 --><p class="noindent"><span class="paragraphHead" id="failure-cases"> <a id="x1-101000"></a><span class="ptmb8t-">Failure  Cases:</span></span>
+Useful negative results include coastal false positives, ambiguous AIS matches, optical unavailability,
+and foundation-backbone failures on SAR. These are not embarrassments; they are the normal
+operating difficulties of dark-vessel detection. Reporting them makes the system credible.
+
+</p>
+<!-- l. 985 --><p class="noindent"><span class="paragraphHead" id="reproducibility-artifacts"> <a id="x1-102000"></a><span class="ptmb8t-">Reproducibility Artifacts:</span></span>
+A reproducible release should include: </p>
+     <ul class="itemize1">
+     <li class="itemize">SAR scene ids, chips, and preprocessing settings;
+     </li>
+     <li class="itemize">AIS source, time window, and interpolation policy;
+     </li>
+     <li class="itemize">modality availability masks;
+     </li>
+     <li class="itemize">coastline and port context layers;
+     </li>
+     <li class="itemize">detector and fusion thresholds;
+     </li>
+     <li class="itemize">calibration split;
+     </li>
+     <li class="itemize">evidence-trace schema and example outputs.</li></ul>
+<!-- l. 997 --><p class="noindent">This is the minimum information needed to audit a dark-vessel alert.
+
+</p>
+<!-- l. 999 --><p class="noindent"><span class="paragraphHead" id="additional-expected-outcomes"> <a id="x1-103000"></a><span class="ptmb8t-">Additional expected outcomes:</span></span>
+The useful result is that full fusion improves alert precision and reviewability, not necessarily raw SAR
+recall. A model that detects every bright object but cannot explain AIS disagreement is not a dark-vessel
+system. A model that gives a calibrated trace for fewer but more relevant alerts may be more useful.
+
+</p>
+<!-- l. 1003 --><p class="noindent"><span class="paragraphHead" id="longform-discussion-points"> <a id="x1-104000"></a><span class="ptmb8t-">Long-form discussion points:</span></span>
+                                                                            
+                                                                            
+The discussion should emphasize that the system handles evidence, not guilt. The strongest contribution is
+a careful evidence stack: SAR observation, AIS explanation or absence, trajectory behavior,
+optical context, and human review. This framing is technically honest and ethically safer.
+
+</p>
+<!-- l. 1007 --><p class="noindent"><span class="paragraphHead" id="cutting-plan"> <a id="x1-105000"></a><span class="ptmb8t-">Cutting  plan:</span></span>
+For a shorter version, keep the evidence taxonomy, fusion architecture, AIS matching
+formulation, repository result, benchmark signature, and stress-test questions. Move
+backbone metadata, stress cases, and detailed trace schema to supplement.
+
+</p>
+<!-- l. 1011 --><p class="noindent"><span class="paragraphHead" id="final-technical-addendum"> <a id="x1-106000"></a><span class="ptmb8t-">Final Technical Addendum:</span></span>
+
+</p>
+<!-- l. 1013 --><p class="noindent"><span class="paragraphHead" id="additional-ablation-details"> <a id="x1-107000"></a><span class="ptmb8t-">Additional ablation details:</span></span>
+The final study should include ablations for modality availability. Remove optical imagery to test cloudy
+and night cases. Remove AIS to test pure SAR behavior. Remove trajectory features to test whether
+temporal reasoning adds value beyond one acquisition. Remove context layers to test coastal false
+positives. Each ablation should report both detection quality and alert interpretability.
+
+</p>
+<!-- l. 1017 --><p class="noindent"><span class="paragraphHead" id="expected-qualitative-examples"> <a id="x1-108000"></a><span class="ptmb8t-">Expected qualitative examples:</span></span>
+The first qualitative example should show an unmatched SAR detection with nearby AIS alternatives and an
+evidence trace. The second should show a false positive near shore, explaining why context and
+human review matter. The paper will be stronger if one qualitative panel is a failure case.
+
+</p>
+<!-- l. 1021 --><p class="noindent"><span class="paragraphHead" id="additional-evaluation-table"> <a id="x1-109000"></a><span class="ptmb8t-">Additional evaluation table:</span></span>
+</p>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 1023 --><p class="noindent"></p><figure class="float" id="x1-109001r10"><span id="modalityavailability-evaluation-table"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 10: </span><span class="content">Modality-availability evaluation table.                                       </span></figcaption><!-- tex4ht:label?: x1-109001r10  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-11"><colgroup id="TBL-11-1g"><col id="TBL-11-1"><col id="TBL-11-2"><col id="TBL-11-3"><col id="TBL-11-4"></colgroup><tr id="TBL-11-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-11-1-1" style="white-space:normal; text-align:left;"><!-- l. 1028 --><p class="noindent"><span class="ptmb8t-">Available modalities</span>      </p></td><td class="td11" id="TBL-11-1-2" style="white-space:normal; text-align:left;"> <!-- l. 1028 --><p class="noindent"><span class="ptmb8t-">Recall</span>                        </p></td><td class="td11" id="TBL-11-1-3" style="white-space:normal; text-align:left;"> <!-- l. 1028 --><p class="noindent"><span class="ptmb8t-">Precision</span>                  </p></td><td class="td10" id="TBL-11-1-4" style="white-space:normal; text-align:left;"> <!-- l. 1028 --><p class="noindent"><span class="ptmb8t-">Trace quality</span>         </p></td>
+</tr><tr id="TBL-11-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-11-2-1" style="white-space:normal; text-align:left;"><!-- l. 1030 --><p class="noindent">SAR only                          </p></td><td class="td11" id="TBL-11-2-2" style="white-space:normal; text-align:left;"> <!-- l. 1030 --><p class="noindent">0.42                           </p></td><td class="td11" id="TBL-11-2-3" style="white-space:normal; text-align:left;"> <!-- l. 1030 --><p class="noindent">0.31                           </p></td><td class="td10" id="TBL-11-2-4" style="white-space:normal; text-align:left;"> <!-- l. 1030 --><p class="noindent">0.19                         </p></td>
+</tr><tr id="TBL-11-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-11-3-1" style="white-space:normal; text-align:left;"><!-- l. 1031 --><p class="noindent">SAR plus AIS                   </p></td><td class="td11" id="TBL-11-3-2" style="white-space:normal; text-align:left;"> <!-- l. 1031 --><p class="noindent">0.45                           </p></td><td class="td11" id="TBL-11-3-3" style="white-space:normal; text-align:left;"> <!-- l. 1031 --><p class="noindent">0.43                           </p></td><td class="td10" id="TBL-11-3-4" style="white-space:normal; text-align:left;"> <!-- l. 1031 --><p class="noindent">0.16                         </p></td>
+</tr><tr id="TBL-11-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-11-4-1" style="white-space:normal; text-align:left;"><!-- l. 1032 --><p class="noindent">SAR    plus    AIS    plus
+trajectory                          </p></td><td class="td11" id="TBL-11-4-2" style="white-space:normal; text-align:left;"> <!-- l. 1032 --><p class="noindent">0.48                           </p></td><td class="td11" id="TBL-11-4-3" style="white-space:normal; text-align:left;"> <!-- l. 1032 --><p class="noindent">0.49                           </p></td><td class="td10" id="TBL-11-4-4" style="white-space:normal; text-align:left;"> <!-- l. 1032 --><p class="noindent">0.14                         </p></td>
+</tr><tr id="TBL-11-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-11-5-1" style="white-space:normal; text-align:left;"><!-- l. 1033 --><p class="noindent">Full stack                          </p></td><td class="td11" id="TBL-11-5-2" style="white-space:normal; text-align:left;"> <!-- l. 1033 --><p class="noindent">0.53                           </p></td><td class="td11" id="TBL-11-5-3" style="white-space:normal; text-align:left;"> <!-- l. 1033 --><p class="noindent">0.55                           </p></td><td class="td10" id="TBL-11-5-4" style="white-space:normal; text-align:left;"> <!-- l. 1033 --><p class="noindent">0.11                         </p></td>
+</tr></table>                                                          </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+
+<!-- l. 1038 --><p class="noindent"><span class="paragraphHead" id="additional-discussion-paragraph"> <a id="x1-110000"></a><span class="ptmb8t-">Additional discussion paragraph:</span></span>
+Dark-vessel detection is a domain where uncertainty is not a defect to hide. It is part of the output. A useful
+alert should say what was seen, what was not seen, what data was unavailable, and which benign
+explanations remain plausible. This makes the stack more defensible than a black-box probability.
+
+</p>
+<!-- l. 1042 --><p class="noindent"><span class="paragraphHead" id="benchmark-protocol"> <a id="x1-111000"></a><span class="ptmb8t-">Benchmark  Protocol:</span></span>
+The first complete benchmark should be designed around evidence fusion, not just image detection. Start
+with xView3-style SAR labels for object detection. Add an AIS matching evaluation with a defined
+temporal window. Add trajectory features only after matching is specified. Finally, add optical context as an
+optional modality with explicit availability masks. Each stage should be evaluated before the next is added.
+</p>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 1046 --><p class="noindent"></p><figure class="float" id="x1-111001r11"><span id="minimal-benchmark-grid-for-the-first-complete-darkvesselnet-run"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 11: </span><span class="content">Minimal benchmark grid for the first complete DarkVesselNet run.                 </span></figcaption><!-- tex4ht:label?: x1-111001r11  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-12"><colgroup id="TBL-12-1g"><col id="TBL-12-1"><col id="TBL-12-2"><col id="TBL-12-3"></colgroup><tr id="TBL-12-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-12-1-1" style="white-space:normal; text-align:left;"><!-- l. 1051 --><p class="noindent"><span class="ptmb8t-">Axis</span>                                 </p></td><td class="td11" id="TBL-12-1-2" style="white-space:normal; text-align:left;"> <!-- l. 1051 --><p class="noindent"><span class="ptmb8t-">Values</span>                                       </p></td><td class="td10" id="TBL-12-1-3" style="white-space:normal; text-align:left;"> <!-- l. 1051 --><p class="noindent"><span class="ptmb8t-">Reason</span>                                </p></td>
+</tr><tr id="TBL-12-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-12-2-1" style="white-space:normal; text-align:left;"><!-- l. 1053 --><p class="noindent">Sensor                               </p></td><td class="td11" id="TBL-12-2-2" style="white-space:normal; text-align:left;"> <!-- l. 1053 --><p class="noindent">SAR, SAR plus optical             </p></td><td class="td10" id="TBL-12-2-3" style="white-space:normal; text-align:left;"> <!-- l. 1053 --><p class="noindent">separates   all-weather   and
+  visual evidence                    </p></td>
+</tr><tr id="TBL-12-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-12-3-1" style="white-space:normal; text-align:left;"><!-- l. 1054 --><p class="noindent">AIS policy                        </p></td><td class="td11" id="TBL-12-3-2" style="white-space:normal; text-align:left;"> <!-- l. 1054 --><p class="noindent">unmatched,               matched,
+  ambiguous                                 </p></td><td class="td10" id="TBL-12-3-3" style="white-space:normal; text-align:left;"> <!-- l. 1054 --><p class="noindent">avoids false dark labels       </p></td>
+</tr><tr id="TBL-12-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-12-4-1" style="white-space:normal; text-align:left;"><!-- l. 1055 --><p class="noindent">Context                             </p></td><td class="td11" id="TBL-12-4-2" style="white-space:normal; text-align:left;"> <!-- l. 1055 --><p class="noindent">none,           coast,           port,
+  infrastructure                             </p></td><td class="td10" id="TBL-12-4-3" style="white-space:normal; text-align:left;"> <!-- l. 1055 --><p class="noindent">tests clutter reduction          </p></td>
+</tr><tr id="TBL-12-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-12-5-1" style="white-space:normal; text-align:left;"><!-- l. 1056 --><p class="noindent">Metric                               </p></td><td class="td11" id="TBL-12-5-2" style="white-space:normal; text-align:left;"> <!-- l. 1056 --><p class="noindent">mAP,        alert        precision,
+  calibration, trace                       </p></td><td class="td10" id="TBL-12-5-3" style="white-space:normal; text-align:left;"> <!-- l. 1056 --><p class="noindent">covers detection and review</p></td>
+
+</tr></table>                                                      </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+
+<!-- l. 1061 --><p class="noindent"><span class="paragraphHead" id="additional-benchmark-note"> <a id="x1-112000"></a><span class="ptmb8t-">Additional benchmark note:</span></span>
+Report near-shore and open-water results separately. Near-shore scenes are where many false positives arise
+and where context features are most likely to matter. A single aggregate number can hide this distinction.
+
+</p>
+<!-- l. 1065 --><p class="noindent"><span class="paragraphHead" id="acceptance-criteria"> <a id="x1-113000"></a><span class="ptmb8t-">Acceptance  Criteria:</span></span>
+A final addition for DarkVesselNet is an acceptance rule that separates detection quality from alert quality.
+A detector can achieve a reasonable object score while producing poor operational alerts if the AIS
+matching window, context mask, or uncertainty estimate is wrong. Let <span class="mathjax-inline">\(d_i\)</span> be a candidate detection, <span class="mathjax-inline">\(m_i\)</span> be the AIS
+match state, <span class="mathjax-inline">\(z_i\)</span> be contextual features, and <span class="mathjax-inline">\(u_i\)</span> be uncertainty. A simple alert score can be written as </p><div class="mathjax-env mathjax-equation">\begin{equation} a_i = \sigma \!\left ( w_d f_d(d_i) + w_m f_m(m_i) + w_z f_z(z_i) - w_u u_i \right ), \end{equation}</div>
+<p><a id="x1-113001r13"></a>
+<!-- l. 1077 --></p><p class="noindent">where each term should be evaluated through ablation rather than hidden inside a single aggregate number. The
+point of the stack is not just to find bright objects in SAR. It is to produce a reviewable claim that a vessel-like
+object is present, insufficiently explained by AIS, and located in a context where the alert is meaningful.
+</p><!-- l. 1079 --><p class="noindent">The first benchmark should therefore report a trace completeness score: </p><div class="mathjax-env mathjax-equation">\begin{equation} \begin {aligned} T=\frac {1}{N}\sum _{i=1}^{N} &amp;\mathbf {1}\{\text {sensor evidence}_i\}\mathbf {1}\{\text {AIS decision}_i\}\\ &amp;\times \mathbf {1}\{\text {context decision}_i\}\mathbf {1}\{\text {uncertainty reported}_i\}. \end {aligned} \end{equation}</div>
+<p><a id="x1-113002r14"></a>
+<!-- l. 1087 --></p><p class="noindent">This is not a substitute for accuracy. It is a guardrail that prevents the paper from
+presenting opaque alerts without the evidence needed for human review.
+</p>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 1089 --><p class="noindent"></p><figure class="float" id="x1-113003r12"><span id="acceptance-criteria-for-the-first-darkvesselnet-benchmark"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 12: </span><span class="content">Acceptance criteria for the first DarkVesselNet benchmark.                       </span></figcaption><!-- tex4ht:label?: x1-113003r12  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-13"><colgroup id="TBL-13-1g"><col id="TBL-13-1"><col id="TBL-13-2"></colgroup><tr id="TBL-13-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-13-1-1" style="white-space:normal; text-align:left;"><!-- l. 1094 --><p class="noindent"><span class="ptmb8t-">Criterion</span>                                  </p></td><td class="td10" id="TBL-13-1-2" style="white-space:normal; text-align:left;"> <!-- l. 1094 --><p class="noindent"><span class="ptmb8t-">Interpretation</span>                                                 </p></td>
+</tr><tr id="TBL-13-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-13-2-1" style="white-space:normal; text-align:left;"><!-- l. 1096 --><p class="noindent">SAR  detection  improves  or
+holds                                          </p></td><td class="td10" id="TBL-13-2-2" style="white-space:normal; text-align:left;"> <!-- l. 1096 --><p class="noindent">fusion does not damage the base detector       </p></td>
+</tr><tr id="TBL-13-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-13-3-1" style="white-space:normal; text-align:left;"><!-- l. 1097 --><p class="noindent">Alert precision improves           </p></td><td class="td10" id="TBL-13-3-2" style="white-space:normal; text-align:left;"> <!-- l. 1097 --><p class="noindent">context and AIS reduce false alerts                 </p></td>
+</tr><tr id="TBL-13-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-13-4-1" style="white-space:normal; text-align:left;"><!-- l. 1098 --><p class="noindent">Trace completeness is high        </p></td><td class="td10" id="TBL-13-4-2" style="white-space:normal; text-align:left;"> <!-- l. 1098 --><p class="noindent">alerts are reviewable                                        </p></td>
+</tr><tr id="TBL-13-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-13-5-1" style="white-space:normal; text-align:left;"><!-- l. 1099 --><p class="noindent">Availability       masks       are
+reported                                      </p></td><td class="td10" id="TBL-13-5-2" style="white-space:normal; text-align:left;"> <!-- l. 1099 --><p class="noindent">missing modalities are handled explicitly       </p></td>
+</tr><tr id="TBL-13-6-" style="vertical-align:baseline;"><td class="td01" id="TBL-13-6-1" style="white-space:normal; text-align:left;"><!-- l. 1100 --><p class="noindent">Near-shore split is disclosed      </p></td><td class="td10" id="TBL-13-6-2" style="white-space:normal; text-align:left;"> <!-- l. 1100 --><p class="noindent">clutter is not hidden in aggregate metrics        </p></td>
+
+</tr></table>                                                 </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+
+<!-- l. 1105 --><p class="noindent"><span class="paragraphHead" id="calibration-and-reviewbudget-analysis"> <a id="x1-114000"></a><span class="ptmb8t-">Calibration and review-budget analysis:</span></span>
+The first benchmark should also evaluate calibration under a fixed review budget. In operational
+monitoring, the user rarely wants every possible detection. They want the best alerts that
+can be reviewed within a shift, vessel class, region, or mission window. Let <span class="mathjax-inline">\(B\)</span> be a review
+budget and let <span class="mathjax-inline">\(\pi _B\)</span> be the top-<span class="mathjax-inline">\(B\)</span> alerts by score. A practical alert precision metric is </p><div class="mathjax-env mathjax-equation">\begin{equation} \mathrm {Prec}@B = \frac {1}{B} \sum _{i\in \pi _B} \mathbf {1}\{y_i=\mathrm {dark\ vessel}\}. \end{equation}</div>
+<p><a id="x1-114001r15"></a>
+<!-- l. 1114 --></p><p class="noindent">The paper should report this alongside detection mAP because the two answer different questions. mAP asks whether
+detections are ranked well across thresholds. <span class="mathjax-inline">\(\mathrm {Prec}@B\)</span> asks whether the first alerts shown to an analyst are worth attention.
+</p><!-- l. 1116 --><p class="noindent">Calibration should be measured after modality fusion, not only on the SAR detector.
+A compact expected calibration error for alert probabilities is </p><div class="mathjax-env mathjax-equation">\begin{equation} \mathrm {ECE} = \sum _{b=1}^{M} \frac {|S_b|}{N} \left | \operatorname {acc}(S_b)-\operatorname {conf}(S_b) \right |, \end{equation}</div>
+<p><a id="x1-114002r16"></a>
+<!-- l. 1125 --></p><p class="noindent">where <span class="mathjax-inline">\(S_b\)</span> is a confidence bin, <span class="mathjax-inline">\(\operatorname {acc}\)</span> is empirical accuracy, and <span class="mathjax-inline">\(\operatorname {conf}\)</span> is average predicted confidence. This matters because
+missing AIS, cloudy optical imagery, or near-shore clutter can make a visually convincing alert less reliable.
+</p>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 1127 --><p class="noindent"></p><figure class="float" id="x1-114003r13"><span id="reviewbudget-reporting-template-for-darkvesselnet"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 13: </span><span class="content">Review-budget reporting template for DarkVesselNet.                           </span></figcaption><!-- tex4ht:label?: x1-114003r13  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-14"><colgroup id="TBL-14-1g"><col id="TBL-14-1"><col id="TBL-14-2"><col id="TBL-14-3"><col id="TBL-14-4"></colgroup><tr id="TBL-14-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-14-1-1" style="white-space:normal; text-align:left;"><!-- l. 1132 --><p class="noindent"><span class="ptmb8t-">Budget</span>                      </p></td><td class="td11" id="TBL-14-1-2" style="white-space:normal; text-align:left;"> <!-- l. 1132 --><p class="noindent"><span class="ptmb8t-">Precision</span>                  </p></td><td class="td11" id="TBL-14-1-3" style="white-space:normal; text-align:left;"> <!-- l. 1132 --><p class="noindent"><span class="ptmb8t-">Dominant false alert</span>      </p></td><td class="td10" id="TBL-14-1-4" style="white-space:normal; text-align:left;"> <!-- l. 1132 --><p class="noindent"><span class="ptmb8t-">ECE</span>                    </p></td>
+</tr><tr id="TBL-14-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-14-2-1" style="white-space:normal; text-align:left;"><!-- l. 1134 --><p class="noindent">Top 25                        </p></td><td class="td11" id="TBL-14-2-2" style="white-space:normal; text-align:left;"> <!-- l. 1134 --><p class="noindent">0.76                           </p></td><td class="td11" id="TBL-14-2-3" style="white-space:normal; text-align:left;"> <!-- l. 1134 --><p class="noindent">near-shore clutter             </p></td><td class="td10" id="TBL-14-2-4" style="white-space:normal; text-align:left;"> <!-- l. 1134 --><p class="noindent">0.08                      </p></td>
+</tr><tr id="TBL-14-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-14-3-1" style="white-space:normal; text-align:left;"><!-- l. 1135 --><p class="noindent">Top 50                        </p></td><td class="td11" id="TBL-14-3-2" style="white-space:normal; text-align:left;"> <!-- l. 1135 --><p class="noindent">0.68                           </p></td><td class="td11" id="TBL-14-3-3" style="white-space:normal; text-align:left;"> <!-- l. 1135 --><p class="noindent">AIS timing mismatch      </p></td><td class="td10" id="TBL-14-3-4" style="white-space:normal; text-align:left;"> <!-- l. 1135 --><p class="noindent">0.10                      </p></td>
+</tr><tr id="TBL-14-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-14-4-1" style="white-space:normal; text-align:left;"><!-- l. 1136 --><p class="noindent">Top 100                      </p></td><td class="td11" id="TBL-14-4-2" style="white-space:normal; text-align:left;"> <!-- l. 1136 --><p class="noindent">0.59                           </p></td><td class="td11" id="TBL-14-4-3" style="white-space:normal; text-align:left;"> <!-- l. 1136 --><p class="noindent">small wakes and buoys    </p></td><td class="td10" id="TBL-14-4-4" style="white-space:normal; text-align:left;"> <!-- l. 1136 --><p class="noindent">0.13                      </p></td>
+</tr><tr id="TBL-14-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-14-5-1" style="white-space:normal; text-align:left;"><!-- l. 1137 --><p class="noindent">Top 250                      </p></td><td class="td11" id="TBL-14-5-2" style="white-space:normal; text-align:left;"> <!-- l. 1137 --><p class="noindent">0.44                           </p></td><td class="td11" id="TBL-14-5-3" style="white-space:normal; text-align:left;"> <!-- l. 1137 --><p class="noindent">coastal infrastructure       </p></td><td class="td10" id="TBL-14-5-4" style="white-space:normal; text-align:left;"> <!-- l. 1137 --><p class="noindent">0.18                      </p></td>
+
+</tr></table>                                                            </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+
+<!-- l. 1142 --><p class="noindent"><span class="paragraphHead" id="limitations"> <a id="x1-115000"></a><span class="ptmb8t-">Limitations:</span></span>
+The public demo is implemented and should not be described as live satellite ingest unless the deployment
+is connected to the required data services. The anomaly head is a compact surrogate for a full physics-informed
+diffusion model. Foundation backbones have different licenses, input bands, and pretraining
+assumptions; users must select compatible models for each modality. Finally, dark-vessel detection is
+operationally sensitive and should include human review before enforcement or compliance use.
+
+</p>
+<h2 class="sectionHead" id="conclusion-and-outlook"><span class="titlemark">6    </span>    <a id="x1-1160006"></a>Conclusion and Outlook</h2>
+<!-- l. 1148 --><p class="noindent">DarkVesselNet provides an arXiv-ready structure for a multi-modal dark-vessel detection project. The
+current code validates core operators and interfaces. The next step is to add measured xView3 and AIS
+experiments, ablations over sensor modalities and backbones, and a clear deployment protocol for live data.
+
+</p>
+<h2 class="likesectionHead" id="references"> <a id="x1-117000"></a>References</h2>
+<!-- l. 1 --><p class="noindent">
+    </p><section class="thebibliography" role="doc-bibliography"><dl><dt>
+ [1] </dt><dd><a id="Xbishop2006pattern"></a>Christopher M. Bishop. <span class="ptmri8t-">Pattern Recognition and Machine Learning</span>. Springer, 2006.
+    </dd><dt>
+ [2] </dt><dd><a id="Xboyd2004convex"></a>Stephen Boyd and Lieven Vandenberghe.  <span class="ptmri8t-">Convex Optimization</span>.  Cambridge University Press,
+    2004.
+    </dd><dt>
+ [3] </dt><dd><a id="Xbubeck2015convex"></a>Sébastien Bubeck. Convex optimization: Algorithms and complexity. <span class="ptmri8t-">Foundations and Trends
+    in Machine Learning</span>, 8(3–4):231–357, 2015.
+    </dd><dt>
+ [4] </dt><dd><a id="Xcarion2020detr"></a>Nicolas Carion et al. End-to-end object detection with transformers. In <span class="ptmri8t-">ECCV</span>, 2020.
+    </dd><dt>
+ [5] </dt><dd><a id="Xchen2018deeplab"></a>Liang-Chieh  Chen  et al.   Encoder-decoder  with  atrous  separable  convolution  for  semantic
+    image segmentation. In <span class="ptmri8t-">ECCV</span>, 2018.
+    </dd><dt>
+ [6] </dt><dd><a id="Xcheng2022mask2former"></a>Bowen Cheng et al. Masked-attention mask transformer for universal image segmentation. In
+    <span class="ptmri8t-">CVPR</span>, 2022.
+    </dd><dt>
+ [7] </dt><dd><a id="Xcong2022satmae"></a>Yezhen Cong, Samir Khanna, Chenlin Meng, Patrick Liu, Efstratios Rozi, Yutong He, Marshall
+    Burke, David Lobell, and Stefano Ermon.  Satmae: Pre-training transformers for temporal and
+    multi-spectral satellite imagery, 2022.
+    </dd><dt>
+ [8] </dt><dd><a id="Xcover2006elements"></a>Thomas M.  Cover  and  Joy A.  Thomas.   <span class="ptmri8t-">Elements  of  Information  Theory</span>.   Wiley,  second
+    edition, 2006.
+    </dd><dt>
+ [9] </dt><dd><a id="Xdosovitskiy2021vit"></a>Alexey Dosovitskiy et al. An image is worth 16x16 words: Transformers for image recognition
+    at scale. In <span class="ptmri8t-">ICLR</span>, 2021.
+    </dd><dt>
+[10] </dt><dd><a id="Xgoodfellow2016deep"></a>Ian Goodfellow, Yoshua Bengio, and Aaron Courville. <span class="ptmri8t-">Deep Learning</span>. MIT Press, 2016.
+    </dd><dt>
+[11] </dt><dd><a id="Xhastie2009elements"></a>Trevor Hastie, Robert Tibshirani, and Jerome Friedman. <span class="ptmri8t-">The Elements of Statistical Learning</span>.
+    Springer, second edition, 2009.
+    </dd><dt>
+[12] </dt><dd><a id="Xhe2016resnet"></a>Kaiming He, Xiangyu Zhang, Shaoqing Ren, and Jian Sun.  Deep residual learning for image
+    recognition. In <span class="ptmri8t-">CVPR</span>, 2016.
+                                                                            
+                                                                            
+    </dd><dt>
+[13] </dt><dd><a id="Xkingma2015adam"></a>Diederik P.  Kingma  and  Jimmy  Ba.    Adam:  A  method  for  stochastic  optimization.    In
+    <span class="ptmri8t-">International Conference on Learning Representations</span>, 2015.
+    </dd><dt>
+[14] </dt><dd><a id="Xkirillov2023segment"></a>Alexander Kirillov et al. Segment anything. In <span class="ptmri8t-">ICCV</span>, 2023.
+    </dd><dt>
+[15] </dt><dd><a id="Xkroodsma2018tracking"></a>David A. Kroodsma, Juan Mayorga, Timothy Hochberg, Nathan A. Miller, Kristina Boerder,
+    Francesco Ferretti, Alex Wilson, Bjorn Bergman, Timothy D. White, Barbara A. Block, et al.
+    Tracking the global footprint of fisheries. <span class="ptmri8t-">Science</span>, 359(6378):904–908, 2018.
+    </dd><dt>
+[16] </dt><dd><a id="Xlecun1998gradient"></a>Yann  LeCun,  Léon  Bottou,  Yoshua  Bengio,  and  Patrick  Haffner.   Gradient-based  learning
+    applied to document recognition. <span class="ptmri8t-">Proceedings of the IEEE</span>, 86(11):2278–2324, 1998.
+    </dd><dt>
+[17] </dt><dd><a id="Xli2017ssdd"></a>Jianwei Li et al. A sar image dataset for ship detection. <span class="ptmri8t-">Remote Sensing</span>, 2017.
+    </dd><dt>
+[18] </dt><dd><a id="Xlin2017focal"></a>Tsung-Yi Lin et al. Focal loss for dense object detection. In <span class="ptmri8t-">ICCV</span>, 2017.
+    </dd><dt>
+[19] </dt><dd><a id="Xliu2024remoteclip"></a>Fan Liu, Delong Chen, Zhan Guan, et al.  Remoteclip: A vision language foundation model
+    for remote sensing. In <span class="ptmri8t-">IEEE Transactions on Geoscience and Remote Sensing</span>, 2024.
+    </dd><dt>
+[20] </dt><dd><a id="Xliu2021swin"></a>Ze Liu et al.  Swin transformer: Hierarchical vision transformer using shifted windows.  In
+    <span class="ptmri8t-">ICCV</span>, 2021.
+    </dd><dt>
+[21] </dt><dd><a id="Xlong2015fcn"></a>Jonathan  Long,  Evan  Shelhamer,  and  Trevor  Darrell.     Fully  convolutional  networks  for
+    semantic segmentation. In <span class="ptmri8t-">CVPR</span>, 2015.
+    </dd><dt>
+[22] </dt><dd><a id="Xmurphy2012machine"></a>Kevin P. Murphy. <span class="ptmri8t-">Machine Learning: A Probabilistic Perspective</span>. MIT Press, 2012.
+    </dd><dt>
+[23] </dt><dd><a id="Xnguyen2020geotracknet"></a>Duc Nguyen, Ronan Vadaine, Guillaume Hajduch, Rene Garello, and Ronan Fablet. Detection
+    of abnormal vessel behaviours from ais data using geotracknet: From the laboratory to the
+    ocean, 2020.
+    </dd><dt>
+[24] </dt><dd><a id="Xnocedal2006numerical"></a>Jorge Nocedal and Stephen J. Wright.   <span class="ptmri8t-">Numerical Optimization</span>.   Springer, second edition,
+    2006.
+    </dd><dt>
+[25] </dt><dd><a id="Xpallotta2013vessel"></a>Giuliana Pallotta, Michele Vespe, and Karna Bryan. Vessel pattern knowledge discovery from
+    ais data: A framework for anomaly detection and route prediction. <span class="ptmri8t-">Entropy</span>, 2013.
+    </dd><dt>
+[26] </dt><dd><a id="Xpaolo2022xview3"></a>Fernando Paolo et al. xview3-sar: Detecting dark fishing activity using synthetic aperture radar
+    imagery.   In <span class="ptmri8t-">Advances in Neural Information Processing Systems Datasets and Benchmarks
+    Track</span>, 2022.
+    </dd><dt>
+[27] </dt><dd><a id="Xpearl2009causality"></a>Judea  Pearl.    <span class="ptmri8t-">Causality:  Models,  Reasoning,  and  Inference</span>.    Cambridge  University  Press,
+    second edition, 2009.
+    </dd><dt>
+[28] </dt><dd><a id="Xradford2021clip"></a>Alec Radford et al.  Learning transferable visual models from natural language supervision.
+    In <span class="ptmri8t-">ICML</span>, 2021.
+    </dd><dt>
+[29] </dt><dd><a id="Xravi2024sam2"></a>Nikhila Ravi et al. Sam 2: Segment anything in images and videos, 2024.
+    </dd><dt>
+[30] </dt><dd><a id="Xredmon2016yolo"></a>Joseph  Redmon,  Santosh  Divvala,  Ross  Girshick,  and  Ali  Farhadi.    You  only  look  once:
+    Unified, real-time object detection. In <span class="ptmri8t-">CVPR</span>, 2016.
+    </dd><dt>
+[31] </dt><dd><a id="Xren2015fasterrcnn"></a>Shaoqing Ren, Kaiming He, Ross Girshick, and Jian Sun.   Faster r-cnn: Towards real-time
+    object detection with region proposal networks. In <span class="ptmri8t-">NeurIPS</span>, 2015.
+    </dd><dt>
+[32] </dt><dd><a id="Xristic2008maritime"></a>Branko Ristic, Barbara La Scala, Mark Morelande, and Neil Gordon.  Statistical analysis of
+    motion patterns in ais data: Anomaly detection and motion prediction. In <span class="ptmri8t-">FUSION</span>, 2008.
+    </dd><dt>
+                                                                            
+                                                                            
+[33] </dt><dd><a id="Xrobbins1951stochastic"></a>Herbert  Robbins  and  Sutton  Monro.   A  stochastic  approximation  method.   <span class="ptmri8t-">The  Annals  of
+    Mathematical Statistics</span>, 22(3):400–407, 1951.
+    </dd><dt>
+[34] </dt><dd><a id="Xronneberger2015unet"></a>Olaf  Ronneberger,  Philipp  Fischer,  and  Thomas  Brox.   U-net:  Convolutional  networks  for
+    biomedical image segmentation. In <span class="ptmri8t-">MICCAI</span>, 2015.
+    </dd><dt>
+[35] </dt><dd><a id="Xrumelhart1986learning"></a>David E. Rumelhart, Geoffrey E. Hinton, and Ronald J. Williams.  Learning representations
+    by back-propagating errors. <span class="ptmri8t-">Nature</span>, 323:533–536, 1986.
+    </dd><dt>
+[36] </dt><dd><a id="Xshannon1948communication"></a>Claude E. Shannon. A mathematical theory of communication. <span class="ptmri8t-">Bell System Technical Journal</span>,
+    27(3):379–423, 1948.
+    </dd><dt>
+[37] </dt><dd><a id="Xsharma2022tist"></a>Arun Sharma and Shashi Shekhar. Analyzing trajectory gaps for possible rendezvous regions.
+    <span class="ptmri8t-">ACM Transactions on Intelligent Systems and Technology</span>, 2022.
+    </dd><dt>
+[38] </dt><dd><a id="Xtseng2023satlas"></a>Gabriel  Tseng  et al.      Satlaspretrain:  A  large-scale  dataset  for  remote  sensing  image
+    understanding, 2023.
+    </dd><dt>
+[39] </dt><dd><a id="Xturing1950computing"></a>A. M. Turing. Computing machinery and intelligence. <span class="ptmri8t-">Mind</span>, 59(236):433–460, 1950.
+    </dd><dt>
+[40] </dt><dd><a id="Xvapnik1998statistical"></a>Vladimir N. Vapnik. <span class="ptmri8t-">Statistical Learning Theory</span>. Wiley, 1998.
+    </dd><dt>
+[41] </dt><dd><a id="Xwang2019sarship"></a>Yuanyuan Wang et al.   Sar-ship-dataset: A dataset for sar ship detection.   <span class="ptmri8t-">Remote Sensing</span>,
+    2019.
+    </dd><dt>
+[42] </dt><dd><a id="Xwei2020hrsid"></a>Shunjun  Wei,  Xiangfeng  Zeng,  Qizhe  Qu,  Mou  Wang,  Hao  Su,  and  Jun  Shi.    Hrsid:  A
+    high-resolution  sar  images  dataset  for  ship  detection  and  instance  segmentation.   In  <span class="ptmri8t-">IEEE
+    Access</span>, 2020.
+    </dd><dt>
+[43] </dt><dd><a id="Xxiong2024dofa"></a>Zhitong  Xiong,  Yi Wang,  Fahong  Zhang,  et al.     Neural  plasticity-inspired  multimodal
+    foundation model for earth observation.   In <span class="ptmri8t-">IEEE/CVF Conference on Computer Vision and
+    Pattern Recognition</span>, 2024.
+    </dd><dt>
+[44] </dt><dd><a id="Xzhang2019ssdd"></a>Tianwen Zhang et al.  Ship detection in sar images based on faster r-cnn.  <span class="ptmri8t-">Remote Sensing</span>,
+    2019.
+    </dd><dt>
+[45] </dt><dd><a id="Xzhang2022sarshipreview"></a>Tianwen Zhang et al.  Deep learning for sar ship detection: Past, present and future.  <span class="ptmri8t-">Remote
+    Sensing</span>, 2022.
+    </dd><dt>
+[46] </dt><dd><a id="Xzhu2021deformabledetr"></a>Xizhou Zhu et al. Deformable detr: Deformable transformers for end-to-end object detection.
+    In <span class="ptmri8t-">ICLR</span>, 2021.
+    </dd></dl></section>
+ 
+
+  </article>
+
+  <section class="bibtex-block" id="bibtex">
+    <h2>BibTeX</h2>
+    <button class="copy-bib" type="button" data-target="bibtex-code">Copy</button>
+    <pre><code id="bibtex-code">@misc{sharma2026darkvesselstack,
+  title        = {DarkVesselNet: Multi-Modal Remote Sensing and Trajectory Reasoning for Dark Vessel Detection},
+  author       = {Arun Sharma},
+  year         = {2026},
+  note         = {Project page / preprint},
+  howpublished = {\url{https://arunshar.github.io/cv-portfolio/projects/darkvessel-stack/}}
+}</code></pre>
+  </section>
+
+  <footer class="paper-footer">
+    <p>Project page for "DarkVesselNet: Multi-Modal Remote Sensing and Trajectory Reasoning for Dark Vessel Detection", rendered from the LaTeX source. <a href="../../index.html">Back to homepage</a>.</p>
+  </footer>
+</div>
+<script src="../../assets/paper.js"></script>
+</body>
+</html>

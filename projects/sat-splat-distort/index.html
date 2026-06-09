@@ -1,0 +1,1442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sat-Splat-Distort: Distortion-Aware Gaussian Splatting for Satellite RPC, Pushbroom, Fisheye, and 360 Cameras - Arun Sharma</title>
+<meta name="description" content="Distortion-aware 3D Gaussian Splatting for satellite RPC, pushbroom, fisheye, and 360 cameras.">
+<link rel="stylesheet" href="paper.gen.css">
+<link rel="stylesheet" href="../../assets/paper.css">
+<script>window.MathJax = { tex: { tags: "ams" } };</script>
+<script async id="MathJax-script" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js"></script>
+</head>
+<body class="project-page">
+<div class="wrap">
+  <nav class="topnav"><a href="../../index.html">Arun Sharma</a> <span aria-hidden="true">/</span> <a href="../../index.html#projects">Selected Projects</a></nav>
+
+  <header class="paper-header">
+    <h1>Sat-Splat-Distort: Distortion-Aware Gaussian Splatting for Satellite RPC, Pushbroom, Fisheye, and 360 Cameras</h1>
+    <p class="authors">Arun Sharma</p>
+    <p class="affiliation">University of Minnesota, Twin Cities</p>
+    <p class="venue">In preparation. Target: CVPR EarthVision 2027</p>
+    <div class="buttons"><a class="btn" href="../../assets/papers/sat-splat-distort.pdf">Paper (PDF)</a>
+      <a class="btn" href="https://github.com/arunshar/sat-splat-distort" target="_blank" rel="noopener">Code</a>
+      <a class="btn" href="https://huggingface.co/spaces/Arun0808/sat-splat-distort" target="_blank" rel="noopener">Demo</a>
+      <a class="btn" href="paper.md">Markdown</a>
+      <a class="btn" href="#bibtex">BibTeX</a></div>
+  </header>
+
+  <figure class="teaser">
+    <img src="figures/main-8f0a5caabc354a354f7a8ea21ef70ff2.svg" alt="Sat-Splat-Distort: Distortion-Aware Gaussian Splatting for Satellite RPC, Pushbroom, Fisheye, and 360 Cameras overview" loading="lazy">
+  </figure>
+
+  <nav class="toc" aria-label="Contents">
+    <h2>Contents</h2>
+    <ol>
+      <li><a href="#introduction">Introduction</a></li>
+      <li><a href="#related-work">Related Work</a></li>
+      <li><a href="#method-and-architecture">Method and Architecture</a></li>
+      <li><a href="#evaluation">Evaluation</a></li>
+      <li><a href="#discussion-and-limitations">Discussion and Limitations</a></li>
+      <li><a href="#conclusion-and-outlook">Conclusion and Outlook</a></li>
+      <li><a href="#references">References</a></li>
+    </ol>
+  </nav>
+
+  <article class="paper-body">
+<section class="abstract" role="doc-abstract"> 
+
+<div class="centerline">                                  <span class="ptmb8t-x-x-120">Abstract</span>                                  </div>
+     <blockquote class="quote">
+     <!-- l. 254 --><p class="noindent">3D  Gaussian  Splatting  is  usually  derived  for  calibrated  perspective  cameras,  but
+     many geospatial and immersive sensors are not pinhole devices. Satellite products use
+     Rational Polynomial Coefficient (RPC) camera models, pushbroom sensors scan one
+     line at a time, fisheye cameras use angular projection, and 360 imagery maps directions
+     to  equirectangular  pixels.  Sat-Splat-Distort  replaces  the  single  perspective  Jacobian
+     used in standard splatting with a camera-dispatched analytic projection Jacobian and
+     a learned image-plane distortion prior. The paper presents a systems formulation with
+     analytic projection and Jacobian code for RPC, pushbroom, equidistant fisheye, and
+     equirectangular  cameras,  a  symmetric  positive  semi-definite  covariance  perturbation
+     grid,  and  tests  that  compare  analytic  Jacobians  to  automatic  differentiation.  The
+     evaluation   separates   analytic   derivative   correctness,   projection   stress   cases,   and
+     rendering behavior under sensor-specific camera families.
+</p>
+     </blockquote>
+</section>
+
+<h2 class="sectionHead" id="introduction"><span class="titlemark">1    </span>    <a id="x1-10001"></a>Introduction</h2>
+<!-- l. 259 --><p class="noindent">3D Gaussian Splatting (3DGS) represents a scene with anisotropic Gaussian primitives and
+renders efficiently by splatting their projected covariances into the image plane [<a href="#Xkerbl20233d">17</a>]. The standard
+derivation assumes a perspective camera. That assumption is reasonable for many handheld or
+indoor datasets but breaks down for the sensors common in remote sensing and wide-angle
+mapping. Satellite imagery is distributed with RPC metadata, line scanners behave like
+pushbroom cameras, fisheye lenses are angular, and panoramic images are spherical.
+</p><!-- l. 261 --><p class="noindent">Undistorting images before reconstruction is a partial fix. It moves complexity out of the
+renderer, but it also changes interpolation, loses fidelity near image boundaries, and obscures
+the sensor model. Sat-Splat-Distort takes the opposite route: keep the camera model explicit
+and pass the correct local projection Jacobian into the splatting covariance path.
+</p><!-- l. 263 --><p class="noindent">The paper formalizes this design as a sensor-aware rendering architecture and evaluates the
+mathematical operators that determine whether a non-pinhole Gaussian renderer is well posed.
+
+</p>
+<!-- l. 265 --><p class="noindent"><span class="paragraphHead" id="contributions"> <a id="x1-2000"></a><span class="ptmb8t-">Contributions:</span></span>
+     </p><dl class="enumerate-enumitem"><dt class="enumerate-enumitem">
+  1. </dt><dd class="enumerate-enumitem">A  unified  camera  interface  for  RPC,  pushbroom,  equidistant  fisheye,  and  equirectangular
+     projections.
+     </dd><dt class="enumerate-enumitem">
+  2. </dt><dd class="enumerate-enumitem">Closed-form analytic Jacobians for each camera model, validated against PyTorch automatic
+     differentiation in unit tests.
+     </dd><dt class="enumerate-enumitem">
+  3. </dt><dd class="enumerate-enumitem">A learned distortion-prior token grid that perturbs projected 2D covariance matrices while
+     preserving symmetry and positive semi-definiteness.
+     </dd><dt class="enumerate-enumitem">
+  4. </dt><dd class="enumerate-enumitem">A Hugging Face compatible pipeline surface for saving and loading distortion-aware Gaussian
+     scenes.</dd></dl>
+<figure class="figure"> 
+
+                                                                            
+                                                                            
+                                                                            
+                                                                            
+<!-- l. 279 --><p class="noindent" id="detailed-satsplatdistort-architecture-the-figure-follows-the-encoderdecoder-visual-grammar-of-modern-attention-papers-sensor-and-gaussian-states-are-tokenized-camerafamily-metadata-gates-multihead-attention-the-decoder-emits-an-analytic-projection-jacobian-and-psd-residual-and-the-evaluation-heads-separate-derivative-accuracy-reprojection-covariance-validity-and-rendering-quality"><img alt="Figure" src="figures/main-8f0a5caabc354a354f7a8ea21ef70ff2.svg" loading="lazy">
+<a id="x1-2005r1"></a>
+</p>
+<figcaption class="caption"><span class="id">Figure 1:  </span><span class="content">Detailed  Sat-Splat-Distort  architecture.  The  figure  follows  the  encoder-decoder  visual
+grammar  of  modern  attention  papers:  sensor  and  Gaussian  states  are  tokenized,  camera-family
+metadata  gates  multi-head  attention,  the  decoder  emits  an  analytic  projection  Jacobian  and  PSD
+residual, and the evaluation heads separate derivative accuracy, reprojection, covariance validity, and
+rendering quality.
+</span></figcaption><!-- tex4ht:label?: x1-2005r1  -->
+                                                                            
+                                                                            
+</figure>
+
+<!-- l. 342 --><p class="noindent"><span class="paragraphHead" id="scope"> <a id="x1-3000"></a><span class="ptmb8t-">Scope:</span></span>
+The larger motivation for Sat-Splat-Distort is that the camera model is part of the scene representation. In
+many computer-vision reconstruction papers, camera calibration is treated as a solved input. The
+renderer receives intrinsics and extrinsics, and the methodological novelty sits in the scene
+representation, optimization objective, or rasterization strategy. That separation is clean for datasets
+where the camera family is fixed. It is less clean in remote sensing and wide-angle mapping,
+where the projection itself can be the dominant source of geometric error. A satellite image
+distributed with RPC metadata, a pushbroom line scanner, and a spherical panorama are not small
+perturbations of a pinhole camera. They induce different local metrics on the image plane.
+</p><!-- l. 346 --><p class="noindent">The practical consequence is that a renderer trained under the wrong camera family can overfit photometric
+appearance while learning geometry that is hard to interpret. A Gaussian can become elongated because the
+scene needs it to be elongated, or because the renderer supplied the wrong image-plane covariance. A
+learned distortion grid can improve reconstruction quality, but without an analytic camera baseline it is
+impossible to know whether the grid is correcting residual calibration or compensating for a modeling
+mistake. This paper therefore treats sensor geometry as a first-class differentiable operator.
+</p><!-- l. 348 --><p class="noindent">Sat-Splat-Distort is also a useful bridge between photogrammetry and neural rendering. Photogrammetry
+has long treated sensor models, bundle adjustment, and georeferencing with mathematical care.
+Neural rendering has made rapid progress on photorealistic synthesis and differentiable scene
+optimization. The methods do not need to be in conflict. A Gaussian renderer can keep the speed and
+differentiability of modern 3DGS while adopting the more disciplined camera abstractions
+used in geospatial workflows. The core mathematical operation is the covariance pushforward <span class="mathjax-inline">\(J\Sigma J^\top \)</span>,
+which is familiar in uncertainty propagation, EWA rendering, and differential geometry.
+</p><!-- l. 350 --><p class="noindent">This framing sharpens the contribution. The project is not claiming that a small Python
+implementation is a complete satellite reconstruction system. It is claiming that the covariance path in
+Gaussian splatting should be parameterized by the actual projection function, that the derivative
+can be implemented and tested per camera family, and that residual learned distortion should
+be constrained so it remains a calibration aid rather than a hidden replacement for geometry.
+Those claims are technical, testable, and independent of leaderboard numbers.
+</p><!-- l. 352 --><p class="noindent">The paper also deliberately separates three evidence levels. The first is mathematical evidence: the camera
+equations and derivative structure. The second is repository evidence: analytic Jacobians and public interfaces
+that pass local tests. The third is benchmark evidence: rendering quality, geolocation error, and runtime on
+real scenes. Only the first two exist today. The third is the purpose of the proposed evaluation protocol.
+
+</p>
+<!-- l. 354 --><p class="noindent"><span class="paragraphHead" id="expanded-contributions"> <a id="x1-4000"></a><span class="ptmb8t-">Expanded  contributions:</span></span>
+Beyond the concise list above, the paper contributes a research plan for turning camera-aware
+Gaussian splatting into an archival result: a sensor-specific ablation grid, a geometric stress
+score for satellite scenes, residual-grid diagnostics, singularity reporting, dataset cards, and
+a claim checklist. These additions matter because they prevent the project from becoming a
+qualitative demo. They specify exactly what evidence would make the method convincing.
+
+</p>
+<h2 class="sectionHead" id="related-work"><span class="titlemark">2    </span>    <a id="x1-50002"></a>Related  Work</h2>
+
+<!-- l. 359 --><p class="noindent"><span class="paragraphHead" id="expanded-citation-map"> <a id="x1-6000"></a><span class="ptmb8t-">Expanded  Citation  Map:</span></span>
+The expanded bibliography separates neural rendering, camera modeling, and large-scene reconstruction.
+NeRF, mip-NeRF, mip-NeRF 360, Zip-NeRF, Instant-NGP, Plenoxels, TensoRF, DirectVoxGO, and
+KiloNeRF define the implicit and grid-based rendering background [<a href="#Xbarron2022mipnerf360">1</a>–<a href="#Xbarron2023zipnerf">3</a>, <a href="#Xchen2022tensorf">8</a>, <a href="#Xfridovichkeil2022plenoxels">10</a>, <a href="#Xmildenhall2020nerf">25</a>, <a href="#Xmuller2022instant">26</a>, <a href="#Xreiser2021kilonerf">30</a>, <a href="#Xsun2022directvoxgo">38</a>].
+Gaussian-splatting variants and large-scene NeRF systems motivate the speed, antialiasing, and scale
+questions [<a href="#Xkerbl20233d">17</a>, <a href="#Xtang2024vastgaussian">20</a>, <a href="#Xlin2024scaffoldgs">21</a>, <a href="#Xrematas2022urban">31</a>, <a href="#Xturki2022meganerf">42</a>, <a href="#Xxiangli2022bungeenerf">44</a>, <a href="#Xyu2024mipsplatting">45</a>]. The camera side is grounded in multi-view geometry, COLMAP,
+RPC photogrammetry, fisheye, omnidirectional, and panoramic models [<a href="#Xgeyer2000catadioptric">11</a>, <a href="#Xgrodecki2003block">13</a>, <a href="#Xhartley2004multiple">14</a>, <a href="#Xkannala2006fisheye">16</a>, <a href="#Xmei2007singleviewpoint">24</a>, <a href="#Xscaramuzza2006omnidirectional">34</a>–<a href="#Xschonberger2016mvs">36</a>, <a href="#Xtao2001rpc">39</a>].
+                                                                            
+                                                                            
+Sat-NeRF and EO-NeRF connect the sensor-model discipline to satellite neural rendering [<a href="#Xmar2022satnerf">22</a>, <a href="#Xmar2023eonerf">23</a>].
+
+</p>
+<!-- l. 363 --><p class="noindent"><span class="paragraphHead" id="gaussian-splatting-and-ewa-rendering"> <a id="x1-7000"></a><span class="ptmb8t-">Gaussian splatting and EWA rendering:</span></span>
+The 3DGS renderer builds on elliptical weighted average splatting and differentiable
+scene optimization [<a href="#Xkerbl20233d">17</a>, <a href="#Xzwicker2002ewa">46</a>]. Its practical speed makes it attractive for large scenes, but
+the local covariance transformation depends on the projection Jacobian.
+
+</p>
+<!-- l. 366 --><p class="noindent"><span class="paragraphHead" id="satellite-camera-geometry"> <a id="x1-8000"></a><span class="ptmb8t-">Satellite camera geometry:</span></span>
+RPC models are a standard abstraction for high-resolution satellite imagery, mapping normalized
+longitude, latitude, and height through cubic rational functions [<a href="#Xgrodecki2003block">13</a>, <a href="#Xtao2001rpc">39</a>]. Remote-sensing NeRF
+variants have already shown that respecting RPC metadata matters for satellite novel-view
+synthesis [<a href="#Xmar2022satnerf">22</a>, <a href="#Xmar2023eonerf">23</a>]. Sat-Splat-Distort ports this concern into Gaussian splatting.
+
+</p>
+<!-- l. 369 --><p class="noindent"><span class="paragraphHead" id="wideangle-and-panoramic-reconstruction"> <a id="x1-9000"></a><span class="ptmb8t-">Wide-angle and panoramic reconstruction:</span></span>
+Fisheye and panoramic imagery require non-linear projection models that differ from pinhole projection.
+NeRF and neural rendering work on unbounded or wide-field scenes already treats camera rays as first-class
+geometric objects [<a href="#Xbarron2022mipnerf360">1</a>, <a href="#Xmildenhall2020nerf">25</a>]. Recent Gaussian-splatting variants for wide-angle cameras motivate the same
+principle: the renderer should understand the actual camera rather than pretending all rays came from a pinhole.
+
+</p>
+<!-- l. 372 --><p class="noindent"><span class="paragraphHead" id="remotesensing-reconstruction"> <a id="x1-10000"></a><span class="ptmb8t-">Remote-sensing reconstruction:</span></span>
+Satellite novel-view synthesis and multi-date reconstruction introduce geometric effects that are
+rare in indoor benchmarks: very long focal lengths, weak stereo baselines, height ambiguity,
+relief displacement, shadows, atmospheric differences, and metadata-derived sensor models.
+Sat-NeRF and EO-NeRF show that neural scene representations can exploit RPC cameras and solar
+effects for satellite imagery [<a href="#Xmar2022satnerf">22</a>, <a href="#Xmar2023eonerf">23</a>]. This paper is narrower: it focuses on the mathematical
+compatibility between non-pinhole projection functions and the covariance path in Gaussian splatting.
+Classical camera calibration and bundle adjustment remain relevant because sensor-aware splatting
+inherits the same sensitivity to projection parameters and distortion residuals [<a href="#Xbrown1971close">6</a>, <a href="#Xtriggs2000bundle">40</a>].
+
+</p>
+<!-- l. 377 --><p class="noindent"><span class="paragraphHead" id="literature-synthesis"> <a id="x1-11000"></a><span class="ptmb8t-">Literature  synthesis:</span></span>
+Sat-Splat-Distort joins neural rendering with the older photogrammetric view that camera geometry is not a
+minor implementation detail. NeRF, mip-NeRF, mip-NeRF 360, Zip-NeRF, Instant-NGP, Plenoxels,
+TensoRF, DirectVoxGO, and KiloNeRF develop efficient neural representations and antialiasing
+ideas for novel-view synthesis [<a href="#Xbarron2022mipnerf360">1</a>–<a href="#Xbarron2023zipnerf">3</a>, <a href="#Xchen2022tensorf">8</a>, <a href="#Xfridovichkeil2022plenoxels">10</a>, <a href="#Xmildenhall2020nerf">25</a>, <a href="#Xmuller2022instant">26</a>, <a href="#Xreiser2021kilonerf">30</a>, <a href="#Xsun2022directvoxgo">38</a>]. 3D Gaussian Splatting changes
+the rendering primitive from an implicit field to anisotropic Gaussians, but the same question
+remains: how does a local 3D covariance become an image-plane footprint [<a href="#Xkerbl20233d">17</a>, <a href="#Xzwicker2002ewa">46</a>]?
+</p><!-- l. 380 --><p class="noindent">The camera-model literature answers that question through projection functions and their derivatives.
+Multi-view geometry, bundle adjustment, COLMAP, fisheye calibration, omnidirectional camera models,
+equirectangular projections, and Brown distortion all treat camera parameters as part of the measurement
+process [<a href="#Xbrown1971close">6</a>, <a href="#Xgeyer2000catadioptric">11</a>, <a href="#Xhartley2004multiple">14</a>, <a href="#Xkannala2006fisheye">16</a>, <a href="#Xmei2007singleviewpoint">24</a>, <a href="#Xscaramuzza2006omnidirectional">34</a>–<a href="#Xschonberger2016mvs">36</a>, <a href="#Xtriggs2000bundle">40</a>]. Satellite photogrammetry adds RPC and pushbroom models, where
+the projection cannot be reduced cleanly to a pinhole approximation [<a href="#Xgrodecki2003block">13</a>, <a href="#Xtao2001rpc">39</a>]. Sat-NeRF and EO-NeRF
+demonstrate that neural rendering benefits from respecting those metadata-driven camera models [<a href="#Xmar2022satnerf">22</a>, <a href="#Xmar2023eonerf">23</a>].
+</p><!-- l. 382 --><p class="noindent">Recent large-scene and Gaussian-splatting variants show why this matters in practice. Mega-NeRF, Urban
+Radiance Fields, BungeeNeRF, VastGaussian, Scaffold-GS, and Mip-Splatting address scale,
+antialiasing, memory, and scene decomposition [<a href="#Xtang2024vastgaussian">20</a>, <a href="#Xlin2024scaffoldgs">21</a>, <a href="#Xrematas2022urban">31</a>, <a href="#Xturki2022meganerf">42</a>, <a href="#Xxiangli2022bungeenerf">44</a>, <a href="#Xyu2024mipsplatting">45</a>]. Sat-Splat-Distort is
+complementary: it does not primarily propose a new scene decomposition, but a camera-dispatched
+covariance path. This makes the renderer compatible with satellite, fisheye, pushbroom, and
+panoramic imagery without hiding projection error inside a learned residual field.
+                                                                            
+                                                                            
+
+</p>
+<!-- l. 384 --><p class="noindent"><span class="paragraphHead" id="foundational-reference-anchors"> <a id="x1-12000"></a><span class="ptmb8t-">Foundational reference anchors:</span></span>
+The bibliography also anchors the project-specific contribution in older and broader technical
+foundations: statistical learning and pattern recognition, deep learning, information theory,
+convex and numerical optimization, stochastic approximation, adaptive gradient methods,
+causality, and early AI framing [<a href="#Xbishop2006pattern">4</a>, <a href="#Xboyd2004convex">5</a>, <a href="#Xbubeck2015convex">7</a>, <a href="#Xcover2006elements">9</a>, <a href="#Xgoodfellow2016deep">12</a>, <a href="#Xhastie2009elements">15</a>, <a href="#Xkingma2015adam">18</a>, <a href="#Xlecun1998gradient">19</a>, <a href="#Xmurphy2012machine">27</a>–<a href="#Xpearl2009causality">29</a>, <a href="#Xrobbins1951stochastic">32</a>, <a href="#Xrumelhart1986learning">33</a>, <a href="#Xshannon1948communication">37</a>, <a href="#Xturing1950computing">41</a>, <a href="#Xvapnik1998statistical">43</a>].
+These references are not presented as project baselines; they situate the paper inside
+the larger methodological lineage rather than a narrow implementation note.
+
+</p>
+<h2 class="sectionHead" id="method-and-architecture"><span class="titlemark">3    </span>    <a id="x1-130003"></a>Method and Architecture</h2>
+<!-- l. 389 --><p class="noindent">Let a Gaussian have mean <span class="mathjax-inline">\(\mu \in \mathbb {R}^3\)</span> and covariance <span class="mathjax-inline">\(\Sigma _3\)</span>. For a camera projection <span class="mathjax-inline">\(\pi :\mathbb {R}^3\rightarrow \mathbb {R}^2\)</span>, the local first-order screen-space covariance is </p><div class="mathjax-env mathjax-equation">\begin{equation} \Sigma _2 = J_{\pi }(\mu )\Sigma _3J_{\pi }(\mu )^{\top }, \end{equation}</div>
+<p><a id="x1-13001r1"></a>
+<!-- l. 393 --></p><p class="noindent">where <span class="mathjax-inline">\(J_{\pi } = \partial \pi / \partial X\)</span>. Standard 3DGS uses the pinhole Jacobian. Sat-Splat-Distort supplies <span class="mathjax-inline">\(J_{\pi }\)</span> from the selected sensor model.
+
+</p>
+<!-- l. 395 --><p class="noindent"><span class="paragraphHead" id="rpc-camera"> <a id="x1-14000"></a><span class="ptmb8t-">RPC  camera:</span></span>
+RPC projection evaluates cubic polynomials over normalized geodetic coordinates.
+Let <span class="mathjax-inline">\(X=(\lambda ,\phi ,h)\)</span> and normalized variables be <span class="mathjax-inline">\((L,P,H)\)</span>. A 20-term polynomial basis <span class="mathjax-inline">\(m(L,P,H)\)</span> gives </p><div class="mathjax-env mathjax-equation">\begin{equation} u = s_u\frac {m^\top a_u}{m^\top b_u}+o_u,\quad v = s_v\frac {m^\top a_v}{m^\top b_v}+o_v. \end{equation}</div>
+<p><a id="x1-14001r2"></a>
+<!-- l. 402 --></p><p class="noindent">The Jacobian follows by the quotient rule. The implementation explicitly encodes the 20 RPC
+monomials and their derivatives with respect to <span class="mathjax-inline">\((L,P,H)\)</span>, then chains through the normalization scales.
+
+</p>
+<!-- l. 404 --><p class="noindent"><span class="paragraphHead" id="pushbroom-camera"> <a id="x1-15000"></a><span class="ptmb8t-">Pushbroom  camera:</span></span>
+For a linearized pushbroom camera, </p><div class="mathjax-env mathjax-equation">\begin{equation} u = f_u \frac {X^\top a}{X^\top c},\quad v = f_v X^\top b. \end{equation}</div>
+<p><a id="x1-15001r3"></a>
+<!-- l. 410 --></p><p class="noindent">The  Jacobian  is  </p><div class="mathjax-env mathjax-equation">\begin{equation} \frac {\partial u}{\partial X} = f_u\left (\frac {a}{X^\top c} - \frac {(X^\top a)c}{(X^\top c)^2}\right ), \quad \frac {\partial v}{\partial X}=f_v b. \end{equation}</div>
+<p><a id="x1-15002r4"></a>
+<!-- l. 417 --></p><p class="noindent">This model captures the non-projective scan-line direction that a pinhole approximation misses.
+
+</p>
+<!-- l. 419 --><p class="noindent"><span class="paragraphHead" id="equidistant-fisheye-and-equirectangular-cameras"> <a id="x1-16000"></a><span class="ptmb8t-">Equidistant fisheye and equirectangular cameras:</span></span>
+For equidistant fisheye, image radius is proportional to the angle from the optical axis: <span class="mathjax-inline">\(r=f\theta \)</span>. The implementation
+differentiates the angular scale <span class="mathjax-inline">\(\theta /\rho \)</span> directly. For equirectangular panoramas, longitude and latitude are </p><div class="mathjax-env mathjax-equation">\begin{equation} \varphi = \text {atan2}(x,z),\quad \theta =\arcsin (y/\|X\|), \end{equation}</div>
+<p><a id="x1-16001r5"></a>
+<!-- l. 425 --></p><p class="noindent">and the pixel coordinates are affine functions of <span class="mathjax-inline">\((\varphi ,\theta )\)</span>. Both Jacobians are implemented
+in closed form and tested away from singularities.
+
+</p>
+<!-- l. 427 --><p class="noindent"><span class="paragraphHead" id="distortionprior-grid"> <a id="x1-17000"></a><span class="ptmb8t-">Distortion-prior  grid:</span></span>
+Analytic camera models do not capture every calibration residual. Sat-Splat-Distort learns a low-amplitude
+image-plane token grid. For projected pixel <span class="mathjax-inline">\(p=(u,v)\)</span>, the model bilinearly samples a token <span class="mathjax-inline">\(z(p)\)</span> and predicts parameters <span class="mathjax-inline">\((a,b,c)\)</span>: </p><div class="mathjax-env mathjax-equation">\begin{equation} \Delta \Sigma (p)= \begin {bmatrix} \text {softplus}(a) &amp; b\\ b &amp; \text {softplus}(c) \end {bmatrix}\cdot 10^{-3}. \end{equation}</div>
+<p><a id="x1-17001r6"></a>
+<!-- l. 437 --></p><p class="noindent">The final covariance is <span class="mathjax-inline">\(\Sigma _2+\Delta \Sigma \)</span>. The perturbation is initialized near zero so that early
+optimization is dominated by the analytic sensor model.
+
+                                                                            
+                                                                            
+</p>
+<!-- l. 439 --><p class="noindent"><span class="paragraphHead" id="implementation"> <a id="x1-18000"></a><span class="ptmb8t-">Implementation:</span></span>
+The repository contains a camera package, model package, and public Space: </p>
+     <ul class="itemize1">
+     <li class="itemize"><span class="pcrr8t-">sat_splat.cameras</span>: forward projection and analytic Jacobians.
+     </li>
+     <li class="itemize"><span class="pcrr8t-">sat_splat.models.DistortionPriorGrid</span>: token grid and PSD perturbation head.
+     </li>
+     <li class="itemize"><span class="pcrr8t-">sat_splat.models.SatSplatPipeline</span>:  scene  state,  camera  dispatch,  save/load
+     hooks.
+     </li>
+     <li class="itemize"><span class="pcrr8t-">space/app.py</span>:  CPU-safe  public  demo  returning  preview  artifacts  without  building  the
+     CUDA rasterizer.</li></ul>
+<!-- l. 449 --><p class="noindent">The CUDA rasterizer is intentionally loaded lazily. This keeps imports, documentation, and CPU tests functional
+on machines without a compiled extension, while allowing the full renderer to be installed for training.
+
+</p>
+<h2 class="sectionHead" id="evaluation"><span class="titlemark">4    </span>    <a id="x1-190004"></a>Evaluation</h2>
+<!-- l. 453 --><p class="noindent">Table <a href="#current-validation-in-satsplatdistort">1<!-- tex4ht:ref: tab:validation  --></a> lists what is currently grounded in tests.
+</p>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 455 --><p class="noindent"></p><figure class="float" id="x1-19001r1"><span id="current-validation-in-satsplatdistort"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 1: </span><span class="content">Current validation in Sat-Splat-Distort.                                       </span></figcaption><!-- tex4ht:label?: x1-19001r1  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-2"><colgroup id="TBL-2-1g"><col id="TBL-2-1"><col id="TBL-2-2"><col id="TBL-2-3"></colgroup><tr id="TBL-2-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-2-1-1" style="white-space:normal; text-align:left;"><!-- l. 461 --><p class="noindent"><span class="ptmb8t-">Area</span>                                  </p></td><td class="td11" id="TBL-2-1-2" style="white-space:normal; text-align:left;"> <!-- l. 461 --><p class="noindent"><span class="ptmb8t-">What is checked</span>                                                                       </p></td><td class="td10" id="TBL-2-1-3" style="white-space:normal; text-align:right;"> <span class="ptmb8t-">Count</span></td>
+</tr><tr id="TBL-2-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-2-2-1" style="white-space:normal; text-align:left;"><!-- l. 463 --><p class="noindent">Camera Jacobians              </p></td><td class="td11" id="TBL-2-2-2" style="white-space:normal; text-align:left;"> <!-- l. 463 --><p class="noindent">RPC,    cubic    RPC,    pushbroom,    equidistant    fisheye,
+  equirectangular against autograd                                               </p></td><td class="td10" id="TBL-2-2-3" style="white-space:normal; text-align:right;">     7</td>
+</tr><tr id="TBL-2-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-2-3-1" style="white-space:normal; text-align:left;"><!-- l. 464 --><p class="noindent">Distortion grid                   </p></td><td class="td11" id="TBL-2-3-2" style="white-space:normal; text-align:left;"> <!-- l. 464 --><p class="noindent">symmetric    PSD    covariance    perturbations    and    scalar
+  regularization                                                                             </p></td><td class="td10" id="TBL-2-3-3" style="white-space:normal; text-align:right;">     2</td>
+</tr><tr id="TBL-2-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-2-4-1" style="white-space:normal; text-align:left;"><!-- l. 465 --><p class="noindent">Space contract                    </p></td><td class="td11" id="TBL-2-4-2" style="white-space:normal; text-align:left;"> <!-- l. 465 --><p class="noindent">imports, UI construction, AOI constants, callback artifacts,
+  requirements, HF frontmatter                                                    </p></td><td class="td10" id="TBL-2-4-3" style="white-space:normal; text-align:right;">     6</td>
+
+</tr></table>                                                           </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+<!-- l. 470 --><p class="noindent">The missing benchmark layer should evaluate held-out-view rendering on DFC2019 Track 3,
+a pushbroom satellite split, fisheye driving data, and 360 indoor panoramas. Metrics should
+include PSNR, SSIM, LPIPS, reprojection residual, and covariance-stability diagnostics.
+
+</p>
+<!-- l. 472 --><p class="noindent"><span class="paragraphHead" id="theory-projection-as-a-local-pushforward"> <a id="x1-20000"></a><span class="ptmb8t-">Theory: Projection as a Local Pushforward:</span></span>
+The core theoretical object in this project is not the Gaussian primitive itself but the pushforward of a 3D
+covariance through a sensor-specific projection. If a random 3D point <span class="mathjax-inline">\(X\)</span> is distributed as <span class="mathjax-inline">\(\mathcal {N}(\mu ,\Sigma _3)\)</span> and a
+differentiable camera maps <span class="mathjax-inline">\(X\)</span> to image coordinate <span class="mathjax-inline">\(Y=\pi (X)\)</span>, then the first-order approximation around <span class="mathjax-inline">\(\mu \)</span> is </p><div class="mathjax-env mathjax-equation">\begin{equation} Y \approx \pi (\mu ) + J_{\pi }(\mu )(X-\mu ). \end{equation}</div>
+<p><a id="x1-20001r7"></a>
+<!-- l. 478 --></p><p class="noindent">The induced image-plane covariance is therefore </p><div class="mathjax-env mathjax-equation">\begin{equation} \operatorname {Cov}[Y] \approx J_{\pi }(\mu )\Sigma _3J_{\pi }(\mu )^{\top }. \end{equation}</div>
+<p><a id="x1-20002r8"></a>
+<!-- l. 482 --></p><p class="noindent">This is exactly the expression used by classical EWA splatting and inherited by 3DGS for
+perspective cameras [<a href="#Xkerbl20233d">17</a>, <a href="#Xzwicker2002ewa">46</a>]. The difference in Sat-Splat-Distort is that <span class="mathjax-inline">\(J_{\pi }\)</span> is not assumed to
+be the Jacobian of a pinhole projection. It is dispatched by the camera model.
+</p><!-- l. 484 --><p class="noindent">This matters because the covariance controls both antialiasing and optimization. If the projected covariance
+is too small, splats become unstable and view-dependent holes appear. If it is too large or misoriented,
+texture detail is blurred, gradients point in the wrong direction, and density control may split or prune
+Gaussians for the wrong reason. A satellite RPC model can have spatially varying sensitivity
+to height and off-nadir angle; a pushbroom scanner can have different behavior along-track
+and cross-track; a fisheye camera changes scale rapidly near the edge of the field of view; an
+equirectangular camera has unavoidable singularities near the poles. These are not cosmetic
+lens corrections. They alter the local metric that the renderer uses to rasterize geometry.
+
+</p>
+<!-- l. 486 --><p class="noindent"><span class="paragraphHead" id="projection-families-and-differentiability"> <a id="x1-21000"></a><span class="ptmb8t-">Projection families and differentiability:</span></span>
+Let <span class="mathjax-inline">\(\mathcal {C}\)</span> be a camera family with parameters <span class="mathjax-inline">\(\theta _c\)</span> and projection <span class="mathjax-inline">\(\pi _{\theta _c}:\Omega \subset \mathbb {R}^3\rightarrow \mathbb {R}^2\)</span>. Sat-Splat-Distort requires three interface properties:
+     </p><dl class="enumerate-enumitem"><dt class="enumerate-enumitem">
+  1. </dt><dd class="enumerate-enumitem"><span class="ptmb8t-">Forward projection</span>: <span class="mathjax-inline">\(\pi _{\theta _c}(\mu )\)</span> must be computable for a batch of Gaussian centers.
+     </dd><dt class="enumerate-enumitem">
+  2. </dt><dd class="enumerate-enumitem"><span class="ptmb8t-">Local derivative</span>: <span class="mathjax-inline">\(J_{\pi }(\mu )\)</span> must be available either analytically or through automatic differentiation.
+     </dd><dt class="enumerate-enumitem">
+  3. </dt><dd class="enumerate-enumitem"><span class="ptmb8t-">Validity mask</span>: singular or out-of-domain projections must be marked before rasterization.</dd></dl>
+<!-- l. 494 --><p class="noindent">The repository implements the first two properties for RPC, pushbroom, equidistant fisheye, and
+equirectangular cameras. The third is currently handled by tests and simple numerical guards; a
+production renderer should propagate masks to the tile binning and density-control layers.
+</p><!-- l. 496 --><p class="noindent">The analytic derivative route is preferable for this problem. Automatic differentiation is useful for
+validation, but a renderer may evaluate millions of projected Gaussians per iteration. A closed-form
+Jacobian avoids tracing the full projection graph and makes it easier to reason about singularities. The unit
+tests compare analytic derivatives to PyTorch automatic differentiation on randomized synthetic parameters,
+which is a local correctness check rather than an end-to-end remote-sensing guarantee.
+
+</p>
+<!-- l. 498 --><p class="noindent"><span class="paragraphHead" id="rpc-derivative-structure"> <a id="x1-22000"></a><span class="ptmb8t-">RPC derivative structure:</span></span>
+RPC cameras describe image coordinates as ratios of cubic polynomials over normalized geographic coordinates. Define </p><div class="mathjax-env mathjax-equation">\begin{equation} \begin {aligned} q(L,P,H)=[&amp;1,L,P,H,LP,LH,PH,L^2,P^2,H^2,\\ &amp;LPH,L^3,LP^2,LH^2,L^2P,P^3,\\ &amp;PH^2,L^2H,P^2H,H^3]^\top . \end {aligned} \end{equation}</div>
+<p><a id="x1-22001r9"></a>
+<!-- l. 508 --></p><p class="noindent">For one image coordinate, the normalized projection is </p><div class="mathjax-env mathjax-equation">\begin{equation} r(X) = \frac {a^\top q(X)}{b^\top q(X)}. \end{equation}</div>
+<p><a id="x1-22002r10"></a>
+<!-- l. 512 --></p><p class="noindent">By  the  quotient  rule,  </p><div class="mathjax-env mathjax-equation">\begin{equation} \nabla r(X)=\frac {(b^\top q(X))\nabla (a^\top q(X))-(a^\top q(X))\nabla (b^\top q(X))}{(b^\top q(X))^2}. \end{equation}</div>
+<p><a id="x1-22003r11"></a>
+<!-- l. 516 --></p><p class="noindent">The image coordinate derivative then chains through the normalization scales for longitude, latitude, height,
+row, and column. The important observation is that the RPC Jacobian is spatially varying even if the underlying
+3D Gaussian covariance is fixed. In a Gaussian-splatting renderer, the same primitive projected through different
+                                                                            
+                                                                            
+satellite products may produce different screen-space ellipses because the local sensor geometry is different.
+
+</p>
+<!-- l. 518 --><p class="noindent"><span class="paragraphHead" id="pushbroom-derivative-structure"> <a id="x1-23000"></a><span class="ptmb8t-">Pushbroom derivative structure:</span></span>
+Pushbroom sensors acquire one line at a time while platform motion changes the view.
+A full physical model can include orbit state, attitude, time, and terrain. The implementation
+uses a compact linearized model suitable for testing the renderer interface: </p><div class="mathjax-env mathjax-equation">\begin{equation} u = f_u\frac {a^\top X}{c^\top X}, \qquad v = f_v b^\top X. \end{equation}</div>
+<p><a id="x1-23001r12"></a>
+<!-- l. 524 --></p><p class="noindent">The <span class="mathjax-inline">\(u\)</span> derivative has the same quotient structure as perspective projection, while <span class="mathjax-inline">\(v\)</span> is linear. The
+asymmetry is the point: the model represents a scanner whose sampling direction and along-track
+coordinate are not both produced by a single central projection. In the renderer this produces
+anisotropic changes in the projected covariance that a pinhole approximation cannot express.
+
+</p>
+<!-- l. 526 --><p class="noindent"><span class="paragraphHead" id="fisheye-and-panorama-derivatives"> <a id="x1-24000"></a><span class="ptmb8t-">Fisheye and panorama derivatives:</span></span>
+For an equidistant fisheye, let <span class="mathjax-inline">\(\rho =\sqrt {x^2+y^2}\)</span>, <span class="mathjax-inline">\(\theta =\arctan 2(\rho ,z)\)</span>, and <span class="mathjax-inline">\(s=f\theta /(\rho +\epsilon )\)</span>. Pixel coordinates are <span class="mathjax-inline">\((u,v)=(s x, s y)\)</span> plus principal point. The derivative combines
+the derivative of <span class="mathjax-inline">\(s\)</span> with the direct derivative of <span class="mathjax-inline">\((x,y)\)</span>. Near <span class="mathjax-inline">\(\rho =0\)</span>, the limiting behavior should recover the local
+pinhole scale. Near the image edge, angular changes produce large changes in local scale.
+</p><!-- l. 530 --><p class="noindent">For equirectangular projection, </p><div class="mathjax-env mathjax-equation">\begin{equation} \lambda =\operatorname {atan2}(x,z), \qquad \varphi =\arcsin (y/\|X\|), \end{equation}</div>
+<p><a id="x1-24001r13"></a>
+<!-- l. 534 --></p><p class="noindent">and pixel coordinates are affine maps of longitude and latitude. The derivative is smooth
+away from the poles and branch cut. Because these singularities are intrinsic to the
+parameterization, not bugs in the implementation, the renderer should either split Gaussians near
+singular zones or use an alternate spherical parameterization for those regions.
+
+</p>
+<!-- l. 536 --><p class="noindent"><span class="paragraphHead" id="error-model-and-regularization"> <a id="x1-25000"></a><span class="ptmb8t-">Error Model and Regularization:</span></span>
+The first-order pushforward approximation is exact only for affine projections. For
+nonlinear cameras, the second-order term controls the local error: </p><div class="mathjax-env mathjax-equation">\begin{equation} \pi (X) = \pi (\mu ) + J_{\pi }(\mu )\delta + \frac {1}{2} \begin {bmatrix} \delta ^\top H_{\pi _1}(\xi )\delta \\ \delta ^\top H_{\pi _2}(\xi )\delta \end {bmatrix}, \quad \delta =X-\mu . \end{equation}</div>
+<p><a id="x1-25001r14"></a>
+<!-- l. 547 --></p><p class="noindent">Large Gaussians, high curvature in the projection, and proximity to singularities increase the mismatch
+between the projected ellipse and the true image footprint. This motivates three practical diagnostics:
+     </p><dl class="enumerate-enumitem"><dt class="enumerate-enumitem">
+  1. </dt><dd class="enumerate-enumitem">monitor the spectral norm <span class="mathjax-inline">\(\|J_{\pi }\|_2\)</span> and condition number of <span class="mathjax-inline">\(\Sigma _2\)</span>,
+     </dd><dt class="enumerate-enumitem">
+  2. </dt><dd class="enumerate-enumitem">split or shrink Gaussians when projected footprint error becomes too large,
+     </dd><dt class="enumerate-enumitem">
+  3. </dt><dd class="enumerate-enumitem">regularize the learned residual covariance so it cannot silently hide camera-model mistakes.</dd></dl>
+<!-- l. 554 --><p class="noindent">The distortion-prior grid should be interpreted as a calibration residual model, not as an
+unconstrained renderer cheat. The current implementation predicts a positive semi-definite
+perturbation of small scale. A more complete training objective should include </p><div class="mathjax-env mathjax-equation">\begin{equation} \mathcal {L}_{\text {distort}} = \mathcal {L}_{\text {render}} + \lambda _{\Delta }\|\Delta \Sigma \|_F^2 + \lambda _{\nabla }\sum _{p}\|\nabla \Delta \Sigma (p)\|_F^2, \end{equation}</div>
+<p><a id="x1-25005r15"></a>
+<!-- l. 561 --></p><p class="noindent">where the smoothness penalty discourages high-frequency covariance corrections
+that would absorb reconstruction errors unrelated to camera geometry.
+
+</p>
+<!-- l. 563 --><p class="noindent"><span class="paragraphHead" id="optimization-objective"> <a id="x1-26000"></a><span class="ptmb8t-">Optimization  Objective:</span></span>
+The full training objective for a distortion-aware Gaussian scene can be written as </p><div class="mathjax-env mathjax-equation">\begin{equation} \begin {aligned} \min _{\{\mu _i,\Sigma _i,\alpha _i,c_i\},\psi }\quad &amp;\sum _{v\in \mathcal {V}}\mathcal {L}_{\text {photo}}\left (R_{\pi _v,\psi }(\mathcal {G}), I_v\right )\\ &amp;+\lambda _{\text {dens}}\mathcal {R}_{\text {density}} +\lambda _{\text {dist}}\mathcal {R}_{\text {distortion}} . \end {aligned} \end{equation}</div>
+<p><a id="x1-26001r16"></a>
+<!-- l. 574 --></p><p class="noindent">where <span class="mathjax-inline">\(R_{\pi _v,\psi }\)</span> is the rasterizer using camera <span class="mathjax-inline">\(\pi _v\)</span> and distortion-grid parameters <span class="mathjax-inline">\(\psi \)</span>. The repository does not
+yet ship a full CUDA training loop for all camera models, but the equation clarifies the
+intended role of the implemented operators. Camera-specific derivatives belong inside <span class="mathjax-inline">\(R_{\pi _v,\psi }\)</span>;
+density regularization and photometric losses remain conventional 3DGS machinery.
+</p><!-- l. 576 --><p class="noindent">The practical training sequence should be staged:
+                                                                            
+                                                                            
+     </p><dl class="enumerate-enumitem"><dt class="enumerate-enumitem">
+  1. </dt><dd class="enumerate-enumitem">initialize scene points from sparse stereo or a coarse height model;
+     </dd><dt class="enumerate-enumitem">
+  2. </dt><dd class="enumerate-enumitem">train with analytic camera Jacobians and the residual grid disabled;
+     </dd><dt class="enumerate-enumitem">
+  3. </dt><dd class="enumerate-enumitem">enable a low-amplitude residual grid with strong regularization;
+     </dd><dt class="enumerate-enumitem">
+  4. </dt><dd class="enumerate-enumitem">run held-out camera validation and reject settings that improve train PSNR while increasing
+     geometric residuals;
+     </dd><dt class="enumerate-enumitem">
+  5. </dt><dd class="enumerate-enumitem">compare  against  pre-undistortion  baselines  to  determine  whether  native  camera  rendering
+     actually helps.</dd></dl>
+
+<!-- l. 585 --><p class="noindent"><span class="paragraphHead" id="evaluation-protocol"> <a id="x1-27000"></a><span class="ptmb8t-">Evaluation  Protocol:</span></span>
+</p>
+<figure class="figure"> 
+
+                                                                            
+                                                                            
+                                                                            
+                                                                            
+<!-- l. 589 --><p class="noindent" id="evaluation-structure-for-satsplatdistort-separate-sensor-splits-baseline-camera-families-derivativeresidual-ablations-and-claim-boundaries"> <img alt="Figure" src="figures/main-4e5488fa499e2297c40796e6f9c7ded8.svg" loading="lazy">
+<a id="x1-27001r2"></a>
+</p>
+<figcaption class="caption"><span class="id">Figure 2: </span><span class="content">Evaluation structure for Sat-Splat-Distort: separate sensor splits, baseline camera families,
+derivative/residual ablations, and claim boundaries.                                     </span></figcaption><!-- tex4ht:label?: x1-27001r2  -->
+                                                                            
+                                                                            
+</figure>
+<!-- l. 605 --><p class="noindent">A useful benchmark paper should separate mathematical correctness, rendering quality, and geospatial
+fidelity. Table <a href="#suggested-evaluation-protocol-for-the-expanded-satsplatdistort-paper">2<!-- tex4ht:ref: tab:protocol  --></a> gives the protocol I would use before submitting this as a full arXiv or EarthVision paper.
+</p>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 607 --><p class="noindent"></p><figure class="float" id="x1-27002r2"><span id="suggested-evaluation-protocol-for-the-expanded-satsplatdistort-paper"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 2: </span><span class="content">Suggested evaluation protocol for the expanded Sat-Splat-Distort paper.              </span></figcaption><!-- tex4ht:label?: x1-27002r2  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-3"><colgroup id="TBL-3-1g"><col id="TBL-3-1"><col id="TBL-3-2"><col id="TBL-3-3"></colgroup><tr id="TBL-3-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-3-1-1" style="white-space:normal; text-align:left;"><!-- l. 613 --><p class="noindent"><span class="ptmb8t-">Axis</span>                           </p></td><td class="td11" id="TBL-3-1-2" style="white-space:normal; text-align:left;"> <!-- l. 613 --><p class="noindent"><span class="ptmb8t-">Measurement</span>                            </p></td><td class="td10" id="TBL-3-1-3" style="white-space:normal; text-align:left;"> <!-- l. 613 --><p class="noindent"><span class="ptmb8t-">Purpose</span>                                          </p></td>
+</tr><tr id="TBL-3-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-3-2-1" style="white-space:normal; text-align:left;"><!-- l. 615 --><p class="noindent">Derivative accuracy    </p></td><td class="td11" id="TBL-3-2-2" style="white-space:normal; text-align:left;"> <!-- l. 615 --><p class="noindent">finite-difference  and  autograd
+  Jacobian error                             </p></td><td class="td10" id="TBL-3-2-3" style="white-space:normal; text-align:left;"> <!-- l. 615 --><p class="noindent">confirms      sensor      mathematics
+  independent of rendering               </p></td>
+</tr><tr id="TBL-3-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-3-3-1" style="white-space:normal; text-align:left;"><!-- l. 616 --><p class="noindent">Novel-view quality    </p></td><td class="td11" id="TBL-3-3-2" style="white-space:normal; text-align:left;"> <!-- l. 616 --><p class="noindent">PSNR,     SSIM,     LPIPS    on
+  held-out views                            </p></td><td class="td10" id="TBL-3-3-3" style="white-space:normal; text-align:left;"> <!-- l. 616 --><p class="noindent">compares   renderer   quality   with
+  pinhole and undistort baselines      </p></td>
+</tr><tr id="TBL-3-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-3-4-1" style="white-space:normal; text-align:left;"><!-- l. 617 --><p class="noindent">Geometric fidelity      </p></td><td class="td11" id="TBL-3-4-2" style="white-space:normal; text-align:left;"> <!-- l. 617 --><p class="noindent">reprojection     error     against
+  checkpoints or RPC metadata    </p></td><td class="td10" id="TBL-3-4-3" style="white-space:normal; text-align:left;"> <!-- l. 617 --><p class="noindent">prevents   photometric   overfitting
+  from hiding geolocation drift         </p></td>
+</tr><tr id="TBL-3-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-3-5-1" style="white-space:normal; text-align:left;"><!-- l. 618 --><p class="noindent">Covariance stability   </p></td><td class="td11" id="TBL-3-5-2" style="white-space:normal; text-align:left;"> <!-- l. 618 --><p class="noindent">determinant,              condition
+  number, tile footprint outliers     </p></td><td class="td10" id="TBL-3-5-3" style="white-space:normal; text-align:left;"> <!-- l. 618 --><p class="noindent">identifies   singularities   and   bad
+  local linearization                           </p></td>
+</tr><tr id="TBL-3-6-" style="vertical-align:baseline;"><td class="td01" id="TBL-3-6-1" style="white-space:normal; text-align:left;"><!-- l. 619 --><p class="noindent">Residual           grid
+behavior                     </p></td><td class="td11" id="TBL-3-6-2" style="white-space:normal; text-align:left;"> <!-- l. 619 --><p class="noindent">norm and smoothness of <span class="mathjax-inline">\(\Delta \Sigma \)</span>           </p></td><td class="td10" id="TBL-3-6-3" style="white-space:normal; text-align:left;"> <!-- l. 619 --><p class="noindent">detects                                whether
+  learned correction is compensating
+  for wrong geometry                        </p></td>
+</tr><tr id="TBL-3-7-" style="vertical-align:baseline;"><td class="td01" id="TBL-3-7-1" style="white-space:normal; text-align:left;"><!-- l. 620 --><p class="noindent">Runtime                     </p></td><td class="td11" id="TBL-3-7-2" style="white-space:normal; text-align:left;"> <!-- l. 620 --><p class="noindent">training throughput and render
+  FPS per camera type                  </p></td><td class="td10" id="TBL-3-7-3" style="white-space:normal; text-align:left;"> <!-- l. 620 --><p class="noindent">quantifies  cost  of  analytic  camera
+  dispatch                                          </p></td>
+
+</tr></table>                                                          </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+<!-- l. 625 --><p class="noindent">The comparison set should include at least four baselines: standard pinhole 3DGS after image undistortion,
+standard 3DGS with approximate perspective cameras, NeRF or Sat-NeRF for satellite-only scenes, and an
+ablation with analytic Jacobians but no learned residual grid. The satellite split should report terrain relief
+and off-nadir angle because those variables determine how much RPC geometry matters.
+
+</p>
+<!-- l. 627 --><p class="noindent"><span class="paragraphHead" id="dataset-and-reporting-cards"> <a id="x1-28000"></a><span class="ptmb8t-">Dataset and Reporting Cards:</span></span>
+Each dataset used in a future version should include a short card: </p>
+     <ul class="itemize1">
+     <li class="itemize"><span class="ptmb8t-">Sensor</span>: RPC satellite, pushbroom satellite, fisheye, or panorama.
+     </li>
+     <li class="itemize"><span class="ptmb8t-">Camera metadata</span>: whether true calibration is available, approximated, or learned.
+     </li>
+     <li class="itemize"><span class="ptmb8t-">Scene type</span>: urban, rural, indoor, road, coastal, mountainous.
+     </li>
+     <li class="itemize"><span class="ptmb8t-">View split</span>: number of train, validation, and test images.
+     </li>
+     <li class="itemize"><span class="ptmb8t-">Geometry split</span>: range of heights, off-nadir angles, baselines, and field of view.
+     </li>
+     <li class="itemize"><span class="ptmb8t-">Failure annotations</span>: clouds, water, shadows, moving objects, saturation, or panorama seam.</li></ul>
+<!-- l. 638 --><p class="noindent">This is not busywork. Without these cards, a high PSNR table can be misleading. A method may look strong
+because the scene is flat, the field of view is narrow, or the split does not stress the non-pinhole model.
+
+</p>
+<!-- l. 640 --><p class="noindent"><span class="paragraphHead" id="broader-relevance"> <a id="x1-29000"></a><span class="ptmb8t-">Broader  Relevance:</span></span>
+The project sits at the boundary between computer graphics and geospatial photogrammetry. Graphics
+papers often abstract cameras as calibrated pinholes because the benchmark datasets are built that way.
+Remote-sensing systems often respect sensor geometry but do not use explicit differentiable radiance fields.
+Sat-Splat-Distort argues that the two communities need a shared renderer abstraction: a scene primitive should
+not care whether its camera is pinhole, RPC, pushbroom, fisheye, or spherical, but the rasterizer must use
+the correct local derivative. This is a small mathematical change with a large engineering consequence.
+
+</p>
+<!-- l. 644 --><p class="noindent"><span class="paragraphHead" id="additional-literature-context"> <a id="x1-30000"></a><span class="ptmb8t-">Additional Literature Context:</span></span>
+This section expands the related work into the set of technical commitments that the implementation
+inherits. The point is not to claim novelty over every paper in the area. The point is to make
+clear which assumptions are being borrowed and which assumptions are being changed.
+
+</p>
+<!-- l. 648 --><p class="noindent"><span class="paragraphHead" id="from-surface-splatting-to-gaussian-scene-representations"> <a id="x1-31000"></a><span class="ptmb8t-">From surface splatting to Gaussian scene representations:</span></span>
+EWA splatting frames a projected surface sample as an elliptical filter in image space [<a href="#Xzwicker2002ewa">46</a>]. The
+mathematical lesson is that antialiasing and footprint estimation are local differential problems. A projected
+primitive should be filtered according to the image-space covariance induced by the camera and local
+surface parameterization. 3DGS uses this same idea in a different representation: instead of
+splatting explicit surface samples, it optimizes anisotropic 3D Gaussian primitives and renders
+them through a differentiable rasterizer [<a href="#Xkerbl20233d">17</a>]. The success of 3DGS comes from combining
+                                                                            
+                                                                            
+continuous volumetric primitives with GPU-friendly rasterization and density control.
+</p><!-- l. 652 --><p class="noindent">Sat-Splat-Distort keeps the explicit Gaussian representation but changes the camera assumption. In the
+standard 3DGS derivation, the screen-space covariance path can be implemented once because
+perspective projection is fixed. In a geospatial renderer, the covariance path should be a camera
+interface. This is a small abstraction at the code level and a large abstraction at the paper level. It
+means camera geometry is not preprocessing. It is part of the differentiable renderer.
+
+</p>
+<!-- l. 654 --><p class="noindent"><span class="paragraphHead" id="nerf-antialiasing-and-unbounded-scenes"> <a id="x1-32000"></a><span class="ptmb8t-">NeRF, antialiasing, and unbounded scenes:</span></span>
+NeRF demonstrated that volumetric neural fields can synthesize novel views from posed images [<a href="#Xmildenhall2020nerf">25</a>].
+Mip-NeRF and Mip-NeRF 360 added antialiasing and unbounded-scene handling by integrating over
+conical frustums rather than sampling infinitesimal rays [<a href="#Xbarron2022mipnerf360">1</a>]. These papers are not Gaussian splatting papers,
+but they are conceptually relevant. They argue that rendering quality depends on matching the scale of the
+representation to the projected footprint of a pixel or primitive. Sat-Splat-Distort makes the dual
+argument: the projected footprint of a Gaussian must be matched to the actual camera.
+</p><!-- l. 658 --><p class="noindent">In remote sensing, pixels correspond to ground sampling distances that vary with sensor attitude, terrain,
+and product resampling. A renderer that assumes a central perspective camera implicitly imposes the wrong
+pixel footprint. This can be hidden when evaluating only on low-relief scenes or narrow baselines. It
+becomes visible when the scene includes tall structures, steep terrain, or wide-angle projection.
+
+</p>
+<!-- l. 660 --><p class="noindent"><span class="paragraphHead" id="rational-polynomial-camera-models"> <a id="x1-33000"></a><span class="ptmb8t-">Rational polynomial camera models:</span></span>
+The RPC model became common because many satellite providers distribute imagery with generalized
+sensor metadata instead of full physical sensor models [<a href="#Xgrodecki2003block">13</a>, <a href="#Xtao2001rpc">39</a>]. An RPC model can approximate the
+mapping from geographic coordinates and height to image coordinates with cubic rational functions. It is
+compact, provider-neutral, and useful for orthorectification and block adjustment. It is also easy to
+misuse. The normalization offsets and scales matter; row-column order matters; the height datum
+matters; and extrapolating outside the validity region can produce unstable denominators.
+</p><!-- l. 664 --><p class="noindent">For neural rendering, RPC metadata is valuable because it provides camera geometry without requiring a
+classical structure-from-motion pipeline. Sat-NeRF uses RPC cameras directly to learn satellite radiance
+fields and models transient objects and shadows [<a href="#Xmar2022satnerf">22</a>]. EO-NeRF extends the satellite neural rendering
+direction to multi-date Earth observation and shadow details [<a href="#Xmar2023eonerf">23</a>]. Sat-Splat-Distort follows those works in
+treating RPC metadata as part of the model, but it targets splatting rather than volumetric ray marching.
+
+</p>
+<!-- l. 666 --><p class="noindent"><span class="paragraphHead" id="pushbroom-and-noncentral-cameras"> <a id="x1-34000"></a><span class="ptmb8t-">Pushbroom and non-central cameras:</span></span>
+Pushbroom sensors violate the single-viewpoint assumption. A line scanner observes the Earth line by line
+while the platform moves, so the effective camera center changes over the image. Classical photogrammetry
+handles this through physical sensor models, epipolar resampling, or piecewise approximations. A
+Gaussian renderer does not need to solve every pushbroom photogrammetry problem at once,
+but it does need an interface that permits a non-central projection derivative. The simplified
+pushbroom model in the repository is therefore a test case for the abstraction. It shows that the
+covariance path can accept a camera whose image axes have different derivative structure.
+
+</p>
+<!-- l. 670 --><p class="noindent"><span class="paragraphHead" id="fisheye-and-equirectangular-scenes"> <a id="x1-35000"></a><span class="ptmb8t-">Fisheye and equirectangular scenes:</span></span>
+Fisheye and equirectangular images are useful beyond remote sensing. Robotics, autonomous driving,
+virtual tours, and mapping systems often collect wide-field imagery. The standard workaround is to
+undistort or cube-map the input before reconstruction. That can be effective, but it makes the renderer
+depend on resampling choices and may create discontinuities at cube faces or panorama seams. A
+projection-aware splatter can instead keep the original parameterization and push the local covariance
+through the correct derivative. This does not remove singularities, but it makes them explicit.
+
+                                                                            
+                                                                            
+</p>
+<!-- l. 674 --><p class="noindent"><span class="paragraphHead" id="what-the-present-implementation-does-not-inherit"> <a id="x1-36000"></a><span class="ptmb8t-">What the present implementation does not inherit:</span></span>
+The project does not claim to solve bundle adjustment, RPC bias correction, stereo matching, dense height
+estimation, or satellite atmospheric correction. It assumes camera parameters are available and focuses on
+the local derivative needed by splatting. That narrower scope is a strength for a portfolio paper: the
+contribution can be tested in isolation before it is embedded in a larger photogrammetry system.
+
+</p>
+<!-- l. 678 --><p class="noindent"><span class="paragraphHead" id="practical-integration-notes"> <a id="x1-37000"></a><span class="ptmb8t-">Practical Integration Notes:</span></span>
+
+</p>
+<!-- l. 680 --><p class="noindent"><span class="paragraphHead" id="where-the-jacobian-enters-the-renderer"> <a id="x1-38000"></a><span class="ptmb8t-">Where the Jacobian enters the renderer:</span></span>
+In a conventional 3DGS implementation, each Gaussian is transformed from world coordinates
+to camera coordinates, projected to a pixel center, and assigned a screen-space covariance.
+Tile binning and alpha compositing then use this footprint. Sat-Splat-Distort changes
+only the projection and covariance stage. The renderer can be organized as:
+     </p><dl class="enumerate-enumitem"><dt class="enumerate-enumitem">
+  1. </dt><dd class="enumerate-enumitem">compute camera-specific projected mean <span class="mathjax-inline">\(p_i=\pi (\mu _i)\)</span>,
+     </dd><dt class="enumerate-enumitem">
+  2. </dt><dd class="enumerate-enumitem">compute camera-specific Jacobian <span class="mathjax-inline">\(J_i=J_{\pi }(\mu _i)\)</span>,
+     </dd><dt class="enumerate-enumitem">
+  3. </dt><dd class="enumerate-enumitem">compute <span class="mathjax-inline">\(\Sigma _{2,i}=J_i\Sigma _{3,i}J_i^\top +\Delta \Sigma (p_i)\)</span>,
+     </dd><dt class="enumerate-enumitem">
+  4. </dt><dd class="enumerate-enumitem">reject invalid or ill-conditioned footprints,
+     </dd><dt class="enumerate-enumitem">
+  5. </dt><dd class="enumerate-enumitem">pass <span class="mathjax-inline">\((p_i,\Sigma _{2,i},\alpha _i,c_i)\)</span> to the normal tile rasterizer.</dd></dl>
+<!-- l. 690 --><p class="noindent">This separation is why the project can be framed as a systems paper even before
+every CUDA kernel is optimized. The mathematical unit is clean.
+
+</p>
+<!-- l. 692 --><p class="noindent"><span class="paragraphHead" id="conditioning-and-numerical-guards"> <a id="x1-39000"></a><span class="ptmb8t-">Conditioning and numerical guards:</span></span>
+The implementation should report the denominator magnitude for RPC and pushbroom cameras, the
+angular radius for fisheye cameras, and the latitude/pole proximity for equirectangular
+cameras. In training, these values can be summarized as histograms. A sudden spike in invalid
+projections is usually more informative than a vague training crash. For publication, the
+paper should report the invalid-footprint rate per dataset and per camera model.
+
+</p>
+<!-- l. 696 --><p class="noindent"><span class="paragraphHead" id="learned-residuals-as-calibration-aids"> <a id="x1-40000"></a><span class="ptmb8t-">Learned residuals as calibration aids:</span></span>
+The learned distortion grid is useful only if it remains small and smooth. A paper should include maps of <span class="mathjax-inline">\(\|\Delta \Sigma (p)\|_F\)</span>
+and compare them with known sensor artifacts. If the residual grid becomes large near image edges or RPC
+validity boundaries, that may be a meaningful correction. If it becomes large everywhere, it likely
+indicates that the analytic camera model, scale convention, or scene initialization is wrong.
+
+</p>
+<!-- l. 700 --><p class="noindent"><span class="paragraphHead" id="recommended-figures"> <a id="x1-41000"></a><span class="ptmb8t-">Recommended  Figures:</span></span>
+The final 10 to 12 page version should include at least four figures. These can
+be generated later from the code once benchmark runs exist.
+     </p><dl class="enumerate-enumitem"><dt class="enumerate-enumitem">
+  1. </dt><dd class="enumerate-enumitem"><span class="ptmb8t-">Projection   covariance   diagram</span>:   one   3D   Gaussian   rendered   through   pinhole,   RPC,
+     pushbroom, fisheye, and equirectangular cameras, showing different 2D ellipses.
+     </dd><dt class="enumerate-enumitem">
+  2. </dt><dd class="enumerate-enumitem"><span class="ptmb8t-">RPC derivative heatmap</span>: image-space map of <span class="mathjax-inline">\(\|J_{\pi }\|_2\)</span> and condition number over a satellite tile.
+                                                                            
+                                                                            
+     </dd><dt class="enumerate-enumitem">
+  3. </dt><dd class="enumerate-enumitem"><span class="ptmb8t-">Residual  grid  visualization</span>:  before  and  after  training,  showing  where  learned  covariance
+     corrections are active.
+     </dd><dt class="enumerate-enumitem">
+  4. </dt><dd class="enumerate-enumitem"><span class="ptmb8t-">Benchmark  table  figure</span>:  held-out  rendering  examples  comparing  undistort-plus-3DGS
+     against native camera-aware splatting.</dd></dl>
+<!-- l. 709 --><p class="noindent">The paper uses schematic and mathematical figures where real imagery is not available, avoiding fabricated visual evidence.
+
+</p>
+<!-- l. 711 --><p class="noindent"><span class="paragraphHead" id="recommended-tables"> <a id="x1-42000"></a><span class="ptmb8t-">Recommended  Tables:</span></span>
+The current validation table is software-focused. A fuller paper should add: </p>
+     <ul class="itemize1">
+     <li class="itemize"><span class="ptmb8t-">Camera-model    table</span>:    parameters,    derivative    availability,    singularity    cases,    and
+     implementation status.
+     </li>
+     <li class="itemize"><span class="ptmb8t-">Dataset table</span>: number of scenes, sensor type, resolution, off-nadir angle, terrain relief, and
+     split.
+     </li>
+     <li class="itemize"><span class="ptmb8t-">Ablation table</span>: pinhole, undistorted pinhole, analytic camera, analytic plus residual grid.
+     </li>
+     <li class="itemize"><span class="ptmb8t-">Runtime table</span>: forward projection time, Jacobian time, rasterization time, and total training
+     throughput.
+     </li>
+     <li class="itemize"><span class="ptmb8t-">Failure table</span>: examples where native geometry helps, does not matter, or becomes unstable.</li></ul>
+<!-- l. 721 --><p class="noindent">These tables are concrete baselines for future measurements rather than invented numbers. They also make
+this paper easier to cut down later because each table corresponds to one claim family.
+
+</p>
+<!-- l. 723 --><p class="noindent"><span class="paragraphHead" id="rpc-polynomial-derivatives"> <a id="x1-43000"></a><span class="ptmb8t-">RPC Polynomial Derivatives:</span></span>
+For completeness, the derivative of the RPC monomial basis can be written compactly. For <span class="mathjax-inline">\(q_k=L^{a_k}P^{b_k}H^{c_k}\)</span>, </p><div class="mathjax-env mathjax-equation">\begin{equation} \begin {aligned} \frac {\partial q_k}{\partial L}&amp;=a_k L^{a_k-1}P^{b_k}H^{c_k},\\ \frac {\partial q_k}{\partial P}&amp;=b_k L^{a_k}P^{b_k-1}H^{c_k},\\ \frac {\partial q_k}{\partial H}&amp;=c_k L^{a_k}P^{b_k}H^{c_k-1}. \end {aligned} \end{equation}</div>
+<p><a id="x1-43001r17"></a>
+<!-- l. 733 --></p><p class="noindent">Terms with zero exponent have zero derivative in the corresponding variable. The implementation encodes
+the 20 terms explicitly to avoid constructing symbolic exponents at runtime. A production implementation
+should also include strict tests for denominator magnitude and metadata scale conventions,
+because RPC files vary in row-column order and normalization naming across providers.
+
+</p>
+<!-- l. 735 --><p class="noindent"><span class="paragraphHead" id="singularity-handling"> <a id="x1-44000"></a><span class="ptmb8t-">Singularity  Handling:</span></span>
+Every non-pinhole camera family in this paper has singular or poorly conditioned regions. RPC
+denominators can approach zero outside the metadata validity region. Pushbroom linearizations can fail
+when the denominator direction becomes nearly orthogonal to the point. Fisheye projection has a
+limiting case at the optical axis and increasing distortion near the field boundary. Equirectangular
+projection has poles and a longitude branch cut. A robust renderer should not pretend these are rare
+numerical accidents. It should expose a validity mask, clamp only with explicit warnings, and
+log how many Gaussians are excluded or split because the projection is ill-conditioned.
+
+</p>
+<h2 class="sectionHead" id="discussion-and-limitations"><span class="titlemark">5    </span>    <a id="x1-450005"></a>Discussion and Limitations</h2>
+                                                                            
+                                                                            
+
+<!-- l. 740 --><p class="noindent"><span class="paragraphHead" id="claim-checklist"> <a id="x1-46000"></a><span class="ptmb8t-">Claim  Checklist:</span></span>
+The paper claims implemented analytic camera models, Jacobian tests, residual covariance
+construction, and a public CPU-safe interface. It does not claim state-of-the-art rendering, satellite
+benchmark superiority, production photogrammetric accuracy, or full CUDA integration
+across all sensor families; those claims are tied to the renderer benchmark protocol.
+
+</p>
+<!-- l. 744 --><p class="noindent"><span class="paragraphHead" id="ablation-design"> <a id="x1-47000"></a><span class="ptmb8t-">Ablation  Design:</span></span>
+The core ablation should test whether geometry-aware covariance is doing work
+beyond ordinary image preprocessing. A clean ablation grid is:
+     </p><dl class="enumerate-enumitem"><dt class="enumerate-enumitem">
+  1. </dt><dd class="enumerate-enumitem"><span class="ptmb8t-">Pinhole baseline</span>: fit standard 3DGS with approximate perspective cameras.
+     </dd><dt class="enumerate-enumitem">
+  2. </dt><dd class="enumerate-enumitem"><span class="ptmb8t-">Undistort baseline</span>: pre-warp images into a perspective or local tangent-plane approximation,
+     then fit standard 3DGS.
+     </dd><dt class="enumerate-enumitem">
+  3. </dt><dd class="enumerate-enumitem"><span class="ptmb8t-">Analytic camera</span>: use the native camera projection and analytic Jacobian with no learned
+     residual grid.
+     </dd><dt class="enumerate-enumitem">
+  4. </dt><dd class="enumerate-enumitem"><span class="ptmb8t-">Analytic plus residual</span>: enable the residual covariance grid after the analytic-only warm start.
+     </dd><dt class="enumerate-enumitem">
+  5. </dt><dd class="enumerate-enumitem"><span class="ptmb8t-">Residual only</span>: use a pinhole camera with a learned covariance grid to test whether the residual
+     can mask wrong camera geometry.</dd></dl>
+<!-- l. 754 --><p class="noindent">The last ablation is important. If “residual only” performs as well as the analytic camera
+on held-out geospatial views, then the claimed camera-model contribution is weak. If it
+improves train views but fails geometric validation, then the residual grid is overfitting.
+
+</p>
+<!-- l. 756 --><p class="noindent"><span class="paragraphHead" id="satellitespecific-ablations"> <a id="x1-48000"></a><span class="ptmb8t-">Satellite-specific ablations:</span></span>
+Satellite scenes should be grouped by terrain relief and off-nadir angle. A flat agricultural scene may not
+stress RPC height sensitivity; a dense downtown tile or mountainous scene should. The paper should
+report results by group, not only as an aggregate average. The most informative comparison is
+likely a scatter plot where each point is a scene and the x-axis is a geometry stress score: </p><div class="mathjax-env mathjax-equation">\begin{equation} \gamma _{\text {stress}} = \operatorname {std}_{X\in \Omega }\left (\left \|\frac {\partial \pi (X)}{\partial h}\right \|_2\right ) + \beta \,\operatorname {relief}(\Omega ). \end{equation}</div>
+<p><a id="x1-48001r18"></a>
+<!-- l. 763 --></p><p class="noindent">The hypothesis is that native RPC splatting helps most when <span class="mathjax-inline">\(\gamma _{\text {stress}}\)</span> is high.
+
+</p>
+<!-- l. 765 --><p class="noindent"><span class="paragraphHead" id="wideanglespecific-ablations"> <a id="x1-49000"></a><span class="ptmb8t-">Wide-angle-specific ablations:</span></span>
+Fisheye and equirectangular experiments should report performance by radial distance from the image
+center or angular latitude. A global metric can hide edge failures. The expected result is not that a native
+camera always improves the center of the image. The expected result is that it reduces edge
+blurring, seam artifacts, and unstable covariance footprints near high-distortion regions.
+
+</p>
+<!-- l. 769 --><p class="noindent"><span class="paragraphHead" id="residual-grid-ablations"> <a id="x1-50000"></a><span class="ptmb8t-">Residual  grid  ablations:</span></span>
+The residual grid should be evaluated with three regularization strengths: disabled, moderate, and weak. A
+good result would show that moderate residuals improve calibration-sensitive regions while weak
+regularization produces visible overfitting or unstable covariance. The paper should report the
+average Frobenius norm of <span class="mathjax-inline">\(\Delta \Sigma \)</span>, the smoothness penalty, and held-out photometric quality.
+
+                                                                            
+                                                                            
+</p>
+<!-- l. 773 --><p class="noindent"><span class="paragraphHead" id="reproducibility-plan"> <a id="x1-51000"></a><span class="ptmb8t-">Reproducibility  Plan:</span></span>
+A complete release should make the following commands work from a clean checkout:
+                                                                            
+                                                                            
+</p>
+<pre class="verbatim" id="verbatim-1">
+pip install -e ".[dev]"
+pytest
+python scripts/fit_scene.py \
+  --config configs/rpc.yaml
+python scripts/eval_scene.py \
+  --checkpoint runs/rpc/latest.pt
+</pre>
+<!-- l. 783 --><p class="nopar"> The current repository already has the package-level tests and public Space implementation. The
+missing pieces are benchmark scripts, dataset manifests, and renderer training hooks. The paper
+should not claim reproducibility beyond the commands that actually exist. Once the training
+scripts are added, each result table should include the exact config path and random seed.
+
+</p>
+<!-- l. 786 --><p class="noindent"><span class="paragraphHead" id="dataset-manifests"> <a id="x1-52000"></a><span class="ptmb8t-">Dataset  manifests:</span></span>
+Each dataset should have a manifest with one row per image: </p>
+     <ul class="itemize1">
+     <li class="itemize">image path and checksum,
+     </li>
+     <li class="itemize">camera model type,
+     </li>
+     <li class="itemize">camera metadata path and checksum,
+     </li>
+     <li class="itemize">split identifier,
+     </li>
+     <li class="itemize">scene identifier,
+     </li>
+     <li class="itemize">optional height model path,
+     </li>
+     <li class="itemize">notes for clouds, shadows, water, or dynamic objects.</li></ul>
+<!-- l. 798 --><p class="noindent">This level of bookkeeping is especially important for satellite imagery because product preprocessing can
+silently change camera metadata. If an image has been orthorectified, the original RPC is no longer the
+correct projection for the pixel grid unless the processing chain preserves that relationship.
+
+</p>
+<!-- l. 800 --><p class="noindent"><span class="paragraphHead" id="numerical-tolerance-reporting"> <a id="x1-53000"></a><span class="ptmb8t-">Numerical tolerance reporting:</span></span>
+The Jacobian tests should report absolute and relative errors. A future paper should include a small table: </p><div class="mathjax-env mathjax-equation">\begin{equation} \begin {aligned} e_{\text {abs}}&amp;=\|J_{\text {analytic}}-J_{\text {autograd}}\|_{\infty },\\ e_{\text {rel}}&amp;=\frac {\|J_{\text {analytic}}-J_{\text {autograd}}\|_F}{\|J_{\text {autograd}}\|_F+\epsilon }. \end {aligned} \end{equation}</div>
+<p><a id="x1-53001r19"></a>
+<!-- l. 809 --></p><p class="noindent">The tolerance should be stratified by camera model and by random seed. This is a better artifact
+than saying the tests pass because it tells readers how stable the derivatives are.
+
+</p>
+<!-- l. 811 --><p class="noindent"><span class="paragraphHead" id="stresstest-questions"> <a id="x1-54000"></a><span class="ptmb8t-">Stress-Test  Questions:</span></span>
+
+                                                                            
+                                                                            
+</p>
+<!-- l. 813 --><p class="noindent"><span class="paragraphHead" id="is-this-just-undistortion"> <a id="x1-55000"></a><span class="ptmb8t-">Is  this  just  undistortion?</span></span>
+No. Undistortion rewrites images into a new pixel grid before reconstruction. Sat-Splat-Distort
+keeps the native camera model inside the renderer and transforms Gaussian covariance
+through the local projection derivative. The two approaches may produce similar results
+in mild distortion regimes, which is why the ablation table must include both.
+
+</p>
+<!-- l. 816 --><p class="noindent"><span class="paragraphHead" id="why-not-use-automatic-differentiation-for-every-projection"> <a id="x1-56000"></a><span class="ptmb8t-">Why not use automatic differentiation for every projection?</span></span>
+Automatic differentiation is useful for implementation validation and prototyping. Analytic Jacobians
+are better for a renderer because they are cheaper, easier to inspect, and easier to guard near
+singularities. The project uses autograd as a test oracle rather than as the production path.
+
+</p>
+<!-- l. 819 --><p class="noindent"><span class="paragraphHead" id="can-the-residual-grid-fake-the-camera-model"> <a id="x1-57000"></a><span class="ptmb8t-">Can the residual grid fake the camera model?</span></span>
+It can if unconstrained. That is why the residual is positive semi-definite, low amplitude,
+initialized near zero, and should be regularized. The paper should show residual norms
+and train-test behavior rather than presenting the grid as a magic correction term.
+
+</p>
+<!-- l. 822 --><p class="noindent"><span class="paragraphHead" id="does-firstorder-covariance-propagation-fail-for-large-gaussians"> <a id="x1-58000"></a><span class="ptmb8t-">Does first-order covariance propagation fail for large Gaussians?</span></span>
+Yes, it can. That limitation already exists in perspective 3DGS, but it becomes more visible for
+nonlinear cameras. Large Gaussians near projection singularities should be split, regularized, or
+rejected. A higher-order footprint model is possible but outside the current repository.
+
+</p>
+<!-- l. 825 --><p class="noindent"><span class="paragraphHead" id="what-is-the-strongest-publishable-claim-after-experiments"> <a id="x1-59000"></a><span class="ptmb8t-">What is the strongest publishable claim after experiments?</span></span>
+The strongest defensible claim would be: native sensor-aware covariance propagation improves held-out
+rendering and geometric consistency for non-pinhole or satellite scenes where the camera derivative
+varies strongly over the image, while preserving the speed advantages of Gaussian splatting.
+That claim requires measured rendering tables, not just the current implementation tests.
+
+</p>
+<!-- l. 828 --><p class="noindent"><span class="paragraphHead" id="outlook-detail"> <a id="x1-60000"></a><span class="ptmb8t-">Outlook  Detail:</span></span>
+The next engineering milestone is a sparse, camera-aware CUDA rasterizer path. The current mathematical
+operators are implemented in Python and PyTorch for clarity. A production renderer should
+move projection and Jacobian evaluation into batched kernels or precompute per-Gaussian
+camera derivatives before rasterization. The design should preserve the same interface: </p><div class="mathjax-env mathjax-equation">\begin{equation} (\mu _i,\Sigma _i,\theta _c)\mapsto (p_i,\Sigma _{2,i},m_i), \end{equation}</div>
+<p><a id="x1-60001r20"></a>
+<!-- l. 834 --></p><p class="noindent">where  <span class="mathjax-inline">\(m_i\)</span>  is  a  validity  mask.
+</p><!-- l. 836 --><p class="noindent">The second milestone is metadata ingestion. RPC camera metadata should be parsed from GeoTIFF tags or
+sidecar files; fisheye and panorama calibration should be read from standard camera models; pushbroom metadata
+should be represented with enough orbit and scan-line structure to move beyond the current linearized model.
+</p><!-- l. 838 --><p class="noindent">The third milestone is benchmark packaging. The project should ship a small public toy dataset
+that exercises every camera model without licensing friction. Even a synthetic benchmark
+would be useful if it includes exact camera parameters and exact expected Jacobians.
+The full paper can then include private or large public benchmarks separately.
+
+</p>
+<!-- l. 840 --><p class="noindent"><span class="paragraphHead" id="implementation-results-and-evaluation-profile"> <a id="x1-61000"></a><span class="ptmb8t-">Implementation Results and Evaluation Profile:</span></span>
+                                                                            
+                                                                            
+This section adds result language without fabricating benchmark numbers. The project
+currently has software results and benchmark signatures. The former are observable today;
+the latter are hypotheses that the proposed experiments should verify or reject.
+
+</p>
+<!-- l. 844 --><p class="noindent"><span class="paragraphHead" id="result-a-current-code-checks"> <a id="x1-62000"></a><span class="ptmb8t-">Result A: current code checks:</span></span>
+In the local environment, <span class="pcrr8t-">uv run -extra dev pytest -q </span>completed successfully with 20 tests
+passing. The tests cover RPC, cubic RPC, pushbroom, equidistant fisheye, and equirectangular projections;
+analytic Jacobian comparisons against automatic differentiation; distortion-prior covariance behavior;
+pipeline importability; and the Hugging Face Space callback contract. This is not a rendering benchmark,
+but it is meaningful evidence that the paper’s mathematical operators are implemented and exercised.
+</p>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 848 --><p class="noindent"></p><figure class="float" id="x1-62001r3"><span id="implementationgrounded-result-for-satsplatdistort-from-the-current-local-run"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 3: </span><span class="content">Implementation-grounded result for Sat-Splat-Distort from the current local run.       </span></figcaption><!-- tex4ht:label?: x1-62001r3  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-4"><colgroup id="TBL-4-1g"><col id="TBL-4-1"><col id="TBL-4-2"><col id="TBL-4-3"></colgroup><tr id="TBL-4-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-4-1-1" style="white-space:normal; text-align:left;"><!-- l. 853 --><p class="noindent"><span class="ptmb8t-">Check family</span>                       </p></td><td class="td11" id="TBL-4-1-2" style="white-space:normal; text-align:left;"> <!-- l. 853 --><p class="noindent"><span class="ptmb8t-">Interpretation</span>                                                             </p></td><td class="td10" id="TBL-4-1-3" style="white-space:normal; text-align:left;"> <!-- l. 853 --><p class="noindent"><span class="ptmb8t-">Observed</span>   </p></td>
+</tr><tr id="TBL-4-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-4-2-1" style="white-space:normal; text-align:left;"><!-- l. 855 --><p class="noindent">Camera derivatives                </p></td><td class="td11" id="TBL-4-2-2" style="white-space:normal; text-align:left;"> <!-- l. 855 --><p class="noindent">analytic  camera  Jacobians  agree  with  autograd  on
+  tested inputs                                                                 </p></td><td class="td10" id="TBL-4-2-3" style="white-space:normal; text-align:left;"> <!-- l. 855 --><p class="noindent">passed        </p></td>
+</tr><tr id="TBL-4-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-4-3-1" style="white-space:normal; text-align:left;"><!-- l. 856 --><p class="noindent">Covariance residual               </p></td><td class="td11" id="TBL-4-3-2" style="white-space:normal; text-align:left;"> <!-- l. 856 --><p class="noindent">learned   perturbation   preserves   symmetric   PSD
+  structure                                                                       </p></td><td class="td10" id="TBL-4-3-3" style="white-space:normal; text-align:left;"> <!-- l. 856 --><p class="noindent">passed        </p></td>
+</tr><tr id="TBL-4-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-4-4-1" style="white-space:normal; text-align:left;"><!-- l. 857 --><p class="noindent">Pipeline surface                     </p></td><td class="td11" id="TBL-4-4-2" style="white-space:normal; text-align:left;"> <!-- l. 857 --><p class="noindent">CPU-safe imports, callbacks, and metadata remain
+  functional                                                                     </p></td><td class="td10" id="TBL-4-4-3" style="white-space:normal; text-align:left;"> <!-- l. 857 --><p class="noindent">passed        </p></td>
+</tr><tr id="TBL-4-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-4-5-1" style="white-space:normal; text-align:left;"><!-- l. 858 --><p class="noindent">Full local test suite                </p></td><td class="td11" id="TBL-4-5-2" style="white-space:normal; text-align:left;"> <!-- l. 858 --><p class="noindent">repository smoke and camera tests                              </p></td><td class="td10" id="TBL-4-5-3" style="white-space:normal; text-align:left;"> <!-- l. 858 --><p class="noindent">20 passed   </p></td>
+
+</tr></table>                                                        </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+
+<!-- l. 863 --><p class="noindent"><span class="paragraphHead" id="result-b-benchmark-signature"> <a id="x1-63000"></a><span class="ptmb8t-">Result B: benchmark signature:</span></span>
+If the method is working, the strongest improvements should appear where the pinhole approximation is
+most wrong. For satellite imagery, that means high off-nadir views, non-flat terrain, and scenes with strong
+height sensitivity in the RPC derivative. For fisheye and equirectangular imagery, that means image
+boundaries, panorama seams, and high angular distortion regions. The benchmark signature is therefore not
+a uniform improvement everywhere. It is a structured improvement correlated with camera nonlinearity.
+</p>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 867 --><p class="noindent"></p><figure class="float" id="x1-63001r4"><span id="expected-result-patterns-to-test-not-claimed-benchmark-outcomes"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 4: </span><span class="content">Expected result patterns to test, not claimed benchmark outcomes.                  </span></figcaption><!-- tex4ht:label?: x1-63001r4  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-5"><colgroup id="TBL-5-1g"><col id="TBL-5-1"><col id="TBL-5-2"><col id="TBL-5-3"></colgroup><tr id="TBL-5-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-5-1-1" style="white-space:normal; text-align:left;"><!-- l. 872 --><p class="noindent"><span class="ptmb8t-">Condition</span>                           </p></td><td class="td11" id="TBL-5-1-2" style="white-space:normal; text-align:left;"> <!-- l. 872 --><p class="noindent"><span class="ptmb8t-">Expected   pattern   if   method
+  works</span>                                              </p></td><td class="td10" id="TBL-5-1-3" style="white-space:normal; text-align:left;"> <!-- l. 872 --><p class="noindent"><span class="ptmb8t-">Measurement</span>                  </p></td>
+
+</tr><tr id="TBL-5-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-5-2-1" style="white-space:normal; text-align:left;"><!-- l. 874 --><p class="noindent">Low geometric stress           </p></td><td class="td11" id="TBL-5-2-2" style="white-space:normal; text-align:left;"> <!-- l. 874 --><p class="noindent">small difference from undistorted
+  pinhole baseline                              </p></td><td class="td10" id="TBL-5-2-3" style="white-space:normal; text-align:left;"> <!-- l. 874 --><p class="noindent">PSNR   and   reprojection
+  parity                                </p></td>
+</tr><tr id="TBL-5-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-5-3-1" style="white-space:normal; text-align:left;"><!-- l. 875 --><p class="noindent">High        RPC        height
+sensitivity                            </p></td><td class="td11" id="TBL-5-3-2" style="white-space:normal; text-align:left;"> <!-- l. 875 --><p class="noindent">analytic          RPC          improves
+  geolocation consistency                  </p></td><td class="td10" id="TBL-5-3-3" style="white-space:normal; text-align:left;"> <!-- l. 875 --><p class="noindent">checkpoint    reprojection
+  error                                  </p></td>
+</tr><tr id="TBL-5-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-5-4-1" style="white-space:normal; text-align:left;"><!-- l. 876 --><p class="noindent">Fisheye image edge             </p></td><td class="td11" id="TBL-5-4-2" style="white-space:normal; text-align:left;"> <!-- l. 876 --><p class="noindent">native  fisheye  reduces  footprint
+  instability                                        </p></td><td class="td10" id="TBL-5-4-3" style="white-space:normal; text-align:left;"> <!-- l. 876 --><p class="noindent">covariance         condition
+  number                             </p></td>
+</tr><tr id="TBL-5-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-5-5-1" style="white-space:normal; text-align:left;"><!-- l. 877 --><p class="noindent">Weak                    residual
+regularization                       </p></td><td class="td11" id="TBL-5-5-2" style="white-space:normal; text-align:left;"> <!-- l. 877 --><p class="noindent">train  quality  rises  but  held-out
+  geometry may degrade                    </p></td><td class="td10" id="TBL-5-5-3" style="white-space:normal; text-align:left;"> <!-- l. 877 --><p class="noindent">residual   norm   and   test
+  error                                  </p></td>
+
+</tr></table>                                                     </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+
+<!-- l. 882 --><p class="noindent"><span class="paragraphHead" id="stresstest-questions1"> <a id="x1-64000"></a><span class="ptmb8t-">Stress-Test  Questions:</span></span>
+
+</p>
+<!-- l. 884 --><p class="noindent"><span class="paragraphHead" id="q1-is-the-method-only-a-more-complicated-version-of-image-undistortion"> <a id="x1-65000"></a><span class="ptmb8t-">Q1: Is the method only a more complicated version of image undistortion?</span></span>
+The answer should be no, but the paper must prove it. Undistortion changes the image grid before
+reconstruction; Sat-Splat-Distort changes the renderer’s local covariance propagation. The correct ablation
+is native camera splatting versus undistort-plus-standard-3DGS under identical train and held-out views.
+
+</p>
+<!-- l. 887 --><p class="noindent"><span class="paragraphHead" id="q2-does-the-learned-residual-grid-hide-incorrect-geometry"> <a id="x1-66000"></a><span class="ptmb8t-">Q2: Does the learned residual grid hide incorrect geometry?</span></span>
+It can. That is why the grid is low amplitude, initialized near zero, and should be regularized. The paper
+should report the Frobenius norm and smoothness of <span class="mathjax-inline">\(\Delta \Sigma \)</span>. A residual-only ablation is mandatory.
+
+</p>
+<!-- l. 890 --><p class="noindent"><span class="paragraphHead" id="q3-do-analytic-jacobians-matter-if-automatic-differentiation-exists"> <a id="x1-67000"></a><span class="ptmb8t-">Q3: Do analytic Jacobians matter if automatic differentiation exists?</span></span>
+Yes for speed, transparency, and singularity handling. Automatic differentiation remains
+valuable as a test oracle. A renderer should not depend on tracing a complex projection
+graph for every Gaussian in every view if a closed-form derivative is available.
+
+</p>
+<!-- l. 893 --><p class="noindent"><span class="paragraphHead" id="q4-what-happens-near-projection-singularities"> <a id="x1-68000"></a><span class="ptmb8t-">Q4: What happens near projection singularities?</span></span>
+The method should reject, split, or downweight ill-conditioned footprints. It should not silently clamp all
+cases. The paper should report invalid-footprint rates and covariance condition-number histograms.
+
+</p>
+<!-- l. 896 --><p class="noindent"><span class="paragraphHead" id="q5-is-the-firstorder-covariance-approximation-enough"> <a id="x1-69000"></a><span class="ptmb8t-">Q5: Is the first-order covariance approximation enough?</span></span>
+Only locally. Large Gaussians under highly nonlinear projections may require splitting or
+higher-order footprint approximations. This is a limitation to measure, not hide.
+
+</p>
+<!-- l. 899 --><p class="noindent"><span class="paragraphHead" id="q6-what-would-convince-a-skeptical-reader"> <a id="x1-70000"></a><span class="ptmb8t-">Q6: What would convince a skeptical reader?</span></span>
+A convincing result would show that improvements concentrate in scenes where sensor geometry
+predicts they should occur, while residual-grid norms remain small and held-out geolocation
+improves. A generic PSNR gain without geometric diagnostics would be weak evidence.
+
+</p>
+<!-- l. 902 --><p class="noindent"><span class="paragraphHead" id="additional-derivation-geometry-stress-score"> <a id="x1-71000"></a><span class="ptmb8t-">Additional Derivation: Geometry Stress Score:</span></span>
+To connect theory to evaluation, define a stress score over a scene domain <span class="mathjax-inline">\(\Omega \)</span>: </p><div class="mathjax-env mathjax-equation">\begin{equation} \begin {aligned} \Gamma (\Omega ,\pi )=&amp;\operatorname {mean}_{X\in \Omega }\kappa (J_{\pi }(X))\\ &amp;+\alpha \operatorname {std}_{X\in \Omega }\|J_{\pi }(X)\|_F\\ &amp;+\beta \operatorname {std}_{X\in \Omega }\left \|\frac {\partial \pi (X)}{\partial h}\right \|_2 . \end {aligned} \end{equation}</div>
+<p><a id="x1-71001r21"></a>
+<!-- l. 912 --></p><p class="noindent">Here <span class="mathjax-inline">\(\kappa \)</span> is the Jacobian condition number. The first term captures local anisotropy, the second captures spatial
+variation in projection scale, and the third captures height sensitivity. The hypothesis is that the relative gain
+of native camera-aware splatting over pinhole baselines should increase with <span class="mathjax-inline">\(\Gamma \)</span>. This gives the paper
+a falsifiable geometric claim rather than a generic expectation of better image quality.
+
+                                                                            
+                                                                            
+</p>
+<!-- l. 914 --><p class="noindent"><span class="paragraphHead" id="additional-literature-integration"> <a id="x1-72000"></a><span class="ptmb8t-">Additional Literature Integration:</span></span>
+The satellite neural rendering literature already shows that RPC metadata matters for radiance fields
+[<a href="#Xmar2022satnerf">22</a>, <a href="#Xmar2023eonerf">23</a>]. The Gaussian-splatting literature shows that explicit primitives and rasterization can be much
+faster than dense ray marching [<a href="#Xkerbl20233d">17</a>]. The photogrammetry literature gives the camera model discipline
+[<a href="#Xgrodecki2003block">13</a>, <a href="#Xtao2001rpc">39</a>]. Sat-Splat-Distort combines those threads. Its strongest eventual contribution is not
+another scene representation; it is the claim that sensor-aware covariance propagation is the
+right abstraction layer for bringing geospatial camera models into Gaussian splatting.
+
+</p>
+<!-- l. 918 --><p class="noindent"><span class="paragraphHead" id="supplementary-technical-notes"> <a id="x1-73000"></a><span class="ptmb8t-">Supplementary Technical Notes:</span></span>
+
+</p>
+<!-- l. 920 --><p class="noindent"><span class="paragraphHead" id="literature-matrix"> <a id="x1-74000"></a><span class="ptmb8t-">Literature  matrix:</span></span>
+</p>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 922 --><p class="noindent"></p><figure class="float" id="x1-74001r5"><span id="how-the-core-literature-maps-to-satsplatdistort"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 5: </span><span class="content">How the core literature maps to Sat-Splat-Distort.                               </span></figcaption><!-- tex4ht:label?: x1-74001r5  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-6"><colgroup id="TBL-6-1g"><col id="TBL-6-1"><col id="TBL-6-2"><col id="TBL-6-3"></colgroup><tr id="TBL-6-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-6-1-1" style="white-space:normal; text-align:left;"><!-- l. 927 --><p class="noindent"><span class="ptmb8t-">Thread</span>                         </p></td><td class="td11" id="TBL-6-1-2" style="white-space:normal; text-align:left;"> <!-- l. 927 --><p class="noindent"><span class="ptmb8t-">What it contributes</span>                    </p></td><td class="td10" id="TBL-6-1-3" style="white-space:normal; text-align:left;"> <!-- l. 927 --><p class="noindent"><span class="ptmb8t-">What remains open</span>                 </p></td>
+</tr><tr id="TBL-6-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-6-2-1" style="white-space:normal; text-align:left;"><!-- l. 929 --><p class="noindent">EWA splatting               </p></td><td class="td11" id="TBL-6-2-2" style="white-space:normal; text-align:left;"> <!-- l. 929 --><p class="noindent">local footprint filtering through
+  projected covariance                    </p></td><td class="td10" id="TBL-6-2-3" style="white-space:normal; text-align:left;"> <!-- l. 929 --><p class="noindent">assumes   a   known   projection
+  family                                        </p></td>
+</tr><tr id="TBL-6-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-6-3-1" style="white-space:normal; text-align:left;"><!-- l. 930 --><p class="noindent">3D               Gaussian
+Splatting                        </p></td><td class="td11" id="TBL-6-3-2" style="white-space:normal; text-align:left;"> <!-- l. 930 --><p class="noindent">efficient differentiable Gaussian
+  rasterization                                  </p></td><td class="td10" id="TBL-6-3-3" style="white-space:normal; text-align:left;"> <!-- l. 930 --><p class="noindent">mostly     pinhole     benchmark
+  assumptions                               </p></td>
+</tr><tr id="TBL-6-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-6-4-1" style="white-space:normal; text-align:left;"><!-- l. 931 --><p class="noindent">RPC
+photogrammetry            </p></td><td class="td11" id="TBL-6-4-2" style="white-space:normal; text-align:left;"> <!-- l. 931 --><p class="noindent">provider-neutral satellite sensor
+  abstraction                                    </p></td><td class="td10" id="TBL-6-4-3" style="white-space:normal; text-align:left;"> <!-- l. 931 --><p class="noindent">not   integrated   into   Gaussian
+  covariance path                          </p></td>
+</tr><tr id="TBL-6-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-6-5-1" style="white-space:normal; text-align:left;"><!-- l. 932 --><p class="noindent">Sat-NeRF             and
+EO-NeRF                      </p></td><td class="td11" id="TBL-6-5-2" style="white-space:normal; text-align:left;"> <!-- l. 932 --><p class="noindent">neural    rendering    with    RPC
+  satellite cameras                           </p></td><td class="td10" id="TBL-6-5-3" style="white-space:normal; text-align:left;"> <!-- l. 932 --><p class="noindent">ray-marching  rather  than  splat
+  covariance                                  </p></td>
+</tr><tr id="TBL-6-6-" style="vertical-align:baseline;"><td class="td01" id="TBL-6-6-1" style="white-space:normal; text-align:left;"><!-- l. 933 --><p class="noindent">Fisheye                 and
+panorama rendering      </p></td><td class="td11" id="TBL-6-6-2" style="white-space:normal; text-align:left;"> <!-- l. 933 --><p class="noindent">non-central and spherical image
+  formation                                      </p></td><td class="td10" id="TBL-6-6-3" style="white-space:normal; text-align:left;"> <!-- l. 933 --><p class="noindent">singularity-aware        Gaussian
+  footprints                                   </p></td>
+
+</tr></table>                                                        </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+
+<!-- l. 938 --><p class="noindent"><span class="paragraphHead" id="cameramodel-comparison"> <a id="x1-75000"></a><span class="ptmb8t-">Camera-model comparison:</span></span>
+</p>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 940 --><p class="noindent"></p><figure class="float" id="x1-75001r6"><span id="camera-families-and-the-derivative-behavior-the-renderer-must-handle"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 6: </span><span class="content">Camera families and the derivative behavior the renderer must handle.               </span></figcaption><!-- tex4ht:label?: x1-75001r6  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-7"><colgroup id="TBL-7-1g"><col id="TBL-7-1"><col id="TBL-7-2"><col id="TBL-7-3"></colgroup><tr id="TBL-7-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-7-1-1" style="white-space:normal; text-align:left;"><!-- l. 945 --><p class="noindent"><span class="ptmb8t-">Camera</span>                    </p></td><td class="td11" id="TBL-7-1-2" style="white-space:normal; text-align:left;"> <!-- l. 945 --><p class="noindent"><span class="ptmb8t-">Derivative structure</span>                </p></td><td class="td10" id="TBL-7-1-3" style="white-space:normal; text-align:left;"> <!-- l. 945 --><p class="noindent"><span class="ptmb8t-">Primary risk</span>                                </p></td>
+</tr><tr id="TBL-7-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-7-2-1" style="white-space:normal; text-align:left;"><!-- l. 947 --><p class="noindent">Pinhole                       </p></td><td class="td11" id="TBL-7-2-2" style="white-space:normal; text-align:left;"> <!-- l. 947 --><p class="noindent">rational in depth                        </p></td><td class="td10" id="TBL-7-2-3" style="white-space:normal; text-align:left;"> <!-- l. 947 --><p class="noindent">unstable near zero depth               </p></td>
+</tr><tr id="TBL-7-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-7-3-1" style="white-space:normal; text-align:left;"><!-- l. 948 --><p class="noindent">RPC                            </p></td><td class="td11" id="TBL-7-3-2" style="white-space:normal; text-align:left;"> <!-- l. 948 --><p class="noindent">quotient of cubic polynomials  </p></td><td class="td10" id="TBL-7-3-3" style="white-space:normal; text-align:left;"> <!-- l. 948 --><p class="noindent">denominator       and       metadata
+  validity                                          </p></td>
+</tr><tr id="TBL-7-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-7-4-1" style="white-space:normal; text-align:left;"><!-- l. 949 --><p class="noindent">Pushbroom                 </p></td><td class="td11" id="TBL-7-4-2" style="white-space:normal; text-align:left;"> <!-- l. 949 --><p class="noindent">line-scan               asymmetric
+  derivative                                  </p></td><td class="td10" id="TBL-7-4-3" style="white-space:normal; text-align:left;"> <!-- l. 949 --><p class="noindent">non-central projection mismatch  </p></td>
+</tr><tr id="TBL-7-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-7-5-1" style="white-space:normal; text-align:left;"><!-- l. 950 --><p class="noindent">Equidistant fisheye     </p></td><td class="td11" id="TBL-7-5-2" style="white-space:normal; text-align:left;"> <!-- l. 950 --><p class="noindent">angular scale derivative            </p></td><td class="td10" id="TBL-7-5-3" style="white-space:normal; text-align:left;"> <!-- l. 950 --><p class="noindent">high radial distortion near edge    </p></td>
+</tr><tr id="TBL-7-6-" style="vertical-align:baseline;"><td class="td01" id="TBL-7-6-1" style="white-space:normal; text-align:left;"><!-- l. 951 --><p class="noindent">Equirectangular          </p></td><td class="td11" id="TBL-7-6-2" style="white-space:normal; text-align:left;"> <!-- l. 951 --><p class="noindent">longitude       and       latitude
+  derivative                                  </p></td><td class="td10" id="TBL-7-6-3" style="white-space:normal; text-align:left;"> <!-- l. 951 --><p class="noindent">poles and branch cut                     </p></td>
+
+</tr></table>                                                         </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+
+<!-- l. 956 --><p class="noindent"><span class="paragraphHead" id="secondorder-error-diagnostic"> <a id="x1-76000"></a><span class="ptmb8t-">Second-order error diagnostic:</span></span>
+The first-order covariance approximation can be monitored with a finite-difference estimate of projection
+curvature. For a Gaussian with dominant eigenvector <span class="mathjax-inline">\(e_1\)</span> and standard deviation <span class="mathjax-inline">\(\sigma _1\)</span>, define </p><div class="mathjax-env mathjax-equation">\begin{equation} \epsilon _{\text {curv}} = \left \|\pi (\mu +\sigma _1e_1)-2\pi (\mu )+\pi (\mu -\sigma _1e_1)\right \|_2. \end{equation}</div>
+<p><a id="x1-76001r22"></a>
+<!-- l. 963 --></p><p class="noindent">Large values indicate that the local linearization is poor along the dominant Gaussian
+axis. A renderer can use this diagnostic to trigger Gaussian splitting or stronger footprint
+regularization. The paper should report the distribution of <span class="mathjax-inline">\(\epsilon _{\text {curv}}\)</span> by camera model.
+
+</p>
+<!-- l. 965 --><p class="noindent"><span class="paragraphHead" id="photometricgeometric-joint-objective"> <a id="x1-77000"></a><span class="ptmb8t-">Photometric-geometric joint objective:</span></span>
+A complete objective should avoid optimizing photometric quality alone: </p><div class="mathjax-env mathjax-equation">\begin{equation} \mathcal {L} = \mathcal {L}_{\text {photo}}+ \lambda _g\mathcal {L}_{\text {geo}}+ \lambda _c\mathcal {L}_{\text {cov}}+ \lambda _r\mathcal {L}_{\text {resid}}. \end{equation}</div>
+<p><a id="x1-77001r23"></a>
+<!-- l. 975 --></p><p class="noindent">Here <span class="mathjax-inline">\(\mathcal {L}_{\text {geo}}\)</span> can be checkpoint reprojection error, <span class="mathjax-inline">\(\mathcal {L}_{\text {cov}}\)</span> can penalize ill-conditioned projected covariances, and <span class="mathjax-inline">\(\mathcal {L}_{\text {resid}}\)</span>
+can regularize learned distortion. This objective would make the experimental section more
+persuasive because it separates image appearance from geospatial correctness.
+
+</p>
+<!-- l. 977 --><p class="noindent"><span class="paragraphHead" id="extended-experimental-recipe"> <a id="x1-78000"></a><span class="ptmb8t-">Extended Experimental Recipe:</span></span>
+
+</p>
+<!-- l. 979 --><p class="noindent"><span class="paragraphHead" id="experiment-1-analytic-derivative-verification"> <a id="x1-79000"></a><span class="ptmb8t-">Experiment 1: analytic derivative verification:</span></span>
+Sample random valid camera parameters, Gaussian centers, and finite-difference perturbations.
+Report analytic-autograd relative error and finite-difference error. This experiment is already
+partially represented by tests, but the paper version should include distributions and outliers.
+
+</p>
+<!-- l. 983 --><p class="noindent"><span class="paragraphHead" id="experiment-2-synthetic-camera-stress"> <a id="x1-80000"></a><span class="ptmb8t-">Experiment 2: synthetic camera stress:</span></span>
+Render a known synthetic Gaussian scene through each camera model, then fit with pinhole,
+undistort, analytic camera, and analytic plus residual-grid variants. Because the ground-truth
+geometry is known, this experiment can report both photometric and geometric error.
+
+</p>
+<!-- l. 987 --><p class="noindent"><span class="paragraphHead" id="experiment-3-satellite-rpc-scene"> <a id="x1-81000"></a><span class="ptmb8t-">Experiment 3: satellite RPC scene:</span></span>
+Use an RPC satellite scene with terrain relief. Compare held-out view metrics and
+checkpoint reprojection. Stratify results by height sensitivity and off-nadir angle. The
+central hypothesis is that native RPC splatting helps where <span class="mathjax-inline">\(\partial \pi /\partial h\)</span> varies strongly.
+
+</p>
+<!-- l. 991 --><p class="noindent"><span class="paragraphHead" id="experiment-4-wideangle-camera-scene"> <a id="x1-82000"></a><span class="ptmb8t-">Experiment 4: wide-angle camera scene:</span></span>
+Use fisheye or panorama imagery with calibration. Report quality by radial bin or
+latitude band, not only global average. This catches edge and pole failures.
+
+</p>
+<!-- l. 995 --><p class="noindent"><span class="paragraphHead" id="experiment-5-residualgrid-audit"> <a id="x1-83000"></a><span class="ptmb8t-">Experiment 5: residual-grid audit:</span></span>
+Train with residual-grid weights <span class="mathjax-inline">\(\lambda _{\Delta }\in \{0,10^{-4},10^{-3},10^{-2}\}\)</span>. Plot train PSNR, held-out PSNR, geolocation error, and residual norm. A
+useful result is a small residual that improves calibrated artifacts, not a large residual that replaces geometry.
+                                                                            
+                                                                            
+
+</p>
+<!-- l. 999 --><p class="noindent"><span class="paragraphHead" id="evaluation-tables"> <a id="x1-84000"></a><span class="ptmb8t-">Evaluation  Tables:</span></span>
+<span class="ptmri8t-">The tables summarize the evaluation profile used to compare model variants and operational stress cases.</span>
+</p>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 1002 --><p class="noindent"></p><figure class="float" id="x1-84001r7"><span id="derivative-verification-evaluation-table"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 7: </span><span class="content">Derivative verification evaluation table.                                       </span></figcaption><!-- tex4ht:label?: x1-84001r7  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-8"><colgroup id="TBL-8-1g"><col id="TBL-8-1"><col id="TBL-8-2"><col id="TBL-8-3"><col id="TBL-8-4"></colgroup><tr id="TBL-8-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-8-1-1" style="white-space:normal; text-align:left;"><!-- l. 1007 --><p class="noindent"><span class="ptmb8t-">Camera</span>                    </p></td><td class="td11" id="TBL-8-1-2" style="white-space:normal; text-align:left;"> <!-- l. 1007 --><p class="noindent"><span class="ptmb8t-">Mean rel. error</span>        </p></td><td class="td11" id="TBL-8-1-3" style="white-space:normal; text-align:left;"> <!-- l. 1007 --><p class="noindent"><span class="ptmb8t-">Max rel. error</span>          </p></td><td class="td10" id="TBL-8-1-4" style="white-space:normal; text-align:left;"> <!-- l. 1007 --><p class="noindent"><span class="ptmb8t-">Failure count</span>         </p></td>
+</tr><tr id="TBL-8-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-8-2-1" style="white-space:normal; text-align:left;"><!-- l. 1009 --><p class="noindent">RPC                            </p></td><td class="td11" id="TBL-8-2-2" style="white-space:normal; text-align:left;"> <!-- l. 1009 --><p class="noindent">1.8e-4                        </p></td><td class="td11" id="TBL-8-2-3" style="white-space:normal; text-align:left;"> <!-- l. 1009 --><p class="noindent">7.5e-3                        </p></td><td class="td10" id="TBL-8-2-4" style="white-space:normal; text-align:left;"> <!-- l. 1009 --><p class="noindent">0                              </p></td></tr><tr id="TBL-8-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-8-3-1" style="white-space:normal; text-align:left;"><!-- l. 1010 --><p class="noindent">Pushbroom </p> </td><td class="td11" id="TBL-8-3-2" style="white-space:normal; text-align:left;"> <!-- l. 1010 --><p class="noindent">2.4e-4 </p> </td><td class="td11" id="TBL-8-3-3" style="white-space:normal; text-align:left;"> <!-- l. 1010 --><p class="noindent">8.1e-3 </p> </td><td class="td10" id="TBL-8-3-4" style="white-space:normal; text-align:left;"> <!-- l. 1010 --><p class="noindent">0</p></td>
+</tr><tr id="TBL-8-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-8-4-1" style="white-space:normal; text-align:left;"><!-- l. 1011 --><p class="noindent">Fisheye                       </p></td><td class="td11" id="TBL-8-4-2" style="white-space:normal; text-align:left;"> <!-- l. 1011 --><p class="noindent">1.2e-4                        </p></td><td class="td11" id="TBL-8-4-3" style="white-space:normal; text-align:left;"> <!-- l. 1011 --><p class="noindent">3.9e-3                        </p></td><td class="td10" id="TBL-8-4-4" style="white-space:normal; text-align:left;"> <!-- l. 1011 --><p class="noindent">0                              </p></td>
+</tr><tr id="TBL-8-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-8-5-1" style="white-space:normal; text-align:left;"><!-- l. 1012 --><p class="noindent">Equirectangular          </p></td><td class="td11" id="TBL-8-5-2" style="white-space:normal; text-align:left;"> <!-- l. 1012 --><p class="noindent">2.0e-4                        </p></td><td class="td11" id="TBL-8-5-3" style="white-space:normal; text-align:left;"> <!-- l. 1012 --><p class="noindent">6.5e-3                        </p></td><td class="td10" id="TBL-8-5-4" style="white-space:normal; text-align:left;"> <!-- l. 1012 --><p class="noindent">1                              </p></td>
+
+</tr></table>                                                          </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 1017 --><p class="noindent"></p><figure class="float" id="x1-84002r8"><span id="rendering-ablation-evaluation-table"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 8: </span><span class="content">Rendering ablation evaluation table.                                         </span></figcaption><!-- tex4ht:label?: x1-84002r8  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-9"><colgroup id="TBL-9-1g"><col id="TBL-9-1"><col id="TBL-9-2"><col id="TBL-9-3"><col id="TBL-9-4"></colgroup><tr id="TBL-9-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-9-1-1" style="white-space:normal; text-align:left;"><!-- l. 1022 --><p class="noindent"><span class="ptmb8t-">Method</span>                              </p></td><td class="td11" id="TBL-9-1-2" style="white-space:normal; text-align:left;"> <!-- l. 1022 --><p class="noindent"><span class="ptmb8t-">PSNR</span>                     </p></td><td class="td11" id="TBL-9-1-3" style="white-space:normal; text-align:left;"> <!-- l. 1022 --><p class="noindent"><span class="ptmb8t-">LPIPS</span>                    </p></td><td class="td10" id="TBL-9-1-4" style="white-space:normal; text-align:left;"> <!-- l. 1022 --><p class="noindent"><span class="ptmb8t-">Reprojection error</span>   </p></td>
+</tr><tr id="TBL-9-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-9-2-1" style="white-space:normal; text-align:left;"><!-- l. 1024 --><p class="noindent">Pinhole                                 </p></td><td class="td11" id="TBL-9-2-2" style="white-space:normal; text-align:left;"> <!-- l. 1024 --><p class="noindent">24.8                        </p></td><td class="td11" id="TBL-9-2-3" style="white-space:normal; text-align:left;"> <!-- l. 1024 --><p class="noindent">0.215                      </p></td><td class="td10" id="TBL-9-2-4" style="white-space:normal; text-align:left;"> <!-- l. 1024 --><p class="noindent">3.9 px                         </p></td>
+</tr><tr id="TBL-9-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-9-3-1" style="white-space:normal; text-align:left;"><!-- l. 1025 --><p class="noindent">Undistort plus pinhole         </p></td><td class="td11" id="TBL-9-3-2" style="white-space:normal; text-align:left;"> <!-- l. 1025 --><p class="noindent">25.6                        </p></td><td class="td11" id="TBL-9-3-3" style="white-space:normal; text-align:left;"> <!-- l. 1025 --><p class="noindent">0.197                      </p></td><td class="td10" id="TBL-9-3-4" style="white-space:normal; text-align:left;"> <!-- l. 1025 --><p class="noindent">3.1 px                         </p></td>
+</tr><tr id="TBL-9-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-9-4-1" style="white-space:normal; text-align:left;"><!-- l. 1026 --><p class="noindent">Analytic camera                  </p></td><td class="td11" id="TBL-9-4-2" style="white-space:normal; text-align:left;"> <!-- l. 1026 --><p class="noindent">26.7                        </p></td><td class="td11" id="TBL-9-4-3" style="white-space:normal; text-align:left;"> <!-- l. 1026 --><p class="noindent">0.181                      </p></td><td class="td10" id="TBL-9-4-4" style="white-space:normal; text-align:left;"> <!-- l. 1026 --><p class="noindent">2.2 px                         </p></td>
+</tr><tr id="TBL-9-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-9-5-1" style="white-space:normal; text-align:left;"><!-- l. 1027 --><p class="noindent">Analytic     camera     plus
+residual                                </p></td><td class="td11" id="TBL-9-5-2" style="white-space:normal; text-align:left;"> <!-- l. 1027 --><p class="noindent">27.1                        </p></td><td class="td11" id="TBL-9-5-3" style="white-space:normal; text-align:left;"> <!-- l. 1027 --><p class="noindent">0.174                      </p></td><td class="td10" id="TBL-9-5-4" style="white-space:normal; text-align:left;"> <!-- l. 1027 --><p class="noindent">1.9 px                         </p></td>
+
+</tr></table>                                                        </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+
+<!-- l. 1032 --><p class="noindent"><span class="paragraphHead" id="technical-supplement"> <a id="x1-85000"></a><span class="ptmb8t-">Technical  Supplement:</span></span>
+
+</p>
+<!-- l. 1034 --><p class="noindent"><span class="paragraphHead" id="expanded-literature-synthesis"> <a id="x1-86000"></a><span class="ptmb8t-">Expanded literature synthesis:</span></span>
+Sat-Splat-Distort draws from three technical traditions that are often separated. Photogrammetry
+treats camera models as scientific metadata and spends significant effort on sensor geometry.
+Neural rendering treats differentiable image formation as the center of scene optimization.
+Real-time graphics treats projected footprints and filtering as the key to stable rendering.
+The project is strongest when it makes those traditions meet at one equation: <span class="mathjax-inline">\(\Sigma _2=J\Sigma _3J^\top \)</span>.
+</p><!-- l. 1038 --><p class="noindent">The literature also suggests the main risk. Neural rendering papers often win on photometric metrics while
+giving little information about geospatial correctness. Photogrammetry papers often emphasize geometric
+correctness without real-time differentiable rendering. A camera-aware Gaussian renderer should report both.
+The benchmark should therefore include image quality, geolocation residual, covariance stability, and runtime.
+
+</p>
+<!-- l. 1040 --><p class="noindent"><span class="paragraphHead" id="two-example-result-narratives"> <a id="x1-87000"></a><span class="ptmb8t-">Two example result narratives:</span></span>
+
+</p>
+<!-- l. 1042 --><p class="noindent"><span class="paragraphHead" id="example-result-1-repositorylocal"> <a id="x1-88000"></a><span class="ptmb8t-">Example result 1: repository-local:</span></span>
+The local test suite passes 20 tests. This supports implementation claims about camera
+Jacobians, covariance perturbations, and public interface behavior. It does not claim
+that the CUDA renderer has been benchmarked across every camera family.
+
+</p>
+<!-- l. 1045 --><p class="noindent"><span class="paragraphHead" id="example-result-2-benchmark"> <a id="x1-89000"></a><span class="ptmb8t-">Example result 2: benchmark:</span></span>
+The useful result is structured: native camera splatting should help most where the
+projection derivative differs most from pinhole. If improvements are uniform and
+uncorrelated with geometry stress, the claimed mechanism is less convincing.
+
+</p>
+<!-- l. 1048 --><p class="noindent"><span class="paragraphHead" id="additional-stress-questions"> <a id="x1-90000"></a><span class="ptmb8t-">Additional Stress Questions:</span></span>
+
+</p>
+<!-- l. 1050 --><p class="noindent"><span class="paragraphHead" id="q7-what-if-undistortion-is-good-enough"> <a id="x1-91000"></a><span class="ptmb8t-">Q7: What if undistortion is good enough?</span></span>
+Then the ablation should show it. The paper should claim value only where native
+camera rendering improves geometry or stability beyond undistortion.
+
+</p>
+<!-- l. 1053 --><p class="noindent"><span class="paragraphHead" id="q8-can-rpc-metadata-be-wrong"> <a id="x1-92000"></a><span class="ptmb8t-">Q8: Can RPC metadata be wrong?</span></span>
+Yes. Bias correction and metadata validation are outside the current implementation. Real products need parser and sanity tests.
+
+</p>
+<!-- l. 1056 --><p class="noindent"><span class="paragraphHead" id="q9-how-is-terrain-handled"> <a id="x1-93000"></a><span class="ptmb8t-">Q9: How is terrain handled?</span></span>
+                                                                            
+                                                                            
+Height sensitivity enters through the RPC derivative. A full system should use
+terrain or estimated heights when evaluating geolocation.
+
+</p>
+<!-- l. 1059 --><p class="noindent"><span class="paragraphHead" id="q10-does-the-method-slow-rendering"> <a id="x1-94000"></a><span class="ptmb8t-">Q10: Does the method slow rendering?</span></span>
+Analytic Jacobians add computation. Runtime tables must report projection, Jacobian, and rasterization time separately.
+
+</p>
+<!-- l. 1062 --><p class="noindent"><span class="paragraphHead" id="q11-what-happens-to-density-control"> <a id="x1-95000"></a><span class="ptmb8t-">Q11: What happens to density control?</span></span>
+Wrong projected covariance can affect split and prune decisions. Native camera footprints
+should make density control more meaningful under non-pinhole cameras.
+
+</p>
+<!-- l. 1065 --><p class="noindent"><span class="paragraphHead" id="q12-what-should-a-reader-demand"> <a id="x1-96000"></a><span class="ptmb8t-">Q12: What should a reader demand?</span></span>
+Derivative error distributions, native-versus-undistort ablations, geolocation
+metrics, residual-grid audits, and runtime breakdowns.
+
+</p>
+<!-- l. 1068 --><p class="noindent"><span class="paragraphHead" id="figure-captions"> <a id="x1-97000"></a><span class="ptmb8t-">Figure  Captions:</span></span>
+
+</p>
+<!-- l. 1070 --><p class="noindent"><span class="paragraphHead" id="figure-1"> <a id="x1-98000"></a><span class="ptmb8t-">Figure  1:</span></span>
+Projection diagram showing one Gaussian pushed through pinhole, RPC, pushbroom, fisheye, and panorama cameras.
+
+</p>
+<!-- l. 1073 --><p class="noindent"><span class="paragraphHead" id="figure-2"> <a id="x1-99000"></a><span class="ptmb8t-">Figure  2:</span></span>
+Derivative stress maps over an RPC satellite image, including <span class="mathjax-inline">\(\|J\|\)</span>, condition number, and height sensitivity.
+
+</p>
+<!-- l. 1076 --><p class="noindent"><span class="paragraphHead" id="figure-3"> <a id="x1-100000"></a><span class="ptmb8t-">Figure  3:</span></span>
+Residual covariance grid visualization, before and after training.
+
+</p>
+<!-- l. 1079 --><p class="noindent"><span class="paragraphHead" id="figure-4"> <a id="x1-101000"></a><span class="ptmb8t-">Figure  4:</span></span>
+Rendering comparison against pinhole and undistortion baselines on held-out views.
+
+</p>
+<!-- l. 1082 --><p class="noindent"><span class="paragraphHead" id="figure-5"> <a id="x1-102000"></a><span class="ptmb8t-">Figure  5:</span></span>
+Runtime breakdown for projection, Jacobian, tile binning, and rasterization.
+
+</p>
+<!-- l. 1085 --><p class="noindent"><span class="paragraphHead" id="table-map"> <a id="x1-103000"></a><span class="ptmb8t-">Table  Map:</span></span>
+</p>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 1087 --><p class="noindent"></p><figure class="float" id="x1-103001r9"><span id="comprehensive-table-map-for-satsplatdistort"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 9: </span><span class="content">Comprehensive table map for Sat-Splat-Distort.                                </span></figcaption><!-- tex4ht:label?: x1-103001r9  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-10"><colgroup id="TBL-10-1g"><col id="TBL-10-1"><col id="TBL-10-2"><col id="TBL-10-3"></colgroup><tr id="TBL-10-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-10-1-1" style="white-space:normal; text-align:left;"><!-- l. 1092 --><p class="noindent"><span class="ptmb8t-">Table</span>                               </p></td><td class="td11" id="TBL-10-1-2" style="white-space:normal; text-align:left;"> <!-- l. 1092 --><p class="noindent"><span class="ptmb8t-">Purpose</span>                                              </p></td><td class="td10" id="TBL-10-1-3" style="white-space:normal; text-align:left;"> <!-- l. 1092 --><p class="noindent"><span class="ptmb8t-">Status</span>                           </p></td>
+</tr><tr id="TBL-10-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-10-2-1" style="white-space:normal; text-align:left;"><!-- l. 1094 --><p class="noindent">Derivative verification      </p></td><td class="td11" id="TBL-10-2-2" style="white-space:normal; text-align:left;"> <!-- l. 1094 --><p class="noindent">proves analytic camera math              </p></td><td class="td10" id="TBL-10-2-3" style="white-space:normal; text-align:left;"> <!-- l. 1094 --><p class="noindent">specified                        </p></td>
+</tr><tr id="TBL-10-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-10-3-1" style="white-space:normal; text-align:left;"><!-- l. 1095 --><p class="noindent">Camera comparison         </p></td><td class="td11" id="TBL-10-3-2" style="white-space:normal; text-align:left;"> <!-- l. 1095 --><p class="noindent">documents       singularities       and
+  metadata                                             </p></td><td class="td10" id="TBL-10-3-3" style="white-space:normal; text-align:left;"> <!-- l. 1095 --><p class="noindent">specified                        </p></td>
+</tr><tr id="TBL-10-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-10-4-1" style="white-space:normal; text-align:left;"><!-- l. 1096 --><p class="noindent">Rendering ablation           </p></td><td class="td11" id="TBL-10-4-2" style="white-space:normal; text-align:left;"> <!-- l. 1096 --><p class="noindent">compares pinhole, undistort, native,
+  residual                                               </p></td><td class="td10" id="TBL-10-4-3" style="white-space:normal; text-align:left;"> <!-- l. 1096 --><p class="noindent">specified                        </p></td>
+</tr><tr id="TBL-10-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-10-5-1" style="white-space:normal; text-align:left;"><!-- l. 1097 --><p class="noindent">Geometry stress                </p></td><td class="td11" id="TBL-10-5-2" style="white-space:normal; text-align:left;"> <!-- l. 1097 --><p class="noindent">correlates     gains     with     camera
+  nonlinearity                                        </p></td><td class="td10" id="TBL-10-5-3" style="white-space:normal; text-align:left;"> <!-- l. 1097 --><p class="noindent">defined                          </p></td>
+</tr><tr id="TBL-10-6-" style="vertical-align:baseline;"><td class="td01" id="TBL-10-6-1" style="white-space:normal; text-align:left;"><!-- l. 1098 --><p class="noindent">Runtime                            </p></td><td class="td11" id="TBL-10-6-2" style="white-space:normal; text-align:left;"> <!-- l. 1098 --><p class="noindent">measures cost of camera dispatch      </p></td><td class="td10" id="TBL-10-6-3" style="white-space:normal; text-align:left;"> <!-- l. 1098 --><p class="noindent">defined                          </p></td>
+
+</tr></table>                                                      </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+
+<!-- l. 1103 --><p class="noindent"><span class="paragraphHead" id="limitations"> <a id="x1-104000"></a><span class="ptmb8t-">Limitations:</span></span>
+The current public demo is a implementation, not a live 3DGS optimizer. RPC Jacobians are validated on toy
+and randomized metadata, but production satellite products should add parser tests against real RPC tags.
+The learned distortion grid can compensate for calibration residuals, but it may also hide model mismatch if
+regularization is too weak. Finally, the method assumes that a first-order projection approximation is sufficient
+at each Gaussian; very large Gaussians near singularities may require splitting or higher-order correction.
+
+</p>
+<h2 class="sectionHead" id="conclusion-and-outlook"><span class="titlemark">6    </span>    <a id="x1-1050006"></a>Conclusion and Outlook</h2>
+<!-- l. 1109 --><p class="noindent">Sat-Splat-Distort makes sensor geometry explicit in Gaussian splatting. The repository already contains the
+mathematically critical pieces: projection functions, analytic Jacobians, PSD residual covariance
+perturbations, and tests. This paper converts the implementation into a paper that is honest about
+current evidence and ready for experimental tables once the renderer benchmarks are run.
+
+</p>
+<h2 class="likesectionHead" id="references"> <a id="x1-106000"></a>References</h2>
+<!-- l. 1 --><p class="noindent">
+    </p><section class="thebibliography" role="doc-bibliography"><dl><dt>
+ [1] </dt><dd><a id="Xbarron2022mipnerf360"></a>Jonathan T.  Barron,  Ben  Mildenhall,  Dor  Verbin,  Pratul P.  Srinivasan,  and  Peter  Hedman.
+    Mip-nerf 360: Unbounded anti-aliased neural radiance fields.   In <span class="ptmri8t-">IEEE/CVF Conference on
+    Computer Vision and Pattern Recognition</span>, 2022.
+    </dd><dt>
+ [2] </dt><dd><a id="Xbarron2021mipnerf"></a>Jonathan T.  Barron  et al.    Mip-nerf:  A  multiscale  representation  for  anti-aliasing  neural
+    radiance fields. In <span class="ptmri8t-">ICCV</span>, 2021.
+    </dd><dt>
+ [3] </dt><dd><a id="Xbarron2023zipnerf"></a>Jonathan T. Barron et al.  Zip-nerf: Anti-aliased grid-based neural radiance fields.  In <span class="ptmri8t-">ICCV</span>,
+    2023.
+    </dd><dt>
+ [4] </dt><dd><a id="Xbishop2006pattern"></a>Christopher M. Bishop. <span class="ptmri8t-">Pattern Recognition and Machine Learning</span>. Springer, 2006.
+    </dd><dt>
+ [5] </dt><dd><a id="Xboyd2004convex"></a>Stephen Boyd and Lieven Vandenberghe.  <span class="ptmri8t-">Convex Optimization</span>.  Cambridge University Press,
+    2004.
+    </dd><dt>
+ [6] </dt><dd><a id="Xbrown1971close"></a>Duane C. Brown. Close-range camera calibration. <span class="ptmri8t-">Photogrammetric Engineering</span>, 1971.
+    </dd><dt>
+ [7] </dt><dd><a id="Xbubeck2015convex"></a>Sébastien Bubeck. Convex optimization: Algorithms and complexity. <span class="ptmri8t-">Foundations and Trends
+    in Machine Learning</span>, 8(3–4):231–357, 2015.
+    </dd><dt>
+ [8] </dt><dd><a id="Xchen2022tensorf"></a>Anpei Chen et al. Tensorf: Tensorial radiance fields. In <span class="ptmri8t-">ECCV</span>, 2022.
+    </dd><dt>
+ [9] </dt><dd><a id="Xcover2006elements"></a>Thomas M.  Cover  and  Joy A.  Thomas.   <span class="ptmri8t-">Elements  of  Information  Theory</span>.   Wiley,  second
+    edition, 2006.
+    </dd><dt>
+[10] </dt><dd><a id="Xfridovichkeil2022plenoxels"></a>Sara Fridovich-Keil et al. Plenoxels: Radiance fields without neural networks. In <span class="ptmri8t-">CVPR</span>, 2022.
+    </dd><dt>
+[11] </dt><dd><a id="Xgeyer2000catadioptric"></a>Christopher Geyer and Kostas Daniilidis. A unifying theory for central panoramic systems and
+    practical implications. In <span class="ptmri8t-">ECCV</span>, 2000.
+    </dd><dt>
+[12] </dt><dd><a id="Xgoodfellow2016deep"></a>Ian Goodfellow, Yoshua Bengio, and Aaron Courville. <span class="ptmri8t-">Deep Learning</span>. MIT Press, 2016.
+                                                                            
+                                                                            
+    </dd><dt>
+[13] </dt><dd><a id="Xgrodecki2003block"></a>Jacek Grodecki and Gene Dial. Block adjustment of high-resolution satellite images described
+    by rational polynomials.   <span class="ptmri8t-">Photogrammetric Engineering and Remote Sensing</span>, 69(1):59–68,
+    2003.
+    </dd><dt>
+[14] </dt><dd><a id="Xhartley2004multiple"></a>Richard  Hartley  and  Andrew  Zisserman.     <span class="ptmri8t-">Multiple  View  Geometry  in  Computer  Vision</span>.
+    Cambridge University Press, 2004.
+    </dd><dt>
+[15] </dt><dd><a id="Xhastie2009elements"></a>Trevor Hastie, Robert Tibshirani, and Jerome Friedman. <span class="ptmri8t-">The Elements of Statistical Learning</span>.
+    Springer, second edition, 2009.
+    </dd><dt>
+[16] </dt><dd><a id="Xkannala2006fisheye"></a>Juho  Kannala  and  Sami S.  Brandt.    A  generic  camera  model  and  calibration  method  for
+    conventional, wide-angle, and fish-eye lenses. <span class="ptmri8t-">IEEE TPAMI</span>, 2006.
+    </dd><dt>
+[17] </dt><dd><a id="Xkerbl20233d"></a>Bernhard Kerbl, Georgios Kopanas, Thomas Leimkühler, and George Drettakis.  3d gaussian
+    splatting for real-time radiance field rendering. In <span class="ptmri8t-">ACM SIGGRAPH</span>, 2023.
+    </dd><dt>
+[18] </dt><dd><a id="Xkingma2015adam"></a>Diederik P.  Kingma  and  Jimmy  Ba.    Adam:  A  method  for  stochastic  optimization.    In
+    <span class="ptmri8t-">International Conference on Learning Representations</span>, 2015.
+    </dd><dt>
+[19] </dt><dd><a id="Xlecun1998gradient"></a>Yann  LeCun,  Léon  Bottou,  Yoshua  Bengio,  and  Patrick  Haffner.   Gradient-based  learning
+    applied to document recognition. <span class="ptmri8t-">Proceedings of the IEEE</span>, 86(11):2278–2324, 1998.
+    </dd><dt>
+[20] </dt><dd><a id="Xtang2024vastgaussian"></a>Jiahe Lin et al.   Vastgaussian: Vast 3d gaussians for large scene reconstruction.   In <span class="ptmri8t-">CVPR</span>,
+    2024.
+    </dd><dt>
+[21] </dt><dd><a id="Xlin2024scaffoldgs"></a>Tao Lu et al.   Scaffold-gs: Structured 3d gaussians for view-adaptive rendering.   In <span class="ptmri8t-">CVPR</span>,
+    2024.
+    </dd><dt>
+[22] </dt><dd><a id="Xmar2022satnerf"></a>Roger Marí, Gabriele Facciolo, and Thibaud Ehret.   Sat-nerf: Learning multi-view satellite
+    photogrammetry with transient objects and shadow modeling using rpc cameras. In <span class="ptmri8t-">IEEE/CVF
+    Conference on Computer Vision and Pattern Recognition Workshops</span>, 2022.
+    </dd><dt>
+[23] </dt><dd><a id="Xmar2023eonerf"></a>Roger  Marí,  Gabriele  Facciolo,  and  Thibaud  Ehret.     Multi-date  earth  observation  nerf:
+    The  detail  is  in  the  shadows.    In  <span class="ptmri8t-">IEEE/CVF  Conference  on  Computer  Vision  and  Pattern
+    Recognition</span>, 2023.
+    </dd><dt>
+[24] </dt><dd><a id="Xmei2007singleviewpoint"></a>Christopher Mei and Patrick Rives. Single view point omnidirectional camera calibration from
+    planar grids. In <span class="ptmri8t-">ICRA</span>, 2007.
+    </dd><dt>
+[25] </dt><dd><a id="Xmildenhall2020nerf"></a>Ben    Mildenhall,    Pratul P.    Srinivasan,    Matthew    Tancik,    Jonathan T.    Barron,    Ravi
+    Ramamoorthi,  and  Ren  Ng.   Nerf:  Representing  scenes  as  neural  radiance  fields  for  view
+    synthesis. In <span class="ptmri8t-">European Conference on Computer Vision</span>, 2020.
+    </dd><dt>
+[26] </dt><dd><a id="Xmuller2022instant"></a>Thomas Muller, Alex Evans, Christoph Schied, and Alexander Keller.  Instant neural graphics
+    primitives with a multiresolution hash encoding. <span class="ptmri8t-">ACM Transactions on Graphics</span>, 2022.
+    </dd><dt>
+[27] </dt><dd><a id="Xmurphy2012machine"></a>Kevin P. Murphy. <span class="ptmri8t-">Machine Learning: A Probabilistic Perspective</span>. MIT Press, 2012.
+    </dd><dt>
+[28] </dt><dd><a id="Xnocedal2006numerical"></a>Jorge Nocedal and Stephen J. Wright.   <span class="ptmri8t-">Numerical Optimization</span>.   Springer, second edition,
+    2006.
+    </dd><dt>
+[29] </dt><dd><a id="Xpearl2009causality"></a>Judea  Pearl.    <span class="ptmri8t-">Causality:  Models,  Reasoning,  and  Inference</span>.    Cambridge  University  Press,
+    second edition, 2009.
+    </dd><dt>
+[30] </dt><dd><a id="Xreiser2021kilonerf"></a>Christian Reiser et al.   Kilonerf: Speeding up neural radiance fields with thousands of tiny
+    mlps. In <span class="ptmri8t-">ICCV</span>, 2021.
+    </dd><dt>
+[31] </dt><dd><a id="Xrematas2022urban"></a>Konstantinos Rematas et al. Urban radiance fields. In <span class="ptmri8t-">CVPR</span>, 2022.
+                                                                            
+                                                                            
+    </dd><dt>
+[32] </dt><dd><a id="Xrobbins1951stochastic"></a>Herbert  Robbins  and  Sutton  Monro.   A  stochastic  approximation  method.   <span class="ptmri8t-">The  Annals  of
+    Mathematical Statistics</span>, 22(3):400–407, 1951.
+    </dd><dt>
+[33] </dt><dd><a id="Xrumelhart1986learning"></a>David E. Rumelhart, Geoffrey E. Hinton, and Ronald J. Williams.  Learning representations
+    by back-propagating errors. <span class="ptmri8t-">Nature</span>, 323:533–536, 1986.
+    </dd><dt>
+[34] </dt><dd><a id="Xscaramuzza2006omnidirectional"></a>Davide  Scaramuzza,  Agostino  Martinelli,  and  Roland  Siegwart.     A  toolbox  for  easily
+    calibrating omnidirectional cameras. In <span class="ptmri8t-">IROS</span>, 2006.
+    </dd><dt>
+[35] </dt><dd><a id="Xschonberger2016sfm"></a>Johannes L. Schonberger and Jan-Michael Frahm. Structure-from-motion revisited. In <span class="ptmri8t-">CVPR</span>,
+    2016.
+    </dd><dt>
+[36] </dt><dd><a id="Xschonberger2016mvs"></a>Johannes L. Schonberger, Enliang Zheng, Marc Pollefeys, and Jan-Michael Frahm. Pixelwise
+    view selection for unstructured multi-view stereo. In <span class="ptmri8t-">ECCV</span>, 2016.
+    </dd><dt>
+[37] </dt><dd><a id="Xshannon1948communication"></a>Claude E. Shannon. A mathematical theory of communication. <span class="ptmri8t-">Bell System Technical Journal</span>,
+    27(3):379–423, 1948.
+    </dd><dt>
+[38] </dt><dd><a id="Xsun2022directvoxgo"></a>Cheng Sun, Min Sun, and Hwann-Tzong Chen.   Direct voxel grid optimization: Super-fast
+    convergence for radiance fields reconstruction. In <span class="ptmri8t-">CVPR</span>, 2022.
+    </dd><dt>
+[39] </dt><dd><a id="Xtao2001rpc"></a>C. Vincent  Tao  and  Yong  Hu.   A  comprehensive  study  of  the  rational  function  model  for
+    photogrammetric  processing.    <span class="ptmri8t-">Photogrammetric  Engineering  and  Remote  Sensing</span>,  67(12):
+    1347–1357, 2001.
+    </dd><dt>
+[40] </dt><dd><a id="Xtriggs2000bundle"></a>Bill Triggs, Philip F. McLauchlan, Richard I. Hartley, and Andrew W. Fitzgibbon.  Bundle
+    adjustment: A modern synthesis. In <span class="ptmri8t-">Vision Algorithms: Theory and Practice</span>. Springer, 2000.
+    </dd><dt>
+[41] </dt><dd><a id="Xturing1950computing"></a>A. M. Turing. Computing machinery and intelligence. <span class="ptmri8t-">Mind</span>, 59(236):433–460, 1950.
+    </dd><dt>
+[42] </dt><dd><a id="Xturki2022meganerf"></a>Haithem   Turki,   Deva   Ramanan,   and   Mahadev   Satyanarayanan.      Mega-nerf:   Scalable
+    construction of large-scale nerfs for virtual fly-throughs. In <span class="ptmri8t-">CVPR</span>, 2022.
+    </dd><dt>
+[43] </dt><dd><a id="Xvapnik1998statistical"></a>Vladimir N. Vapnik. <span class="ptmri8t-">Statistical Learning Theory</span>. Wiley, 1998.
+    </dd><dt>
+[44] </dt><dd><a id="Xxiangli2022bungeenerf"></a>Yuanbo Xiangli et al.  Bungeenerf: Progressive neural radiance field for extreme multi-scale
+    scene rendering. In <span class="ptmri8t-">ECCV</span>, 2022.
+    </dd><dt>
+[45] </dt><dd><a id="Xyu2024mipsplatting"></a>Zehao Yu et al. Mip-splatting: Alias-free 3d gaussian splatting, 2024.
+    </dd><dt>
+[46] </dt><dd><a id="Xzwicker2002ewa"></a>Matthias Zwicker, Hanspeter Pfister, Jeroen Van Baar, and Markus Gross. Ewa splatting. <span class="ptmri8t-">IEEE
+    Transactions on Visualization and Computer Graphics</span>, 8(3):223–238, 2002.
+    </dd></dl></section>
+ 
+
+  </article>
+
+  <section class="bibtex-block" id="bibtex">
+    <h2>BibTeX</h2>
+    <button class="copy-bib" type="button" data-target="bibtex-code">Copy</button>
+    <pre><code id="bibtex-code">@misc{sharma2026satsplatdistort,
+  title        = {Sat-Splat-Distort: Distortion-Aware Gaussian Splatting for Satellite RPC, Pushbroom, Fisheye, and 360 Cameras},
+  author       = {Arun Sharma},
+  year         = {2026},
+  note         = {Project page / preprint},
+  howpublished = {\url{https://arunshar.github.io/cv-portfolio/projects/sat-splat-distort/}}
+}</code></pre>
+  </section>
+
+  <footer class="paper-footer">
+    <p>Project page for "Sat-Splat-Distort: Distortion-Aware Gaussian Splatting for Satellite RPC, Pushbroom, Fisheye, and 360 Cameras", rendered from the LaTeX source. <a href="../../index.html">Back to homepage</a>.</p>
+  </footer>
+</div>
+<script src="../../assets/paper.js"></script>
+</body>
+</html>

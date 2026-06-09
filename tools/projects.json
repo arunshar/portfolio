@@ -1,0 +1,66 @@
+{
+  "site_base": "https://arunshar.github.io/cv-portfolio",
+  "author": "Arun Sharma",
+  "affiliation": "University of Minnesota, Twin Cities",
+  "github_user": "arunshar",
+  "hf_user": "Arun0808",
+  "projects": [
+    {
+      "slug": "geosam-3d",
+      "source": "geosam-3d/paper",
+      "venue": "In preparation. Target: 3DV / CVPR 4DV workshop 2027",
+      "blurb": "Promptable 3D scene segmentation from monocular video via heat-method geodesic propagation over Gaussian centroids."
+    },
+    {
+      "slug": "sat-splat-distort",
+      "source": "sat-splat-distort/paper",
+      "venue": "In preparation. Target: CVPR EarthVision 2027",
+      "blurb": "Distortion-aware 3D Gaussian Splatting for satellite RPC, pushbroom, fisheye, and 360 cameras."
+    },
+    {
+      "slug": "physflow-earth",
+      "source": "physflow-earth/paper",
+      "venue": "In preparation. Target: NeurIPS 2026 Climate Change AI workshop",
+      "blurb": "Physics-constrained rectified flow for Sentinel-2 super-resolution and ERA5/CHIRPS climate downscaling."
+    },
+    {
+      "slug": "trajprompt",
+      "source": "trajprompt/paper",
+      "venue": "In preparation. Target: NeurIPS 2026 Datasets and Benchmarks",
+      "blurb": "Open-vocabulary maritime trajectory search: trajectory-CLIP and TGARD with SAM 2 over AIS tracks and satellite imagery."
+    },
+    {
+      "slug": "darkvessel-stack",
+      "source": "darkvessel-stack/paper",
+      "venue": "In preparation. Target: CVPR EarthVision 2027; xView3-SAR benchmark",
+      "blurb": "Multi-modal dark-vessel detection fusing Sentinel-1 SAR, Sentinel-2 optical, and AIS with TGARD and Pi-DPM anomaly reasoning."
+    },
+    {
+      "slug": "pin-service",
+      "source": "pin-service/paper",
+      "venue": "Systems preprint",
+      "blurb": "Production gRPC service for map-constrained pickup and drop-off pin selection in autonomous ride-hail."
+    },
+    {
+      "slug": "mapfix-spatial",
+      "source": "mapfix-spatial/paper",
+      "venue": "Preprint",
+      "blurb": "Distortion-aware geospatial coordinate correction with a deterministic engine and optional LLM-assisted analysis.",
+      "demo": "https://huggingface.co/spaces/Arun0808/mapfix-spatial"
+    },
+    {
+      "slug": "pi-grpo",
+      "source": "tools/_external/pi-grpo/paper",
+      "texfile": "pi_grpo_neurips.tex",
+      "venue": "In preparation. Target: NeurIPS workshop",
+      "blurb": "Physics-informed reinforcement learning with Group Relative Policy Optimization for trajectory generation and reasoning."
+    },
+    {
+      "slug": "geotrace-agent",
+      "source": "tools/_external/geotrace-agent/paper",
+      "texfile": "geotrace_agent_neurips.tex",
+      "venue": "In preparation. Target: NeurIPS workshop",
+      "blurb": "Multi-agent framework for spatiotemporal reasoning with Haegerstrand space-time prisms, MCP tools, and A2A messaging."
+    }
+  ]
+}

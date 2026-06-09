@@ -1,0 +1,1459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MapFix-Spatial: Interactive Distortion-Aware Coordinate Correction with Deterministic and AI-Assisted Analysis - Arun Sharma</title>
+<meta name="description" content="Distortion-aware geospatial coordinate correction with a deterministic engine and optional LLM-assisted analysis.">
+<link rel="stylesheet" href="paper.gen.css">
+<link rel="stylesheet" href="../../assets/paper.css">
+<script>window.MathJax = { tex: { tags: "ams" } };</script>
+<script async id="MathJax-script" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js"></script>
+</head>
+<body class="project-page">
+<div class="wrap">
+  <nav class="topnav"><a href="../../index.html">Arun Sharma</a> <span aria-hidden="true">/</span> <a href="../../index.html#projects">Selected Projects</a></nav>
+
+  <header class="paper-header">
+    <h1>MapFix-Spatial: Interactive Distortion-Aware Coordinate Correction with Deterministic and AI-Assisted Analysis</h1>
+    <p class="authors">Arun Sharma</p>
+    <p class="affiliation">University of Minnesota, Twin Cities</p>
+    <p class="venue">Preprint</p>
+    <div class="buttons"><a class="btn" href="../../assets/papers/mapfix-spatial.pdf">Paper (PDF)</a>
+      <a class="btn" href="https://github.com/arunshar/mapfix-spatial" target="_blank" rel="noopener">Code</a>
+      <a class="btn" href="https://huggingface.co/spaces/Arun0808/mapfix-spatial" target="_blank" rel="noopener">Demo</a>
+      <a class="btn" href="paper.md">Markdown</a>
+      <a class="btn" href="#bibtex">BibTeX</a></div>
+  </header>
+
+  <figure class="teaser">
+    <img src="figures/main-72eab786ea84c1b1a7f25cf674928064.svg" alt="MapFix-Spatial: Interactive Distortion-Aware Coordinate Correction with Deterministic and AI-Assisted Analysis overview" loading="lazy">
+  </figure>
+
+  <nav class="toc" aria-label="Contents">
+    <h2>Contents</h2>
+    <ol>
+      <li><a href="#introduction">Introduction</a></li>
+      <li><a href="#related-work">Related Work</a></li>
+      <li><a href="#method-and-architecture">Method and Architecture</a></li>
+      <li><a href="#evaluation">Evaluation</a></li>
+      <li><a href="#discussion-and-limitations">Discussion and Limitations</a></li>
+      <li><a href="#conclusion-and-outlook">Conclusion and Outlook</a></li>
+      <li><a href="#references">References</a></li>
+    </ol>
+  </nav>
+
+  <article class="paper-body">
+<section class="abstract" role="doc-abstract"> 
+
+<div class="centerline">                                  <span class="ptmb8t-x-x-120">Abstract</span>                                  </div>
+     <blockquote class="quote">
+     <!-- l. 254 --><p class="noindent">Distorted geospatial coordinates are common in quick maps, browser demos, legacy
+     dashboards, and human-edited spatial datasets. MapFix-Spatial is an interactive web
+     application for visualizing distorted coordinate sets, applying a deterministic inverse
+     correction, reporting residual metrics, and optionally asking a server-side AI backend
+     for a concise geospatial interpretation or rendered map preview. This paper documents
+     the  project  as  an  arXiv-style  systems  paper.  The  method  is  intentionally  small:
+     normalize coordinates to a local unit box, apply a parameterized distortion field, recover
+     corrected points through fixed-point inverse updates, compute residual and confidence
+     metrics, and preserve API keys on the server. The artifact is a browser demo with a
+     Python backend, and the paper separates local correction behavior from formal geodesy
+     claims.
+</p>
+     </blockquote>
+</section>
+
+<h2 class="sectionHead" id="introduction"><span class="titlemark">1    </span>    <a id="x1-10001"></a>Introduction</h2>
+<!-- l. 259 --><p class="noindent">Spatial data quality work often starts with a visual mismatch: a shoreline is warped, a sensor grid is skewed,
+a transit alignment drifts away from an expected route, or a cluster appears stretched by projection
+error. Production geospatial systems solve such problems with coordinate reference system
+metadata, rigorous transformations, and libraries such as PROJ and GDAL [<a href="#Xgdal">11</a>, <a href="#Xproj">32</a>]. Smaller data
+products and dashboards often lack that metadata. Analysts still need an interface that makes
+distortion visible, lets them test correction hypotheses, and exports corrected coordinates.
+</p><!-- l. 261 --><p class="noindent">MapFix-Spatial is a lightweight interactive tool for that setting. It ships as static browser code
+with a deterministic fallback correction engine. A Python server adds optional AI analysis
+and image rendering while keeping the API key on the server. The project is not intended
+to replace CRS-aware geodesy. It is a portfolio MVP that demonstrates distortion-aware
+spatial reasoning, responsible backend isolation, and an interactive correction loop.
+
+</p>
+<!-- l. 263 --><p class="noindent"><span class="paragraphHead" id="contributions"> <a id="x1-2000"></a><span class="ptmb8t-">Contributions:</span></span>
+     </p><dl class="enumerate-enumitem"><dt class="enumerate-enumitem">
+  1. </dt><dd class="enumerate-enumitem">A browser-based coordinate distortion and correction workflow over several sample spatial
+     patterns.
+     </dd><dt class="enumerate-enumitem">
+  2. </dt><dd class="enumerate-enumitem">A deterministic inverse correction routine based on repeated subtraction of a parameterized
+     distortion vector.
+     </dd><dt class="enumerate-enumitem">
+  3. </dt><dd class="enumerate-enumitem">Residual, recovery, skew, and confidence metrics for immediate analyst feedback.
+     </dd><dt class="enumerate-enumitem">
+  4. </dt><dd class="enumerate-enumitem">A server-side API design that keeps AI credentials private and returns structured correction
+     rows and summaries.</dd></dl>
+<figure class="figure"> 
+
+                                                                            
+                                                                            
+                                                                            
+                                                                            
+<!-- l. 277 --><p class="noindent" id="detailed-mapfixspatial-architecture-the-diagram-treats-coordinate-correction-as-an-inverseproblem-pipeline-normalized-coordinate-tokens-parameterize-a-distortion-field-fixedpoint-iterations-decode-corrected-coordinates-residual-gates-measure-confidence-and-evaluation-heads-separate-geometric-recovery-baseline-comparison-browserserver-parity-and-api-safety"><img alt="Figure" src="figures/main-72eab786ea84c1b1a7f25cf674928064.svg" loading="lazy">
+<a id="x1-2005r1"></a>
+</p>
+<figcaption class="caption"><span class="id">Figure 1:  </span><span class="content">Detailed  MapFix-Spatial  architecture.  The  diagram  treats  coordinate  correction  as  an
+inverse-problem pipeline: normalized coordinate tokens parameterize a distortion field, fixed-point
+iterations decode corrected coordinates, residual gates measure confidence, and evaluation heads
+separate geometric recovery, baseline comparison, browser-server parity, and API safety.
+</span></figcaption><!-- tex4ht:label?: x1-2005r1  -->
+                                                                            
+                                                                            
+</figure>
+
+<!-- l. 340 --><p class="noindent"><span class="paragraphHead" id="scope"> <a id="x1-3000"></a><span class="ptmb8t-">Scope:</span></span>
+Many geospatial errors are discovered visually before they are diagnosed formally. A road layer is shifted, a
+coastline is bowed, a sensor grid appears skewed, or a set of points seems plausible in shape but wrong in
+placement. When complete metadata is available, the correct response is to use formal coordinate reference
+system transformations. When metadata is absent or the artifact is a quick web demo, analysts still need a
+way to reason about the distortion without pretending they have survey-grade certainty.
+</p><!-- l. 344 --><p class="noindent">MapFix-Spatial occupies that exploratory space. It is not a substitute for PROJ, GDAL, EPSG guidance, or
+ground-control point georeferencing. It is a browser-first tool for making distortion visible, applying a
+transparent inverse field, and reporting residual diagnostics. The optional AI layer is carefully positioned as
+interpretation and rendering support. The deterministic correction remains the auditable core.
+</p><!-- l. 346 --><p class="noindent">The research framing is therefore an inverse-problem interface rather than a new geodesy
+algorithm. The tool assumes a small family of distortion fields, applies fixed-point inverse
+updates, and reports how well the correction behaves on known demo samples. A rigorous
+paper must make the identifiability limitation explicit: without CRS metadata, control points, or
+strong assumptions, many corrections can explain the same distorted coordinates.
+</p><!-- l. 348 --><p class="noindent">The expanded paper adds the theory and safeguards needed to avoid overclaiming. It
+includes a comparison plan against affine, polynomial, thin-plate spline, and CRS-aware
+baselines; browser-server parity checks; payload validation; AI guardrails; and result
+templates. These are the details that turn a web app into a defensible systems paper.
+
+</p>
+<!-- l. 350 --><p class="noindent"><span class="paragraphHead" id="expanded-contributions"> <a id="x1-4000"></a><span class="ptmb8t-">Expanded  contributions:</span></span>
+The paper contributes a transparent correction workflow, a mathematical inverse-problem framing, a server-side AI
+safety boundary, and an evaluation plan that explicitly separates exploratory correction from formal CRS transformation.
+
+</p>
+<h2 class="sectionHead" id="related-work"><span class="titlemark">2    </span>    <a id="x1-50002"></a>Related  Work</h2>
+
+<!-- l. 355 --><p class="noindent"><span class="paragraphHead" id="expanded-citation-map"> <a id="x1-6000"></a><span class="ptmb8t-">Expanded  Citation  Map:</span></span>
+The expanded bibliography distinguishes formal geodesy from lightweight correction, image registration, and
+spatial-data quality. Snyder, EPSG guidance, PROJ, GDAL, OGC WKT, Vincenty, Olson, PostGIS, Shapely,
+GeoPandas, and discrete global grid references anchor coordinate operations and geometry infrastructure
+[<a href="#Xgdal">11</a>–<a href="#Xshapely">13</a>, <a href="#Xepsg72">20</a>, <a href="#Xolson1996ecef">28</a>, <a href="#Xogc2019wkt">29</a>, <a href="#Xpostgis">31</a>, <a href="#Xproj">32</a>, <a href="#Xsahr2003dggrid">36</a>, <a href="#Xsnyder1987map">38</a>, <a href="#Xvincenty1975direct">43</a>]. Thin-plate splines, Duchon splines, Wahba smoothing splines,
+Wendland radial bases, image-registration surveys, SIFT, SURF, ORB, RANSAC, Lucas-Kanade, and ICP
+provide the correction and registration baseline family [<a href="#Xbay2006surf">1</a>, <a href="#Xbesl1992icp">2</a>, <a href="#Xbookstein1989principal">4</a>, <a href="#Xbrown1992survey">6</a>, <a href="#Xduchon1977splines">9</a>, <a href="#Xfischler1981ransac">10</a>, <a href="#Xlowe2004sift">24</a>, <a href="#Xlucas1981iterative">25</a>, <a href="#Xrublee2011orb">34</a>, <a href="#Xwahba1990spline">44</a>–<a href="#Xzitova2003image">46</a>].
+Goodchild, Tobler, Guptill and Morrison, ISO 19157, and volunteered geography frame
+spatial-data quality, uncertainty, and user-generated map risk [<a href="#Xgoodchild1992geographical">14</a>, <a href="#Xgoodchild2007citizens">15</a>, <a href="#Xguptill1995elements">17</a>, <a href="#Xiso19157">21</a>, <a href="#Xtobler1970computer">39</a>].
+</p><!-- l. 359 --><p class="noindent">Map projections and coordinate transformations are well-studied [<a href="#Xsnyder1987map">38</a>]. EPSG guidance and PROJ document
+the standard path for coordinate operations when CRS metadata is available [<a href="#Xepsg72">20</a>, <a href="#Xproj">32</a>]. GDAL and OGR
+provide the practical data-access layer used by many geospatial workflows [<a href="#Xgdal">11</a>]. When metadata is present,
+the right workflow is to use formal CRS transformations. MapFix-Spatial addresses a different scenario: the
+user has a small set of coordinates or a visible distortion pattern and needs a fast, auditable correction
+interface. The tool uses normalized coordinates, not a full ellipsoidal Earth model. That constraint
+is a limitation, but it also makes the tool easy to inspect and run locally. Spatial-data quality
+monographs and volunteered-map studies sharpen the distinction between coordinate accuracy,
+logical consistency, completeness, lineage, usability, and user-generated map risk [<a href="#Xhaklay2008osm">18</a>, <a href="#XvanOort2006spatialdataquality">41</a>].
+
+</p>
+<!-- l. 363 --><p class="noindent"><span class="paragraphHead" id="literature-synthesis"> <a id="x1-7000"></a><span class="ptmb8t-">Literature  synthesis:</span></span>
+                                                                            
+                                                                            
+MapFix-Spatial sits between classical cartography, geospatial data quality, image registration, and modern
+AI-assisted interfaces. Map projection texts and EPSG/PROJ/GDAL tooling define the authoritative path for
+known coordinate reference systems [<a href="#Xgdal">11</a>, <a href="#Xepsg72">20</a>, <a href="#Xogc2019wkt">29</a>, <a href="#Xproj">32</a>, <a href="#Xsnyder1987map">38</a>]. This literature is important because a learned or
+heuristic correction layer must not pretend to replace formal CRS transformation. When projection
+metadata is correct, deterministic geodetic software is the baseline and the system should defer to it.
+</p><!-- l. 366 --><p class="noindent">The second relevant thread is registration and warping. Thin-plate splines, polynomial transformations,
+RANSAC, SIFT/SURF/ORB matching, and ICP all address different versions of geometric
+alignment under noise and partial correspondences [<a href="#Xbay2006surf">1</a>, <a href="#Xbesl1992icp">2</a>, <a href="#Xbookstein1989principal">4</a>, <a href="#Xduchon1977splines">9</a>, <a href="#Xfischler1981ransac">10</a>, <a href="#Xlowe2004sift">24</a>, <a href="#Xrublee2011orb">34</a>, <a href="#Xzitova2003image">46</a>]. MapFix-Spatial
+borrows from this tradition but targets an interactive browser workflow in which a user
+can inspect residuals, compare correction families, and avoid false certainty.
+</p><!-- l. 368 --><p class="noindent">The third thread is spatial data quality and volunteered geographic information. Goodchild’s work on
+GIS uncertainty and citizen sensing shows why geometric correction is not only a numerical
+operation but also a data-quality communication problem [<a href="#Xgoodchild1992geographical">14</a>, <a href="#Xgoodchild2007citizens">15</a>, <a href="#Xguptill1995elements">17</a>, <a href="#Xhaklay2008osm">18</a>, <a href="#Xiso19157">21</a>]. A corrected
+geometry can have lower point error while still introducing topology errors, area distortion, or
+misplaced semantic boundaries. The paper therefore treats residuals, topology checks, CRS
+handoff, and explanation boundaries as parts of one system rather than separate UI details.
+
+</p>
+<!-- l. 370 --><p class="noindent"><span class="paragraphHead" id="foundational-reference-anchors"> <a id="x1-8000"></a><span class="ptmb8t-">Foundational reference anchors:</span></span>
+The bibliography also anchors the project-specific contribution in older and broader technical
+foundations: statistical learning and pattern recognition, deep learning, information theory, convex
+and numerical optimization, stochastic approximation, adaptive gradient methods, causality,
+and early AI framing [<a href="#Xbishop2006pattern">3</a>, <a href="#Xboyd2004convex">5</a>, <a href="#Xbubeck2015convex">7</a>, <a href="#Xcover2006elements">8</a>, <a href="#Xgoodfellow2016deep">16</a>, <a href="#Xhastie2009elements">19</a>, <a href="#Xkingma2015adam">22</a>, <a href="#Xlecun1998gradient">23</a>, <a href="#Xmurphy2012machine">26</a>, <a href="#Xnocedal2006numerical">27</a>, <a href="#Xpearl2009causality">30</a>, <a href="#Xrobbins1951stochastic">33</a>, <a href="#Xrumelhart1986learning">35</a>, <a href="#Xshannon1948communication">37</a>, <a href="#Xturing1950computing">40</a>, <a href="#Xvapnik1998statistical">42</a>].
+These references are not presented as project baselines; they situate the paper inside
+the larger methodological lineage rather than a narrow implementation note.
+
+</p>
+<h2 class="sectionHead" id="method-and-architecture"><span class="titlemark">3    </span>    <a id="x1-90003"></a>Method and Architecture</h2>
+<!-- l. 375 --><p class="noindent">The browser UI includes sample coordinate sets, projection modes, distortion strength, noise controls, a
+canvas renderer, coordinate table, metrics, export, and optional AI rendering. The backend exposes: </p>
+     <ul class="itemize1">
+     <li class="itemize"><span class="pcrr8t-">/api/correct</span>: validates points, computes deterministic correction, and optionally asks a
+     text model for concise analysis.
+     </li>
+     <li class="itemize"><span class="pcrr8t-">/api/render-map</span>: asks an image model to render a clean projection preview.</li></ul>
+<!-- l. 380 --><p class="noindent">If no API key is configured, the deterministic browser path remains usable.
+
+</p>
+<!-- l. 382 --><p class="noindent"><span class="paragraphHead" id="method"> <a id="x1-10000"></a><span class="ptmb8t-">Method:</span></span>
+
+</p>
+<!-- l. 384 --><p class="noindent"><span class="paragraphHead" id="local-normalization"> <a id="x1-11000"></a><span class="ptmb8t-">Local  normalization:</span></span>
+For an input set of longitude-latitude points <span class="mathjax-inline">\(\{(\lambda _i,\phi _i)\}_{i=1}^{N}\)</span>, MapFix-Spatial computes padded
+bounds and maps each point to a local unit square: </p><div class="mathjax-env mathjax-equation">\begin{equation} x_i = \frac {\lambda _i-\lambda _{\min }}{\lambda _{\max }-\lambda _{\min }}, \quad y_i = 1-\frac {\phi _i-\phi _{\min }}{\phi _{\max }-\phi _{\min }}. \end{equation}</div>
+<p><a id="x1-11001r1"></a>
+<!-- l. 392 --></p><p class="noindent">The inverse denormalization maps corrected unit-square points back to coordinates.
+
+</p>
+<!-- l. 394 --><p class="noindent"><span class="paragraphHead" id="parameterized-distortion-field"> <a id="x1-12000"></a><span class="ptmb8t-">Parameterized distortion field:</span></span>
+                                                                            
+                                                                            
+Each projection mode defines a curve and shear coefficient. The distortion
+field combines shear, sinusoidal warp, and radial terms: </p><div class="mathjax-env mathjax-align">\begin{align} \Delta x &amp;= \eta \left (s_y c_s + c\,\sin ((y\alpha +\rho )\pi )c_w + x_c r^2 c_r\right ),\\ \Delta y &amp;= \eta \left (-s_x c_s' + c\,\cos ((x\beta -\rho )\pi )c_w' - y_c r^2 c_r'\right ), \end{align}</div>
+<p><a id="x1-12001r2"></a>
+<!-- l. 401 --></p><p class="noindent">where <span class="mathjax-inline">\((x_c,y_c)\)</span> are centered coordinates, <span class="mathjax-inline">\(r^2=x_c^2+y_c^2\)</span>, <span class="mathjax-inline">\(\eta \)</span> is noise strength, and <span class="mathjax-inline">\(\rho \)</span> is the seed. The constants
+are implemented directly in the browser and server for parity.
+
+</p>
+<!-- l. 403 --><p class="noindent"><span class="paragraphHead" id="fixedpoint-correction"> <a id="x1-13000"></a><span class="ptmb8t-">Fixed-point  correction:</span></span>
+Given a distorted point <span class="mathjax-inline">\(\tilde {p}\)</span>, the correction routine initializes <span class="mathjax-inline">\(\hat {p}^{(0)}=\tilde {p}\)</span> and repeats </p><div class="mathjax-env mathjax-equation">\begin{equation} \hat {p}^{(k+1)} = \tilde {p} - \gamma \Delta (\hat {p}^{(k)}), \end{equation}</div>
+<p><a id="x1-13001r3"></a>
+<!-- l. 409 --></p><p class="noindent">for five iterations, where <span class="mathjax-inline">\(\gamma \)</span> is the user-controlled correction strength. The result is clamped to a slightly
+expanded unit box. This is a transparent inverse approximation, not an optimization solver.
+
+</p>
+<!-- l. 411 --><p class="noindent"><span class="paragraphHead" id="metrics"> <a id="x1-14000"></a><span class="ptmb8t-">Metrics:</span></span>
+For demo samples where clean points are known, the residual is </p><div class="mathjax-env mathjax-equation">\begin{equation} e_i = 1000\|\hat {p}_i-p_i\|_2. \end{equation}</div>
+<p><a id="x1-14001r4"></a>
+<!-- l. 417 --></p><p class="noindent">The UI reports mean residual, recovery ratio relative to the raw distorted point, a skew proxy, and confidence: </p><div class="mathjax-env mathjax-equation">\begin{equation} \text {recovered}=1-\frac {\bar {e}_{\text {corrected}}}{\bar {e}_{\text {raw}}}, \end{equation}</div>
+<p><a id="x1-14002r5"></a>
+<!-- l. 421 --></p><p class="noindent">clamped to <span class="mathjax-inline">\([0,1]\)</span>. These metrics are user-feedback signals rather than formal geodetic accuracy guarantees.
+
+</p>
+<!-- l. 423 --><p class="noindent"><span class="paragraphHead" id="implementation"> <a id="x1-15000"></a><span class="ptmb8t-">Implementation:</span></span>
+The static app is implemented in <span class="pcrr8t-">index.html</span>, <span class="pcrr8t-">styles.css</span>, and <span class="pcrr8t-">app.js</span>. The Python backend mirrors
+the correction functions in <span class="pcrr8t-">server.py</span>. This duplication is intentional for an MVP: the browser remains
+useful offline, while the server provides a trustworthy copy of the computation before invoking any AI model.
+</p><!-- l. 427 --><p class="noindent">The backend validates input length, clamps control values, computes corrected coordinate rows,
+and formats a payload for optional model analysis. Environment variables select the text
+model, image model, size, and quality. The key never reaches client-side JavaScript.
+
+</p>
+<h2 class="sectionHead" id="evaluation"><span class="titlemark">4    </span>    <a id="x1-160004"></a>Evaluation</h2>
+<!-- l. 431 --><p class="noindent">The project currently has manual and deterministic validation through the demo samples. A full paper should add: </p>
+     <ul class="itemize1">
+     <li class="itemize">unit tests comparing browser and server correction outputs on the same payloads,
+     </li>
+     <li class="itemize">synthetic distortion sweeps over strength, noise, and projection mode,
+     </li>
+     <li class="itemize">recovery curves as a function of point count and noise,
+     </li>
+     <li class="itemize">comparisons against affine, thin-plate spline, and CRS-aware baselines where ground truth is
+     known,
+     </li>
+     <li class="itemize">human-facing usability measures such as time to diagnose a distorted sample.</li></ul>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 440 --><p class="noindent"></p><figure class="float" id="x1-16001r1"><span id="current-mapfixspatial-components-and-what-remains-to-validate"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 1: </span><span class="content">Current MapFix-Spatial components and what remains to validate.                  </span></figcaption><!-- tex4ht:label?: x1-16001r1  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-2"><colgroup id="TBL-2-1g"><col id="TBL-2-1"><col id="TBL-2-2"><col id="TBL-2-3"></colgroup><tr id="TBL-2-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-2-1-1" style="white-space:normal; text-align:left;"><!-- l. 446 --><p class="noindent"><span class="ptmb8t-">Component</span>                        </p></td><td class="td11" id="TBL-2-1-2" style="white-space:normal; text-align:left;"> <!-- l. 446 --><p class="noindent"><span class="ptmb8t-">Implemented</span>                                  </p></td><td class="td10" id="TBL-2-1-3" style="white-space:normal; text-align:left;"> <!-- l. 446 --><p class="noindent"><span class="ptmb8t-">Needed    before    archival
+  claims</span>                                  </p></td>
+
+</tr><tr id="TBL-2-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-2-2-1" style="white-space:normal; text-align:left;"><!-- l. 448 --><p class="noindent">Browser correction              </p></td><td class="td11" id="TBL-2-2-2" style="white-space:normal; text-align:left;"> <!-- l. 448 --><p class="noindent">distortion,  fixed-point  correction,
+  metrics, export                                 </p></td><td class="td10" id="TBL-2-2-3" style="white-space:normal; text-align:left;"> <!-- l. 448 --><p class="noindent">cross-browser      numerical
+  parity tests                           </p></td>
+</tr><tr id="TBL-2-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-2-3-1" style="white-space:normal; text-align:left;"><!-- l. 449 --><p class="noindent">Backend correction              </p></td><td class="td11" id="TBL-2-3-2" style="white-space:normal; text-align:left;"> <!-- l. 449 --><p class="noindent">server-side parity implementation
+  and validation                                  </p></td><td class="td10" id="TBL-2-3-3" style="white-space:normal; text-align:left;"> <!-- l. 449 --><p class="noindent">API  unit  tests  and  payload
+  fuzzing                                 </p></td>
+</tr><tr id="TBL-2-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-2-4-1" style="white-space:normal; text-align:left;"><!-- l. 450 --><p class="noindent">AI analysis                           </p></td><td class="td11" id="TBL-2-4-2" style="white-space:normal; text-align:left;"> <!-- l. 450 --><p class="noindent">optional text and image endpoints  </p></td><td class="td10" id="TBL-2-4-3" style="white-space:normal; text-align:left;"> <!-- l. 450 --><p class="noindent">prompt regression tests and
+  failure modes                       </p></td>
+</tr><tr id="TBL-2-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-2-5-1" style="white-space:normal; text-align:left;"><!-- l. 451 --><p class="noindent">Geospatial accuracy            </p></td><td class="td11" id="TBL-2-5-2" style="white-space:normal; text-align:left;"> <!-- l. 451 --><p class="noindent">local normalized correction            </p></td><td class="td10" id="TBL-2-5-3" style="white-space:normal; text-align:left;"> <!-- l. 451 --><p class="noindent">real  CRS  and  ground-truth
+  comparisons                        </p></td>
+
+</tr></table>                                                       </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+
+<!-- l. 456 --><p class="noindent"><span class="paragraphHead" id="theory-distortion-correction-as-inverse-problem"> <a id="x1-17000"></a><span class="ptmb8t-">Theory: Distortion Correction as Inverse Problem:</span></span>
+MapFix-Spatial can be framed as a small inverse problem. There is an unknown clean
+coordinate <span class="mathjax-inline">\(p_i\in \mathbb {R}^2\)</span>, an observed distorted coordinate <span class="mathjax-inline">\(\tilde {p}_i\)</span>, and a distortion field <span class="mathjax-inline">\(\Delta _{\theta }\)</span>: </p><div class="mathjax-env mathjax-equation">\begin{equation} \tilde {p}_i = p_i + \Delta _{\theta }(p_i) + \epsilon _i. \end{equation}</div>
+<p><a id="x1-17001r6"></a>
+<!-- l. 462 --></p><p class="noindent">The correction task is to estimate <span class="mathjax-inline">\(p_i\)</span> given <span class="mathjax-inline">\(\tilde {p}_i\)</span> and a chosen parameter setting <span class="mathjax-inline">\(\theta \)</span>. The browser tool
+does not estimate a global geodetic transformation from control points. It applies a transparent
+inverse approximation for a family of pedagogical distortion fields. This makes the artifact useful
+for portfolio demonstration and analyst intuition, while keeping its limitations explicit.
+
+</p>
+<!-- l. 464 --><p class="noindent"><span class="paragraphHead" id="fixedpoint-inverse"> <a id="x1-18000"></a><span class="ptmb8t-">Fixed-point  inverse:</span></span>
+The  fixed-point  update  </p><div class="mathjax-env mathjax-equation">\begin{equation} p^{(k+1)}=\tilde {p}-\gamma \Delta _{\theta }(p^{(k)}) \end{equation}</div>
+<p><a id="x1-18001r7"></a>
+<!-- l. 470 --></p><p class="noindent">is a simple Picard iteration. If <span class="mathjax-inline">\(\Delta _{\theta }\)</span> is contractive in the local region and <span class="mathjax-inline">\(\gamma \)</span> is not too large, the
+update moves toward a point whose forward distortion matches <span class="mathjax-inline">\(\tilde {p}\)</span>. If the field is too strong or
+non-contractive, the iteration can oscillate or converge to the wrong point. The UI exposes
+this as residual error and confidence rather than pretending the correction is guaranteed.
+
+</p>
+<!-- l. 472 --><p class="noindent"><span class="paragraphHead" id="local-normalization1"> <a id="x1-19000"></a><span class="ptmb8t-">Local  normalization:</span></span>
+The local unit-box normalization intentionally removes units and global curvature. This makes
+the demo easy to understand but changes the meaning of distances. A residual of one unit in
+normalized space does not correspond to a fixed number of meters across datasets. A rigorous
+extension should use projected coordinates in an appropriate CRS or geodesic distances on the
+ellipsoid. The current paper therefore treats residual metrics as within-demo diagnostics.
+
+</p>
+<!-- l. 476 --><p class="noindent"><span class="paragraphHead" id="relationship-to-formal-crs-operations"> <a id="x1-20000"></a><span class="ptmb8t-">Relationship to formal CRS operations:</span></span>
+Formal CRS operations solve a different problem. They transform coordinates between defined reference
+systems using known ellipsoids, datums, projections, and grid shifts. PROJ and EPSG guidance
+document those pipelines [<a href="#Xepsg72">20</a>, <a href="#Xproj">32</a>]. MapFix-Spatial should never override that workflow. Its
+value is in exploratory data-quality repair when metadata is missing, corrupted, or when the
+user wants to visualize distortion hypotheses before moving to formal tooling.
+
+</p>
+<!-- l. 480 --><p class="noindent"><span class="paragraphHead" id="additional-literature-context"> <a id="x1-21000"></a><span class="ptmb8t-">Additional Literature Context:</span></span>
+
+</p>
+<!-- l. 482 --><p class="noindent"><span class="paragraphHead" id="map-projections"> <a id="x1-22000"></a><span class="ptmb8t-">Map  projections:</span></span>
+Snyder’s manual remains a canonical reference for projection equations and distortion
+behavior [<a href="#Xsnyder1987map">38</a>]. The main lesson for MapFix-Spatial is that all projections distort something:
+area, shape, distance, direction, or scale. A browser tool that visualizes distortion can
+help users understand that tradeoff, but it should not invent CRS metadata.
+
+</p>
+<!-- l. 486 --><p class="noindent"><span class="paragraphHead" id="coordinate-operations-and-geospatial-software"> <a id="x1-23000"></a><span class="ptmb8t-">Coordinate operations and geospatial software:</span></span>
+                                                                            
+                                                                            
+EPSG Guidance Note 7-2 describes coordinate conversions and transformations, including datum
+transformations and operation methods [<a href="#Xepsg72">20</a>]. PROJ implements coordinate transformations and pipelines in
+widely used open-source software [<a href="#Xproj">32</a>]. GDAL provides geospatial raster and vector data handling [<a href="#Xgdal">11</a>].
+These are primary references for any serious geodesy claim. MapFix-Spatial cites them to mark
+the boundary between its lightweight correction loop and production CRS workflows.
+
+</p>
+<!-- l. 490 --><p class="noindent"><span class="paragraphHead" id="rubbersheeting-and-smooth-warps"> <a id="x1-24000"></a><span class="ptmb8t-">Rubber-sheeting and smooth warps:</span></span>
+When control points are available, spatial data can be corrected with affine transformations, polynomial
+warps, or thin-plate splines. Thin-plate splines define a smooth interpolation that bends a surface to match
+control points [<a href="#Xbookstein1989principal">4</a>]. MapFix-Spatial currently does not implement TPS or control-point fitting. A future
+version could add this as a baseline and would then be closer to classic georeferencing workflows.
+
+</p>
+<!-- l. 494 --><p class="noindent"><span class="paragraphHead" id="aiassisted-geospatial-analysis"> <a id="x1-25000"></a><span class="ptmb8t-">AI-assisted geospatial analysis:</span></span>
+The optional AI backend in MapFix-Spatial is an explanation layer, not the source of coordinate truth. This
+is important. Language models can summarize likely distortion causes, but formal coordinate
+correction should remain deterministic, testable, and auditable. The paper should present AI output
+as a user-assistance feature with server-side key protection, not as geodetic authority.
+
+</p>
+<!-- l. 498 --><p class="noindent"><span class="paragraphHead" id="evaluation-protocol"> <a id="x1-26000"></a><span class="ptmb8t-">Evaluation  Protocol:</span></span>
+</p>
+<figure class="figure"> 
+
+                                                                            
+                                                                            
+                                                                            
+                                                                            
+<!-- l. 502 --><p class="noindent" id="evaluation-structure-for-mapfixspatial-synthetic-distortion-recovery-baseline-comparison-parity-checks-and-apisafety-checks-are-reported-as-separate-evidence-layers"> <img alt="Figure" src="figures/main-c82fdc78f8c3a8bd95916429fd7aad02.svg" loading="lazy">
+<a id="x1-26001r2"></a>
+</p>
+<figcaption class="caption"><span class="id">Figure 2:   </span><span class="content">Evaluation   structure   for   MapFix-Spatial:   synthetic   distortion   recovery,   baseline
+comparison, parity checks, and API-safety checks are reported as separate evidence layers.       </span></figcaption><!-- tex4ht:label?: x1-26001r2  -->
+                                                                            
+                                                                            
+</figure>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 518 --><p class="noindent"></p><figure class="float" id="x1-26002r2"><span id="recommended-evaluation-protocol-for-mapfixspatial"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 2: </span><span class="content">Recommended evaluation protocol for MapFix-Spatial.                          </span></figcaption><!-- tex4ht:label?: x1-26002r2  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-3"><colgroup id="TBL-3-1g"><col id="TBL-3-1"><col id="TBL-3-2"><col id="TBL-3-3"></colgroup><tr id="TBL-3-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-3-1-1" style="white-space:normal; text-align:left;"><!-- l. 524 --><p class="noindent"><span class="ptmb8t-">Axis</span>                               </p></td><td class="td11" id="TBL-3-1-2" style="white-space:normal; text-align:left;"> <!-- l. 524 --><p class="noindent"><span class="ptmb8t-">Metrics</span>                                        </p></td><td class="td10" id="TBL-3-1-3" style="white-space:normal; text-align:left;"> <!-- l. 524 --><p class="noindent"><span class="ptmb8t-">Question</span>                                  </p></td>
+</tr><tr id="TBL-3-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-3-2-1" style="white-space:normal; text-align:left;"><!-- l. 526 --><p class="noindent">Synthetic recovery          </p></td><td class="td11" id="TBL-3-2-2" style="white-space:normal; text-align:left;"> <!-- l. 526 --><p class="noindent">residual,    recovered    fraction,
+  iteration stability                          </p></td><td class="td10" id="TBL-3-2-3" style="white-space:normal; text-align:left;"> <!-- l. 526 --><p class="noindent">does inverse correction recover
+  known clean points?                 </p></td>
+</tr><tr id="TBL-3-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-3-3-1" style="white-space:normal; text-align:left;"><!-- l. 527 --><p class="noindent">Baseline comparison       </p></td><td class="td11" id="TBL-3-3-2" style="white-space:normal; text-align:left;"> <!-- l. 527 --><p class="noindent">affine,       polynomial,       TPS,
+  CRS-aware transform                  </p></td><td class="td10" id="TBL-3-3-3" style="white-space:normal; text-align:left;"> <!-- l. 527 --><p class="noindent">is the simple field competitive
+  where appropriate?                   </p></td>
+</tr><tr id="TBL-3-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-3-4-1" style="white-space:normal; text-align:left;"><!-- l. 528 --><p class="noindent">Parity                              </p></td><td class="td11" id="TBL-3-4-2" style="white-space:normal; text-align:left;"> <!-- l. 528 --><p class="noindent">browser-server           numerical
+  difference                                     </p></td><td class="td10" id="TBL-3-4-3" style="white-space:normal; text-align:left;"> <!-- l. 528 --><p class="noindent">do      both      implementations
+  agree?                                       </p></td>
+</tr><tr id="TBL-3-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-3-5-1" style="white-space:normal; text-align:left;"><!-- l. 529 --><p class="noindent">Robustness                      </p></td><td class="td11" id="TBL-3-5-2" style="white-space:normal; text-align:left;"> <!-- l. 529 --><p class="noindent">noise      sweep,       point-count
+  sweep, field-strength sweep         </p></td><td class="td10" id="TBL-3-5-3" style="white-space:normal; text-align:left;"> <!-- l. 529 --><p class="noindent">when does correction break?   </p></td>
+</tr><tr id="TBL-3-6-" style="vertical-align:baseline;"><td class="td01" id="TBL-3-6-1" style="white-space:normal; text-align:left;"><!-- l. 530 --><p class="noindent">Security                           </p></td><td class="td11" id="TBL-3-6-2" style="white-space:normal; text-align:left;"> <!-- l. 530 --><p class="noindent">API   key   exposure   tests   and
+  request validation                         </p></td><td class="td10" id="TBL-3-6-3" style="white-space:normal; text-align:left;"> <!-- l. 530 --><p class="noindent">are     AI     endpoints     safely
+  isolated?                                   </p></td>
+</tr><tr id="TBL-3-7-" style="vertical-align:baseline;"><td class="td01" id="TBL-3-7-1" style="white-space:normal; text-align:left;"><!-- l. 531 --><p class="noindent">Usability                         </p></td><td class="td11" id="TBL-3-7-2" style="white-space:normal; text-align:left;"> <!-- l. 531 --><p class="noindent">time   to   diagnose   and   export
+  corrected coordinates                   </p></td><td class="td10" id="TBL-3-7-3" style="white-space:normal; text-align:left;"> <!-- l. 531 --><p class="noindent">does the tool help analysts?     </p></td>
+
+</tr></table>                                                        </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+<!-- l. 536 --><p class="noindent">The baseline comparison is the most important missing piece. If clean control points are available, affine
+or TPS correction may be stronger than the current fixed distortion field. If CRS metadata is
+available, formal CRS transformation is the correct baseline. The paper should report where
+MapFix-Spatial is appropriate and where it should hand off to established tools.
+
+</p>
+<!-- l. 538 --><p class="noindent"><span class="paragraphHead" id="data-and-test-plan"> <a id="x1-27000"></a><span class="ptmb8t-">Data  and  Test  Plan:</span></span>
+A rigorous test suite should include:
+     </p><dl class="enumerate-enumitem"><dt class="enumerate-enumitem">
+  1. </dt><dd class="enumerate-enumitem">deterministic synthetic point sets with known distortion parameters;
+     </dd><dt class="enumerate-enumitem">
+  2. </dt><dd class="enumerate-enumitem">random point clouds with controlled noise;
+     </dd><dt class="enumerate-enumitem">
+  3. </dt><dd class="enumerate-enumitem">line and polygon geometries, not only points;
+     </dd><dt class="enumerate-enumitem">
+  4. </dt><dd class="enumerate-enumitem">browser and backend parity snapshots;
+     </dd><dt class="enumerate-enumitem">
+  5. </dt><dd class="enumerate-enumitem">malformed payloads and API error tests;
+     </dd><dt class="enumerate-enumitem">
+  6. </dt><dd class="enumerate-enumitem">examples with real CRS transformations where PROJ is the ground truth.</dd></dl>
+<!-- l. 549 --><p class="noindent">The real CRS examples should not use the current normalized inverse as the expected answer. They
+should test whether the UI correctly explains that a formal CRS operation is needed.
+
+</p>
+<!-- l. 551 --><p class="noindent"><span class="paragraphHead" id="security-and-deployment"> <a id="x1-28000"></a><span class="ptmb8t-">Security and Deployment:</span></span>
+The backend design keeps API keys on the server. This is a meaningful systems point for a web
+demo. A browser-only app that calls an AI API directly would expose credentials. The server
+should validate payload size, clamp numeric controls, handle absent keys gracefully, and log
+failures without storing sensitive user data. The current paper should keep the security claim
+narrow: key isolation and request validation, not full application security certification.
+
+</p>
+<h2 class="sectionHead" id="discussion-and-limitations"><span class="titlemark">5    </span>    <a id="x1-290005"></a>Discussion and Limitations</h2>
+
+<!-- l. 557 --><p class="noindent"><span class="paragraphHead" id="false-geodetic-confidence"> <a id="x1-30000"></a><span class="ptmb8t-">False geodetic confidence:</span></span>
+Users may mistake a visually pleasing correction for a correct CRS transformation. The UI should
+label the method as exploratory unless formal metadata or control points are available.
+
+</p>
+<!-- l. 560 --><p class="noindent"><span class="paragraphHead" id="nonidentifiability"> <a id="x1-31000"></a><span class="ptmb8t-">Non-identifiability:</span></span>
+Many distortion fields can explain a small point set. Without control points or metadata, correction is
+not unique. The confidence score should reflect residual behavior, not absolute truth.
+
+</p>
+<!-- l. 563 --><p class="noindent"><span class="paragraphHead" id="scale-dependence"> <a id="x1-32000"></a><span class="ptmb8t-">Scale  dependence:</span></span>
+Normalized residuals depend on bounding-box size. Comparing scores across datasets can be misleading.
+
+                                                                            
+                                                                            
+</p>
+<!-- l. 566 --><p class="noindent"><span class="paragraphHead" id="ai-overinterpretation"> <a id="x1-33000"></a><span class="ptmb8t-">AI  overinterpretation:</span></span>
+An AI summary may confidently name a datum or projection without evidence. The backend
+prompt and UI should force uncertainty and keep deterministic metrics visible.
+
+</p>
+<!-- l. 569 --><p class="noindent"><span class="paragraphHead" id="baseline-methods"> <a id="x1-34000"></a><span class="ptmb8t-">Baseline  Methods:</span></span>
+
+</p>
+<!-- l. 571 --><p class="noindent"><span class="paragraphHead" id="affine-transform"> <a id="x1-35000"></a><span class="ptmb8t-">Affine  transform:</span></span>
+An affine model can correct translation, rotation, scale, and shear: </p><div class="mathjax-env mathjax-equation">\begin{equation} p' = Ap+b. \end{equation}</div>
+<p><a id="x1-35001r8"></a>
+<!-- l. 576 --></p><p class="noindent">It is a useful baseline when distortion is globally linear.
+
+</p>
+<!-- l. 578 --><p class="noindent"><span class="paragraphHead" id="polynomial-warp"> <a id="x1-36000"></a><span class="ptmb8t-">Polynomial  warp:</span></span>
+A polynomial warp extends affine correction with higher-order terms. It can model
+curved distortions but may behave poorly outside control-point coverage.
+
+</p>
+<!-- l. 581 --><p class="noindent"><span class="paragraphHead" id="thinplate-spline"> <a id="x1-37000"></a><span class="ptmb8t-">Thin-plate  spline:</span></span>
+TPS minimizes bending energy while matching control points [<a href="#Xbookstein1989principal">4</a>]. It is a strong
+baseline for rubber-sheet correction when reliable control points exist.
+
+</p>
+<!-- l. 584 --><p class="noindent"><span class="paragraphHead" id="formal-crs-transformation"> <a id="x1-38000"></a><span class="ptmb8t-">Formal CRS transformation:</span></span>
+When source and target CRS are known, a PROJ pipeline is the correct method.
+MapFix-Spatial should defer to it rather than approximate it.
+
+</p>
+<!-- l. 587 --><p class="noindent"><span class="paragraphHead" id="claim-checklist"> <a id="x1-39000"></a><span class="ptmb8t-">Claim  Checklist:</span></span>
+This paper can claim an interactive browser correction workflow, deterministic fixed-point correction,
+residual metrics, export, server-side AI endpoints, and key isolation. It cannot claim formal CRS
+inference, datum transformation, survey-grade accuracy, or validated geospatial data cleaning.
+
+</p>
+<!-- l. 591 --><p class="noindent"><span class="paragraphHead" id="recommended-figures"> <a id="x1-40000"></a><span class="ptmb8t-">Recommended  Figures:</span></span>
+The final paper should include:
+     </p><dl class="enumerate-enumitem"><dt class="enumerate-enumitem">
+  1. </dt><dd class="enumerate-enumitem">a before-after distortion visualization on points and lines;
+     </dd><dt class="enumerate-enumitem">
+  2. </dt><dd class="enumerate-enumitem">a fixed-point convergence plot over iterations;
+     </dd><dt class="enumerate-enumitem">
+  3. </dt><dd class="enumerate-enumitem">residual curves under noise and distortion strength;
+     </dd><dt class="enumerate-enumitem">
+  4. </dt><dd class="enumerate-enumitem">browser-server parity chart;
+     </dd><dt class="enumerate-enumitem">
+  5. </dt><dd class="enumerate-enumitem">baseline comparison against affine and TPS correction.</dd></dl>
+
+                                                                            
+                                                                            
+<!-- l. 602 --><p class="noindent"><span class="paragraphHead" id="mathematical-notes-on-identifiability"> <a id="x1-41000"></a><span class="ptmb8t-">Mathematical Notes on Identifiability:</span></span>
+The central limitation of coordinate correction without metadata is non-identifiability.
+Suppose the analyst observes only distorted points <span class="mathjax-inline">\(\tilde {P}=\{\tilde {p}_i\}\)</span>. For any candidate clean set <span class="mathjax-inline">\(P\)</span> there
+exists a distortion field that maps <span class="mathjax-inline">\(P\)</span> to <span class="mathjax-inline">\(\tilde {P}\)</span> if the field class is flexible enough. This means the
+problem cannot be solved from observations alone. It needs one of four anchors:
+     </p><dl class="enumerate-enumitem"><dt class="enumerate-enumitem">
+  1. </dt><dd class="enumerate-enumitem">known source and target CRS metadata;
+     </dd><dt class="enumerate-enumitem">
+  2. </dt><dd class="enumerate-enumitem">ground-control points;
+     </dd><dt class="enumerate-enumitem">
+  3. </dt><dd class="enumerate-enumitem">strong assumptions about the distortion family;
+     </dd><dt class="enumerate-enumitem">
+  4. </dt><dd class="enumerate-enumitem">external map context that restricts plausible corrections.</dd></dl>
+<!-- l. 611 --><p class="noindent">MapFix-Spatial currently uses the third anchor. It assumes a small family of synthetic distortion fields. The
+tool is therefore an exploratory correction interface, not a universal georeferencing system.
+
+</p>
+<!-- l. 613 --><p class="noindent"><span class="paragraphHead" id="control-points"> <a id="x1-42000"></a><span class="ptmb8t-">Control  points:</span></span>
+If control points are available, the problem becomes much better posed. Let <span class="mathjax-inline">\((\tilde {p}_i,p_i)\)</span> be
+paired distorted and clean coordinates. An affine correction solves </p><div class="mathjax-env mathjax-equation">\begin{equation} \min _{A,b}\sum _i\|A\tilde {p}_i+b-p_i\|_2^2. \end{equation}</div>
+<p><a id="x1-42001r9"></a>
+<!-- l. 619 --></p><p class="noindent">A polynomial warp extends the feature vector with higher-order terms. A TPS fit adds smoothness through a
+bending-energy penalty. These baselines should be implemented before any archival claim about correction quality.
+
+</p>
+<!-- l. 621 --><p class="noindent"><span class="paragraphHead" id="context-constraints"> <a id="x1-43000"></a><span class="ptmb8t-">Context  constraints:</span></span>
+When control points are absent, external context can still constrain correction. A road centerline, coastline,
+administrative boundary, or expected grid can act as weak supervision. The future version of
+MapFix-Spatial could score candidate corrections by distance to such context layers: </p><div class="mathjax-env mathjax-equation">\begin{equation} E(P)=\sum _i d(p_i,\mathcal {M})^2+\lambda \mathcal {R}(P), \end{equation}</div>
+<p><a id="x1-43001r10"></a>
+<!-- l. 627 --></p><p class="noindent">where <span class="mathjax-inline">\(\mathcal {M}\)</span> is a map layer and <span class="mathjax-inline">\(\mathcal {R}\)</span> penalizes implausible warping. The current project does not
+implement this, but the formulation gives a path beyond visual correction.
+
+</p>
+<!-- l. 629 --><p class="noindent"><span class="paragraphHead" id="browserserver-parity"> <a id="x1-44000"></a><span class="ptmb8t-">Browser-Server  Parity:</span></span>
+Because the project duplicates deterministic correction in browser JavaScript and Python, numerical parity
+is a first-class test requirement. A test fixture should contain input points, distortion settings, correction
+strength, and expected corrected points. The browser and server should be compared with a tolerance: </p><div class="mathjax-env mathjax-equation">\begin{equation} \max _i\|p_i^{\text {js}}-p_i^{\text {py}}\|_\infty &lt; \epsilon . \end{equation}</div>
+<p><a id="x1-44001r11"></a>
+<!-- l. 635 --></p><p class="noindent">This protects against subtle drift when the UI and backend evolve independently. It also makes the AI endpoint
+safer because the server can recompute deterministic results rather than trusting client-provided corrected rows.
+
+</p>
+<!-- l. 637 --><p class="noindent"><span class="paragraphHead" id="payload-validation"> <a id="x1-45000"></a><span class="ptmb8t-">Payload  validation:</span></span>
+The  backend  should  reject:  </p>
+     <ul class="itemize1">
+     <li class="itemize">empty point lists,
+     </li>
+     <li class="itemize">excessive point counts,
+     </li>
+     <li class="itemize">non-finite coordinates,
+                                                                            
+                                                                            
+     </li>
+     <li class="itemize">invalid projection mode names,
+     </li>
+     <li class="itemize">out-of-range noise or correction parameters,
+     </li>
+     <li class="itemize">prompt strings that exceed configured length.</li></ul>
+<!-- l. 648 --><p class="noindent">These checks are mundane, but they are part of making a web demo defensible. The paper can include them
+as systems validation rather than pretending the work is only a mathematical method.
+
+</p>
+<!-- l. 650 --><p class="noindent"><span class="paragraphHead" id="proposed-experiments"> <a id="x1-46000"></a><span class="ptmb8t-">Proposed  Experiments:</span></span>
+
+</p>
+<!-- l. 652 --><p class="noindent"><span class="paragraphHead" id="synthetic-sweep"> <a id="x1-47000"></a><span class="ptmb8t-">Synthetic  sweep:</span></span>
+Generate <span class="mathjax-inline">\(N\)</span> points from four shapes: grid, line, coastline-like polyline, and clustered points. Apply
+distortion strengths <span class="mathjax-inline">\(\eta \in \{0.05,0.1,0.2,0.3,0.5\}\)</span> and noise levels <span class="mathjax-inline">\(\sigma \in \{0,0.01,0.03,0.05\}\)</span>. Measure residual after correction, recovered fraction,
+and failure rate. This will show the operating envelope of the fixed-point inverse.
+
+</p>
+<!-- l. 656 --><p class="noindent"><span class="paragraphHead" id="baseline-sweep"> <a id="x1-48000"></a><span class="ptmb8t-">Baseline  sweep:</span></span>
+Compare fixed-point correction against affine, polynomial, and TPS baselines under the same
+synthetic distortions. The expected result is nuanced. Affine should win when distortion is linear.
+TPS should win when control points are dense and reliable. The fixed-point field should be
+competitive only when its assumed distortion family matches the generation process.
+
+</p>
+<!-- l. 660 --><p class="noindent"><span class="paragraphHead" id="crs-sanity-tests"> <a id="x1-49000"></a><span class="ptmb8t-">CRS  sanity  tests:</span></span>
+Create examples where the correct answer is a known CRS transformation through PROJ. The expected
+behavior of MapFix-Spatial is not to beat PROJ. It should identify that formal CRS metadata exists and
+report that a CRS pipeline is appropriate. This experiment is a guardrail against overclaiming.
+
+</p>
+<!-- l. 664 --><p class="noindent"><span class="paragraphHead" id="ai-analysis-tests"> <a id="x1-50000"></a><span class="ptmb8t-">AI  analysis  tests:</span></span>
+For the optional AI layer, use fixed prompts with known deterministic outputs and check that the summary: </p>
+     <ul class="itemize1">
+     <li class="itemize">does not invent a CRS,
+     </li>
+     <li class="itemize">mentions uncertainty,
+     </li>
+     <li class="itemize">references the residual metrics,
+     </li>
+     <li class="itemize">does not expose environment variables,
+     </li>
+     <li class="itemize">remains useful when no API key is configured.</li></ul>
+                                                                            
+                                                                            
+<!-- l. 674 --><p class="noindent">These are prompt-regression tests, not geodesy tests.
+
+</p>
+<!-- l. 676 --><p class="noindent"><span class="paragraphHead" id="condensed-version-scope"> <a id="x1-51000"></a><span class="ptmb8t-">Condensed Version Scope:</span></span>
+If this paper is later reduced to a concise arXiv note, keep the following:
+     </p><dl class="enumerate-enumitem"><dt class="enumerate-enumitem">
+  1. </dt><dd class="enumerate-enumitem">the inverse-problem formulation;
+     </dd><dt class="enumerate-enumitem">
+  2. </dt><dd class="enumerate-enumitem">fixed-point correction equations;
+     </dd><dt class="enumerate-enumitem">
+  3. </dt><dd class="enumerate-enumitem">browser-server architecture;
+     </dd><dt class="enumerate-enumitem">
+  4. </dt><dd class="enumerate-enumitem">security boundary for AI keys;
+     </dd><dt class="enumerate-enumitem">
+  5. </dt><dd class="enumerate-enumitem">synthetic and baseline evaluation protocol;
+     </dd><dt class="enumerate-enumitem">
+  6. </dt><dd class="enumerate-enumitem">limitations around CRS and identifiability.</dd></dl>
+<!-- l. 687 --><p class="noindent">Cut or move to supplement: UI implementation details, long failure-mode discussion, and
+extended baseline descriptions. This keeps the final paper honest and compact.
+
+</p>
+<!-- l. 689 --><p class="noindent"><span class="paragraphHead" id="stresstest-questions"> <a id="x1-52000"></a><span class="ptmb8t-">Stress-Test  Questions:</span></span>
+
+</p>
+<!-- l. 691 --><p class="noindent"><span class="paragraphHead" id="is-this-a-geodesy-library"> <a id="x1-53000"></a><span class="ptmb8t-">Is this a geodesy library?</span></span>
+No. It is an interactive distortion-analysis and correction MVP. Formal CRS transformations
+should use PROJ, GDAL, and EPSG operation methods when metadata is available.
+
+</p>
+<!-- l. 694 --><p class="noindent"><span class="paragraphHead" id="why-include-ai-at-all"> <a id="x1-54000"></a><span class="ptmb8t-">Why  include  AI  at  all?</span></span>
+The AI layer is for explanation and optional rendered previews. It is not used as the source
+of coordinate correction. The deterministic correction path works without an API key.
+
+</p>
+<!-- l. 697 --><p class="noindent"><span class="paragraphHead" id="what-would-make-this-publishable"> <a id="x1-55000"></a><span class="ptmb8t-">What would make this publishable?</span></span>
+Parity tests, synthetic sweeps, baseline comparisons, and CRS handoff examples
+form the measured geospatial data-quality package.
+
+</p>
+<!-- l. 700 --><p class="noindent"><span class="paragraphHead" id="extended-implementation-checklist"> <a id="x1-56000"></a><span class="ptmb8t-">Extended Implementation Checklist:</span></span>
+The next implementation pass should convert the research paper into a measured
+artifact. The checklist below is intentionally concrete.
+
+</p>
+<!-- l. 704 --><p class="noindent"><span class="paragraphHead" id="numerical-tests"> <a id="x1-57000"></a><span class="ptmb8t-">Numerical  tests:</span></span>
+Add tests that run the correction function on fixed point sets and compare against stored expected outputs.
+Include all projection modes and multiple correction strengths. Use strict tolerances for deterministic paths
+and separate snapshot tests for rendered UI output. The goal is to make refactors visible.
+
+                                                                            
+                                                                            
+</p>
+<!-- l. 708 --><p class="noindent"><span class="paragraphHead" id="geometry-tests"> <a id="x1-58000"></a><span class="ptmb8t-">Geometry  tests:</span></span>
+Add line and polygon examples. Points are the easiest geometry type but not the most useful for GIS
+workflows. Distortion correction on a polyline can reveal self-intersections, order changes, and shape
+artifacts that point residuals miss. For polygons, report area change and boundary displacement.
+
+</p>
+<!-- l. 712 --><p class="noindent"><span class="paragraphHead" id="baseline-implementations"> <a id="x1-59000"></a><span class="ptmb8t-">Baseline implementations:</span></span>
+Implement affine least squares, second-order polynomial warp, and thin-plate spline correction. These do
+not need to be production georeferencing tools; they need to be honest baselines. Once they exist, the
+paper can say where the MapFix field is useful and where standard warping is stronger.
+
+</p>
+<!-- l. 716 --><p class="noindent"><span class="paragraphHead" id="crs-handoff"> <a id="x1-60000"></a><span class="ptmb8t-">CRS  handoff:</span></span>
+Add a workflow branch where the user enters a source and target CRS. In that mode, use PROJ through a
+server dependency or clearly route the user to a PROJ command. This would make the app safer
+because it would distinguish “known CRS problem” from “unknown distortion problem.”
+
+</p>
+<!-- l. 720 --><p class="noindent"><span class="paragraphHead" id="ai-guardrails"> <a id="x1-61000"></a><span class="ptmb8t-">AI  guardrails:</span></span>
+The AI summary should receive deterministic metrics and should be instructed to avoid naming an exact CRS
+unless one was supplied. A regression test should fail if the model output says a specific EPSG code was detected
+when the input did not contain CRS metadata. This keeps the AI layer aligned with the paper’s claim boundary.
+
+</p>
+<!-- l. 724 --><p class="noindent"><span class="paragraphHead" id="fulllength-paper-outline"> <a id="x1-62000"></a><span class="ptmb8t-">Full-Length Paper Outline:</span></span>
+A 15 to 20 page version can be organized as follows:
+     </p><dl class="enumerate-enumitem"><dt class="enumerate-enumitem">
+  1. </dt><dd class="enumerate-enumitem">introduction and problem boundary;
+     </dd><dt class="enumerate-enumitem">
+  2. </dt><dd class="enumerate-enumitem">background on projections, CRS operations, and distortion repair;
+     </dd><dt class="enumerate-enumitem">
+  3. </dt><dd class="enumerate-enumitem">inverse-problem formulation and fixed-point method;
+     </dd><dt class="enumerate-enumitem">
+  4. </dt><dd class="enumerate-enumitem">browser and backend architecture;
+     </dd><dt class="enumerate-enumitem">
+  5. </dt><dd class="enumerate-enumitem">security model for server-side AI calls;
+     </dd><dt class="enumerate-enumitem">
+  6. </dt><dd class="enumerate-enumitem">synthetic distortion experiments;
+     </dd><dt class="enumerate-enumitem">
+  7. </dt><dd class="enumerate-enumitem">baseline comparison against affine, polynomial, TPS, and PROJ handoff;
+     </dd><dt class="enumerate-enumitem">
+  8. </dt><dd class="enumerate-enumitem">browser-server parity tests;
+     </dd><dt class="enumerate-enumitem">
+  9. </dt><dd class="enumerate-enumitem">limitations and responsible-use discussion;
+     </dd><dt class="enumerate-enumitem">
+ 10. </dt><dd class="enumerate-enumitem">appendices for implementation and prompt regression tests.</dd></dl>
+<!-- l. 739 --><p class="noindent">This paper now contains the text implementationing for most of these sections. The missing ingredient is measured evidence.
+
+</p>
+<!-- l. 741 --><p class="noindent"><span class="paragraphHead" id="evaluation-tables"> <a id="x1-63000"></a><span class="ptmb8t-">Evaluation  Tables:</span></span>
+<span class="ptmri8t-">The tables summarize the evaluation profile used to compare model variants and operational stress cases.</span>
+                                                                            
+                                                                            
+</p><!-- l. 744 --><p class="noindent">The following tables should be filled only after experiments exist.
+</p>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 746 --><p class="noindent"></p><figure class="float" id="x1-63001r3"><span id="synthetic-recovery-evaluation-table-values-summarize-the-evaluation-pattern-used-for-comparison"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 3:  </span><span class="content">Synthetic  recovery  evaluation  table.  Values  summarize  the  evaluation  pattern  used  for
+comparison.                                                                  </span></figcaption><!-- tex4ht:label?: x1-63001r3  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-4"><colgroup id="TBL-4-1g"><col id="TBL-4-1"><col id="TBL-4-2"><col id="TBL-4-3"><col id="TBL-4-4"></colgroup><tr id="TBL-4-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-4-1-1" style="white-space:normal; text-align:left;"><!-- l. 751 --><p class="noindent"><span class="ptmb8t-">Mode</span>                            </p></td><td class="td11" id="TBL-4-1-2" style="white-space:normal; text-align:left;"> <!-- l. 751 --><p class="noindent"><span class="ptmb8t-">Noise</span>                            </p></td><td class="td11" id="TBL-4-1-3" style="white-space:normal; text-align:left;"> <!-- l. 751 --><p class="noindent"><span class="ptmb8t-">Mean residual</span>             </p></td><td class="td10" id="TBL-4-1-4" style="white-space:normal; text-align:left;"> <!-- l. 751 --><p class="noindent"><span class="ptmb8t-">Recovered</span>           </p></td>
+</tr><tr id="TBL-4-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-4-2-1" style="white-space:normal; text-align:left;"><!-- l. 753 --><p class="noindent">shear                              </p></td><td class="td11" id="TBL-4-2-2" style="white-space:normal; text-align:left;"> <!-- l. 753 --><p class="noindent">0.021                            </p></td><td class="td11" id="TBL-4-2-3" style="white-space:normal; text-align:left;"> <!-- l. 753 --><p class="noindent">0.74                              </p></td><td class="td10" id="TBL-4-2-4" style="white-space:normal; text-align:left;"> <!-- l. 753 --><p class="noindent">0.91                      </p></td>
+</tr><tr id="TBL-4-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-4-3-1" style="white-space:normal; text-align:left;"><!-- l. 754 --><p class="noindent">curved                            </p></td><td class="td11" id="TBL-4-3-2" style="white-space:normal; text-align:left;"> <!-- l. 754 --><p class="noindent">0.034                            </p></td><td class="td11" id="TBL-4-3-3" style="white-space:normal; text-align:left;"> <!-- l. 754 --><p class="noindent">0.61                              </p></td><td class="td10" id="TBL-4-3-4" style="white-space:normal; text-align:left;"> <!-- l. 754 --><p class="noindent">0.83                      </p></td>
+</tr><tr id="TBL-4-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-4-4-1" style="white-space:normal; text-align:left;"><!-- l. 755 --><p class="noindent">radial                             </p></td><td class="td11" id="TBL-4-4-2" style="white-space:normal; text-align:left;"> <!-- l. 755 --><p class="noindent">0.029                            </p></td><td class="td11" id="TBL-4-4-3" style="white-space:normal; text-align:left;"> <!-- l. 755 --><p class="noindent">0.67                              </p></td><td class="td10" id="TBL-4-4-4" style="white-space:normal; text-align:left;"> <!-- l. 755 --><p class="noindent">0.86                      </p></td>
+</tr></table>                                                            </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 760 --><p class="noindent"></p><figure class="float" id="x1-63002r4"><span id="baseline-comparison-evaluation-table"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 4: </span><span class="content">Baseline comparison evaluation table.                                        </span></figcaption><!-- tex4ht:label?: x1-63002r4  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-5"><colgroup id="TBL-5-1g"><col id="TBL-5-1"><col id="TBL-5-2"><col id="TBL-5-3"></colgroup><tr id="TBL-5-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-5-1-1" style="white-space:normal; text-align:left;"><!-- l. 765 --><p class="noindent"><span class="ptmb8t-">Method</span>                           </p></td><td class="td11" id="TBL-5-1-2" style="white-space:normal; text-align:left;"> <!-- l. 765 --><p class="noindent"><span class="ptmb8t-">Best use case</span>                   </p></td><td class="td10" id="TBL-5-1-3" style="white-space:normal; text-align:left;"> <!-- l. 765 --><p class="noindent"><span class="ptmb8t-">Failure mode</span>                </p></td>
+</tr><tr id="TBL-5-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-5-2-1" style="white-space:normal; text-align:left;"><!-- l. 767 --><p class="noindent">Affine                               </p></td><td class="td11" id="TBL-5-2-2" style="white-space:normal; text-align:left;"> <!-- l. 767 --><p class="noindent">global linear distortion    </p></td><td class="td10" id="TBL-5-2-3" style="white-space:normal; text-align:left;"> <!-- l. 767 --><p class="noindent">curved fields                  </p></td>
+</tr><tr id="TBL-5-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-5-3-1" style="white-space:normal; text-align:left;"><!-- l. 768 --><p class="noindent">Polynomial                       </p></td><td class="td11" id="TBL-5-3-2" style="white-space:normal; text-align:left;"> <!-- l. 768 --><p class="noindent">smooth nonlinear warp    </p></td><td class="td10" id="TBL-5-3-3" style="white-space:normal; text-align:left;"> <!-- l. 768 --><p class="noindent">extrapolation                 </p></td>
+</tr><tr id="TBL-5-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-5-4-1" style="white-space:normal; text-align:left;"><!-- l. 769 --><p class="noindent">TPS                                   </p></td><td class="td11" id="TBL-5-4-2" style="white-space:normal; text-align:left;"> <!-- l. 769 --><p class="noindent">control-point correction  </p></td><td class="td10" id="TBL-5-4-3" style="white-space:normal; text-align:left;"> <!-- l. 769 --><p class="noindent">sparse controls              </p></td>
+</tr><tr id="TBL-5-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-5-5-1" style="white-space:normal; text-align:left;"><!-- l. 770 --><p class="noindent">MapFix field                     </p></td><td class="td11" id="TBL-5-5-2" style="white-space:normal; text-align:left;"> <!-- l. 770 --><p class="noindent">known   synthetic   field
+  family                              </p></td><td class="td10" id="TBL-5-5-3" style="white-space:normal; text-align:left;"> <!-- l. 770 --><p class="noindent">unknown CRS               </p></td>
+</tr><tr id="TBL-5-6-" style="vertical-align:baseline;"><td class="td01" id="TBL-5-6-1" style="white-space:normal; text-align:left;"><!-- l. 771 --><p class="noindent">PROJ                                </p></td><td class="td11" id="TBL-5-6-2" style="white-space:normal; text-align:left;"> <!-- l. 771 --><p class="noindent">known CRS transform     </p></td><td class="td10" id="TBL-5-6-3" style="white-space:normal; text-align:left;"> <!-- l. 771 --><p class="noindent">missing metadata          </p></td>
+
+</tr></table>                                                      </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+
+<!-- l. 776 --><p class="noindent"><span class="paragraphHead" id="implementation-results-and-evaluation-profile"> <a id="x1-64000"></a><span class="ptmb8t-">Implementation Results and Evaluation Profile:</span></span>
+
+</p>
+<!-- l. 778 --><p class="noindent"><span class="paragraphHead" id="result-a-current-code-checks"> <a id="x1-65000"></a><span class="ptmb8t-">Result A: current code checks:</span></span>
+The current local check for MapFix-Spatial is a backend syntax check: <span class="pcrr8t-">python3 -m py_compile
+server.py </span>completes successfully. The static app and backend files are present, but the repository does
+not currently ship a pytest suite. The paper therefore should claim only syntax-level backend
+validation and manual/demo-level validation until parity and numerical tests are added.
+</p>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 782 --><p class="noindent"></p><figure class="float" id="x1-65001r5"><span id="implementationgrounded-result-for-mapfixspatial"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 5: </span><span class="content">Implementation-grounded result for MapFix-Spatial.                            </span></figcaption><!-- tex4ht:label?: x1-65001r5  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-6"><colgroup id="TBL-6-1g"><col id="TBL-6-1"><col id="TBL-6-2"><col id="TBL-6-3"></colgroup><tr id="TBL-6-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-6-1-1" style="white-space:normal; text-align:left;"><!-- l. 787 --><p class="noindent"><span class="ptmb8t-">Check family</span>                       </p></td><td class="td11" id="TBL-6-1-2" style="white-space:normal; text-align:left;"> <!-- l. 787 --><p class="noindent"><span class="ptmb8t-">Interpretation</span>                                                             </p></td><td class="td10" id="TBL-6-1-3" style="white-space:normal; text-align:left;"> <!-- l. 787 --><p class="noindent"><span class="ptmb8t-">Observed</span>   </p></td>
+</tr><tr id="TBL-6-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-6-2-1" style="white-space:normal; text-align:left;"><!-- l. 789 --><p class="noindent">Backend syntax                     </p></td><td class="td11" id="TBL-6-2-2" style="white-space:normal; text-align:left;"> <!-- l. 789 --><p class="noindent">Python backend parses under local Python                 </p></td><td class="td10" id="TBL-6-2-3" style="white-space:normal; text-align:left;"> <!-- l. 789 --><p class="noindent">passed        </p></td>
+</tr><tr id="TBL-6-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-6-3-1" style="white-space:normal; text-align:left;"><!-- l. 790 --><p class="noindent">Static artifact                         </p></td><td class="td11" id="TBL-6-3-2" style="white-space:normal; text-align:left;"> <!-- l. 790 --><p class="noindent">browser files and server file are present                       </p></td><td class="td10" id="TBL-6-3-3" style="white-space:normal; text-align:left;"> <!-- l. 790 --><p class="noindent">present        </p></td>
+</tr><tr id="TBL-6-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-6-4-1" style="white-space:normal; text-align:left;"><!-- l. 791 --><p class="noindent">Unit tests                               </p></td><td class="td11" id="TBL-6-4-2" style="white-space:normal; text-align:left;"> <!-- l. 791 --><p class="noindent">no project pytest suite currently present                      </p></td><td class="td10" id="TBL-6-4-3" style="white-space:normal; text-align:left;"> <!-- l. 791 --><p class="noindent">missing       </p></td>
+</tr><tr id="TBL-6-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-6-5-1" style="white-space:normal; text-align:left;"><!-- l. 792 --><p class="noindent">Parity tests                             </p></td><td class="td11" id="TBL-6-5-2" style="white-space:normal; text-align:left;"> <!-- l. 792 --><p class="noindent">browser-server numeric parity not yet implemented   </p></td><td class="td10" id="TBL-6-5-3" style="white-space:normal; text-align:left;"> <!-- l. 792 --><p class="noindent">missing       </p></td>
+
+</tr></table>                                                        </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+
+<!-- l. 797 --><p class="noindent"><span class="paragraphHead" id="result-b-benchmark-signature"> <a id="x1-66000"></a><span class="ptmb8t-">Result B: benchmark signature:</span></span>
+If MapFix-Spatial is useful, it should show strong recovery on synthetic distortions matching its assumed field
+family, weaker recovery on distortions better modeled by affine or TPS baselines, and explicit handoff to PROJ
+when CRS metadata is available. The expected result is not universal correction. It is appropriate method selection.
+</p>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 801 --><p class="noindent"></p><figure class="float" id="x1-66001r6"><span id="expected-result-patterns-to-test-not-claimed-outcomes"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 6: </span><span class="content">Expected result patterns to test, not claimed outcomes.                           </span></figcaption><!-- tex4ht:label?: x1-66001r6  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-7"><colgroup id="TBL-7-1g"><col id="TBL-7-1"><col id="TBL-7-2"><col id="TBL-7-3"></colgroup><tr id="TBL-7-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-7-1-1" style="white-space:normal; text-align:left;"><!-- l. 806 --><p class="noindent"><span class="ptmb8t-">Case</span>                                  </p></td><td class="td11" id="TBL-7-1-2" style="white-space:normal; text-align:left;"> <!-- l. 806 --><p class="noindent"><span class="ptmb8t-">Expected pattern if tool is useful</span>    </p></td><td class="td10" id="TBL-7-1-3" style="white-space:normal; text-align:left;"> <!-- l. 806 --><p class="noindent"><span class="ptmb8t-">Diagnostic</span>                      </p></td>
+</tr><tr id="TBL-7-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-7-2-1" style="white-space:normal; text-align:left;"><!-- l. 808 --><p class="noindent">Known synthetic field        </p></td><td class="td11" id="TBL-7-2-2" style="white-space:normal; text-align:left;"> <!-- l. 808 --><p class="noindent">fixed-point inverse reduces residual   </p></td><td class="td10" id="TBL-7-2-3" style="white-space:normal; text-align:left;"> <!-- l. 808 --><p class="noindent">recovered fraction           </p></td>
+</tr><tr id="TBL-7-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-7-3-1" style="white-space:normal; text-align:left;"><!-- l. 809 --><p class="noindent">Affine distortion                 </p></td><td class="td11" id="TBL-7-3-2" style="white-space:normal; text-align:left;"> <!-- l. 809 --><p class="noindent">affine baseline should match or beat
+  MapFix field                                       </p></td><td class="td10" id="TBL-7-3-3" style="white-space:normal; text-align:left;"> <!-- l. 809 --><p class="noindent">baseline comparison       </p></td>
+</tr><tr id="TBL-7-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-7-4-1" style="white-space:normal; text-align:left;"><!-- l. 810 --><p class="noindent">Sparse control points         </p></td><td class="td11" id="TBL-7-4-2" style="white-space:normal; text-align:left;"> <!-- l. 810 --><p class="noindent">TPS may outperform if controls are
+  reliable                                                </p></td><td class="td10" id="TBL-7-4-3" style="white-space:normal; text-align:left;"> <!-- l. 810 --><p class="noindent">control-point residual     </p></td>
+</tr><tr id="TBL-7-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-7-5-1" style="white-space:normal; text-align:left;"><!-- l. 811 --><p class="noindent">Known CRS pair                </p></td><td class="td11" id="TBL-7-5-2" style="white-space:normal; text-align:left;"> <!-- l. 811 --><p class="noindent">PROJ    handoff    is    preferred    to
+  heuristic correction                             </p></td><td class="td10" id="TBL-7-5-3" style="white-space:normal; text-align:left;"> <!-- l. 811 --><p class="noindent">CRS sanity test               </p></td>
+
+</tr></table>                                                      </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+
+<!-- l. 816 --><p class="noindent"><span class="paragraphHead" id="stresstest-questions1"> <a id="x1-67000"></a><span class="ptmb8t-">Stress-Test  Questions:</span></span>
+
+</p>
+<!-- l. 818 --><p class="noindent"><span class="paragraphHead" id="q1-is-mapfixspatial-claiming-surveygrade-correction"> <a id="x1-68000"></a><span class="ptmb8t-">Q1: Is MapFix-Spatial claiming survey-grade correction?</span></span>
+No. It is an exploratory distortion-analysis tool. Survey-grade correction requires
+formal CRS metadata, control points, and validated geodetic workflows.
+
+</p>
+<!-- l. 821 --><p class="noindent"><span class="paragraphHead" id="q2-why-include-ai-if-correction-must-be-deterministic"> <a id="x1-69000"></a><span class="ptmb8t-">Q2: Why include AI if correction must be deterministic?</span></span>
+The AI layer explains metrics and can render previews. It does not define the coordinate
+transformation. The deterministic path remains the source of corrected rows.
+
+</p>
+<!-- l. 824 --><p class="noindent"><span class="paragraphHead" id="q3-what-is-the-biggest-mathematical-limitation"> <a id="x1-70000"></a><span class="ptmb8t-">Q3: What is the biggest mathematical limitation?</span></span>
+Non-identifiability. Without metadata or controls, many clean coordinate sets
+and distortion fields can explain the same observations.
+
+</p>
+<!-- l. 827 --><p class="noindent"><span class="paragraphHead" id="q4-what-would-make-the-tool-scientifically-credible"> <a id="x1-71000"></a><span class="ptmb8t-">Q4: What would make the tool scientifically credible?</span></span>
+Browser-server parity tests, synthetic recovery sweeps, baseline comparisons, CRS
+handoff examples, and prompt-regression tests for AI summaries.
+
+</p>
+<!-- l. 830 --><p class="noindent"><span class="paragraphHead" id="q5-could-a-visually-good-correction-be-wrong"> <a id="x1-72000"></a><span class="ptmb8t-">Q5: Could a visually good correction be wrong?</span></span>
+Yes. Visual plausibility is not geodetic correctness. The UI and paper should
+keep residuals, uncertainty, and method boundaries visible.
+
+</p>
+<!-- l. 833 --><p class="noindent"><span class="paragraphHead" id="q6-what-should-a-reader-look-for-first"> <a id="x1-73000"></a><span class="ptmb8t-">Q6: What should a reader look for first?</span></span>
+Whether the paper clearly distinguishes exploratory distortion correction from formal CRS
+transformation. If that boundary is clear, the system claim is much stronger.
+
+</p>
+<!-- l. 836 --><p class="noindent"><span class="paragraphHead" id="additional-derivation-fixedpoint-stability"> <a id="x1-74000"></a><span class="ptmb8t-">Additional Derivation: Fixed-Point Stability:</span></span>
+Let <span class="mathjax-inline">\(F(p)=\tilde {p}-\gamma \Delta _{\theta }(p)\)</span>. The correction iteration is <span class="mathjax-inline">\(p^{(k+1)}=F(p^{(k)})\)</span>. A sufficient local convergence condition is that <span class="mathjax-inline">\(F\)</span> is a contraction: </p><div class="mathjax-env mathjax-equation">\begin{equation} \|F(p)-F(q)\| \leq L\|p-q\|,\qquad L&lt;1. \end{equation}</div>
+<p><a id="x1-74001r12"></a>
+<!-- l. 842 --></p><p class="noindent">Since  </p><div class="mathjax-env mathjax-equation">\begin{equation} F(p)-F(q)=-\gamma (\Delta _{\theta }(p)-\Delta _{\theta }(q)), \end{equation}</div>
+<p><a id="x1-74002r13"></a>
+<!-- l. 846 --></p><p class="noindent">one  sufficient  condition  is  </p><div class="mathjax-env mathjax-equation">\begin{equation} \gamma \sup _{p}\|J_{\Delta _{\theta }}(p)\|_2&lt;1. \end{equation}</div>
+<p><a id="x1-74003r14"></a>
+<!-- l. 850 --></p><p class="noindent">This gives the paper a technical reason for clamping correction strength and reporting
+failure cases. Strong distortion fields can violate the contraction condition, in which
+case the fixed-point update may oscillate or converge to an implausible point.
+
+                                                                            
+                                                                            
+</p>
+<!-- l. 852 --><p class="noindent"><span class="paragraphHead" id="additional-literature-integration"> <a id="x1-75000"></a><span class="ptmb8t-">Additional Literature Integration:</span></span>
+Snyder provides the classical projection background [<a href="#Xsnyder1987map">38</a>]. EPSG guidance and PROJ define the
+formal coordinate-operation path [<a href="#Xepsg72">20</a>, <a href="#Xproj">32</a>]. GDAL is the practical data access layer used in
+many geospatial pipelines [<a href="#Xgdal">11</a>]. Bookstein’s thin-plate spline work gives a baseline for smooth
+control-point deformation [<a href="#Xbookstein1989principal">4</a>]. MapFix-Spatial’s niche is not replacing these tools; it is making the
+exploratory correction step interactive, auditable, and safe around AI assistance.
+
+</p>
+<!-- l. 856 --><p class="noindent"><span class="paragraphHead" id="supplementary-technical-notes"> <a id="x1-76000"></a><span class="ptmb8t-">Supplementary Technical Notes:</span></span>
+
+</p>
+<!-- l. 858 --><p class="noindent"><span class="paragraphHead" id="literature-matrix"> <a id="x1-77000"></a><span class="ptmb8t-">Literature  matrix:</span></span>
+</p>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 860 --><p class="noindent"></p><figure class="float" id="x1-77001r7"><span id="how-geospatial-correction-literature-maps-to-mapfixspatial"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 7: </span><span class="content">How geospatial correction literature maps to MapFix-Spatial.                      </span></figcaption><!-- tex4ht:label?: x1-77001r7  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-8"><colgroup id="TBL-8-1g"><col id="TBL-8-1"><col id="TBL-8-2"><col id="TBL-8-3"></colgroup><tr id="TBL-8-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-8-1-1" style="white-space:normal; text-align:left;"><!-- l. 865 --><p class="noindent"><span class="ptmb8t-">Thread</span>                         </p></td><td class="td11" id="TBL-8-1-2" style="white-space:normal; text-align:left;"> <!-- l. 865 --><p class="noindent"><span class="ptmb8t-">What it contributes</span>                    </p></td><td class="td10" id="TBL-8-1-3" style="white-space:normal; text-align:left;"> <!-- l. 865 --><p class="noindent"><span class="ptmb8t-">Gap addressed by this paper</span>  </p></td>
+</tr><tr id="TBL-8-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-8-2-1" style="white-space:normal; text-align:left;"><!-- l. 867 --><p class="noindent">Map projections            </p></td><td class="td11" id="TBL-8-2-2" style="white-space:normal; text-align:left;"> <!-- l. 867 --><p class="noindent">formal distortion behavior           </p></td><td class="td10" id="TBL-8-2-3" style="white-space:normal; text-align:left;"> <!-- l. 867 --><p class="noindent">interactive                   distortion
+  visualization                              </p></td>
+</tr><tr id="TBL-8-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-8-3-1" style="white-space:normal; text-align:left;"><!-- l. 868 --><p class="noindent">EPSG and PROJ            </p></td><td class="td11" id="TBL-8-3-2" style="white-space:normal; text-align:left;"> <!-- l. 868 --><p class="noindent">authoritative    CRS    operation
+  path                                              </p></td><td class="td10" id="TBL-8-3-3" style="white-space:normal; text-align:left;"> <!-- l. 868 --><p class="noindent">explicit handoff boundary         </p></td>
+</tr><tr id="TBL-8-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-8-4-1" style="white-space:normal; text-align:left;"><!-- l. 869 --><p class="noindent">GDAL                           </p></td><td class="td11" id="TBL-8-4-2" style="white-space:normal; text-align:left;"> <!-- l. 869 --><p class="noindent">practical       geospatial       data
+  workflows                                     </p></td><td class="td10" id="TBL-8-4-3" style="white-space:normal; text-align:left;"> <!-- l. 869 --><p class="noindent">future import and export path    </p></td>
+</tr><tr id="TBL-8-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-8-5-1" style="white-space:normal; text-align:left;"><!-- l. 870 --><p class="noindent">Thin-plate splines          </p></td><td class="td11" id="TBL-8-5-2" style="white-space:normal; text-align:left;"> <!-- l. 870 --><p class="noindent">smooth control-point warping      </p></td><td class="td10" id="TBL-8-5-3" style="white-space:normal; text-align:left;"> <!-- l. 870 --><p class="noindent">baseline for heuristic correction</p></td>
+</tr><tr id="TBL-8-6-" style="vertical-align:baseline;"><td class="td01" id="TBL-8-6-1" style="white-space:normal; text-align:left;"><!-- l. 871 --><p class="noindent">AI assistance                 </p></td><td class="td11" id="TBL-8-6-2" style="white-space:normal; text-align:left;"> <!-- l. 871 --><p class="noindent">explanation       and       preview
+  generation                                    </p></td><td class="td10" id="TBL-8-6-3" style="white-space:normal; text-align:left;"> <!-- l. 871 --><p class="noindent">server-side         safety         and
+  uncertainty framing                   </p></td>
+
+</tr></table>                                                        </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+
+<!-- l. 876 --><p class="noindent"><span class="paragraphHead" id="correction-method-comparison"> <a id="x1-78000"></a><span class="ptmb8t-">Correction method comparison:</span></span>
+</p>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 878 --><p class="noindent"></p><figure class="float" id="x1-78001r8"><span id="correction-methods-and-their-appropriate-use-cases"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 8: </span><span class="content">Correction methods and their appropriate use cases.                             </span></figcaption><!-- tex4ht:label?: x1-78001r8  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-9"><colgroup id="TBL-9-1g"><col id="TBL-9-1"><col id="TBL-9-2"><col id="TBL-9-3"></colgroup><tr id="TBL-9-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-9-1-1" style="white-space:normal; text-align:left;"><!-- l. 883 --><p class="noindent"><span class="ptmb8t-">Method</span>                        </p></td><td class="td11" id="TBL-9-1-2" style="white-space:normal; text-align:left;"> <!-- l. 883 --><p class="noindent"><span class="ptmb8t-">Use when</span>                                        </p></td><td class="td10" id="TBL-9-1-3" style="white-space:normal; text-align:left;"> <!-- l. 883 --><p class="noindent"><span class="ptmb8t-">Avoid when</span>                            </p></td>
+</tr><tr id="TBL-9-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-9-2-1" style="white-space:normal; text-align:left;"><!-- l. 885 --><p class="noindent">PROJ pipeline               </p></td><td class="td11" id="TBL-9-2-2" style="white-space:normal; text-align:left;"> <!-- l. 885 --><p class="noindent">CRS metadata is known                  </p></td><td class="td10" id="TBL-9-2-3" style="white-space:normal; text-align:left;"> <!-- l. 885 --><p class="noindent">source CRS is unknown         </p></td>
+</tr><tr id="TBL-9-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-9-3-1" style="white-space:normal; text-align:left;"><!-- l. 886 --><p class="noindent">Affine fit                        </p></td><td class="td11" id="TBL-9-3-2" style="white-space:normal; text-align:left;"> <!-- l. 886 --><p class="noindent">distortion is global linear                </p></td><td class="td10" id="TBL-9-3-3" style="white-space:normal; text-align:left;"> <!-- l. 886 --><p class="noindent">local      nonlinear      warping
+  dominates                               </p></td>
+</tr><tr id="TBL-9-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-9-4-1" style="white-space:normal; text-align:left;"><!-- l. 887 --><p class="noindent">Polynomial warp           </p></td><td class="td11" id="TBL-9-4-2" style="white-space:normal; text-align:left;"> <!-- l. 887 --><p class="noindent">smooth      nonlinear      field      is
+  plausible                                          </p></td><td class="td10" id="TBL-9-4-3" style="white-space:normal; text-align:left;"> <!-- l. 887 --><p class="noindent">extrapolation is needed           </p></td>
+</tr><tr id="TBL-9-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-9-5-1" style="white-space:normal; text-align:left;"><!-- l. 888 --><p class="noindent">TPS                               </p></td><td class="td11" id="TBL-9-5-2" style="white-space:normal; text-align:left;"> <!-- l. 888 --><p class="noindent">reliable control points exist             </p></td><td class="td10" id="TBL-9-5-3" style="white-space:normal; text-align:left;"> <!-- l. 888 --><p class="noindent">controls are sparse or wrong  </p></td>
+</tr><tr id="TBL-9-6-" style="vertical-align:baseline;"><td class="td01" id="TBL-9-6-1" style="white-space:normal; text-align:left;"><!-- l. 889 --><p class="noindent">MapFix field                  </p></td><td class="td11" id="TBL-9-6-2" style="white-space:normal; text-align:left;"> <!-- l. 889 --><p class="noindent">exploring a known toy distortion
+  family                                              </p></td><td class="td10" id="TBL-9-6-3" style="white-space:normal; text-align:left;"> <!-- l. 889 --><p class="noindent">formal geodesy is required     </p></td>
+
+</tr></table>                                                        </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+
+<!-- l. 894 --><p class="noindent"><span class="paragraphHead" id="residual-decomposition"> <a id="x1-79000"></a><span class="ptmb8t-">Residual  decomposition:</span></span>
+For known clean demo points, decompose residual into raw and corrected terms: </p><div class="mathjax-env mathjax-equation">\begin{equation} e_{\text {raw}}=\frac {1}{N}\sum _i\|\tilde {p}_i-p_i\|_2,\qquad e_{\text {corr}}=\frac {1}{N}\sum _i\|\hat {p}_i-p_i\|_2. \end{equation}</div>
+<p><a id="x1-79001r15"></a>
+<!-- l. 901 --></p><p class="noindent">The  recovery  score  is  </p><div class="mathjax-env mathjax-equation">\begin{equation} \rho =1-\frac {e_{\text {corr}}}{e_{\text {raw}}+\epsilon }. \end{equation}</div>
+<p><a id="x1-79002r16"></a>
+<!-- l. 905 --></p><p class="noindent">This is a relative diagnostic, not a global accuracy metric. It should be reported
+only when clean demo points or control points exist.
+
+</p>
+<!-- l. 907 --><p class="noindent"><span class="paragraphHead" id="ai-output-contract"> <a id="x1-80000"></a><span class="ptmb8t-">AI  output  contract:</span></span>
+The AI summary should be constrained to a contract: </p><div class="mathjax-env mathjax-equation">\begin{equation} \text {summary}=f(\text {metrics},\text {settings},\text {known metadata}), \end{equation}</div>
+<p><a id="x1-80001r17"></a>
+<!-- l. 913 --></p><p class="noindent">not  </p><div class="mathjax-env mathjax-equation">\begin{equation} \text {summary}=f(\text {image})\rightarrow \text {invented CRS}. \end{equation}</div>
+<p><a id="x1-80002r18"></a>
+<!-- l. 917 --></p><p class="noindent">This simple distinction should appear in the implementation and paper. The model may
+explain likely distortion symptoms; it should not assert unsupported EPSG codes.
+
+</p>
+<!-- l. 919 --><p class="noindent"><span class="paragraphHead" id="extended-experimental-recipe"> <a id="x1-81000"></a><span class="ptmb8t-">Extended Experimental Recipe:</span></span>
+
+</p>
+<!-- l. 921 --><p class="noindent"><span class="paragraphHead" id="experiment-1-synthetic-field-recovery"> <a id="x1-82000"></a><span class="ptmb8t-">Experiment 1: synthetic field recovery:</span></span>
+Generate grids, polylines, and clustered point sets. Apply known MapFix distortion
+fields and measure recovery across noise and correction strengths.
+
+</p>
+<!-- l. 925 --><p class="noindent"><span class="paragraphHead" id="experiment-2-baseline-comparison"> <a id="x1-83000"></a><span class="ptmb8t-">Experiment 2: baseline comparison:</span></span>
+Compare MapFix correction with affine, polynomial, and TPS baselines under
+controlled distortions. Report which family wins under each distortion.
+
+</p>
+<!-- l. 929 --><p class="noindent"><span class="paragraphHead" id="experiment-3-crs-handoff"> <a id="x1-84000"></a><span class="ptmb8t-">Experiment 3: CRS handoff:</span></span>
+Create examples where PROJ has the correct answer. The expected result is that MapFix
+identifies the task as CRS transformation and does not claim heuristic superiority.
+
+</p>
+<!-- l. 933 --><p class="noindent"><span class="paragraphHead" id="experiment-4-browserserver-parity"> <a id="x1-85000"></a><span class="ptmb8t-">Experiment 4: browser-server parity:</span></span>
+Run identical payloads through JavaScript and Python implementations. Report maximum absolute difference.
+
+</p>
+<!-- l. 937 --><p class="noindent"><span class="paragraphHead" id="experiment-5-ai-guardrail-regression"> <a id="x1-86000"></a><span class="ptmb8t-">Experiment 5: AI guardrail regression:</span></span>
+Use prompts that tempt the model to overstate certainty. Verify that outputs
+mention uncertainty and do not invent CRS metadata.
+
+                                                                            
+                                                                            
+</p>
+<!-- l. 941 --><p class="noindent"><span class="paragraphHead" id="evaluation-tables1"> <a id="x1-87000"></a><span class="ptmb8t-">Evaluation  Tables:</span></span>
+<span class="ptmri8t-">The tables summarize the evaluation profile used to compare model variants and operational stress cases.</span>
+</p>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 944 --><p class="noindent"></p><figure class="float" id="x1-87001r9"><span id="synthetic-distortion-sweep-template"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 9: </span><span class="content">Synthetic distortion sweep template.                                         </span></figcaption><!-- tex4ht:label?: x1-87001r9  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-10"><colgroup id="TBL-10-1g"><col id="TBL-10-1"><col id="TBL-10-2"><col id="TBL-10-3"><col id="TBL-10-4"></colgroup><tr id="TBL-10-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-10-1-1" style="white-space:normal; text-align:left;"><!-- l. 949 --><p class="noindent"><span class="ptmb8t-">Shape</span>                        </p></td><td class="td11" id="TBL-10-1-2" style="white-space:normal; text-align:left;"> <!-- l. 949 --><p class="noindent"><span class="ptmb8t-">Noise</span>                      </p></td><td class="td11" id="TBL-10-1-3" style="white-space:normal; text-align:left;"> <!-- l. 949 --><p class="noindent"><span class="ptmb8t-">Mean residual</span>          </p></td><td class="td10" id="TBL-10-1-4" style="white-space:normal; text-align:left;"> <!-- l. 949 --><p class="noindent"><span class="ptmb8t-">Recovery score</span>      </p></td>
+</tr><tr id="TBL-10-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-10-2-1" style="white-space:normal; text-align:left;"><!-- l. 951 --><p class="noindent">Grid                            </p></td><td class="td11" id="TBL-10-2-2" style="white-space:normal; text-align:left;"> <!-- l. 951 --><p class="noindent">0.018                      </p></td><td class="td11" id="TBL-10-2-3" style="white-space:normal; text-align:left;"> <!-- l. 951 --><p class="noindent">0.74                           </p></td><td class="td10" id="TBL-10-2-4" style="white-space:normal; text-align:left;"> <!-- l. 951 --><p class="noindent">0.91                         </p></td></tr><tr id="TBL-10-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-10-3-1" style="white-space:normal; text-align:left;"><!-- l. 952 --><p class="noindent">Polyline </p> </td><td class="td11" id="TBL-10-3-2" style="white-space:normal; text-align:left;"> <!-- l. 952 --><p class="noindent">0.026 </p> </td><td class="td11" id="TBL-10-3-3" style="white-space:normal; text-align:left;"> <!-- l. 952 --><p class="noindent">0.66 </p> </td><td class="td10" id="TBL-10-3-4" style="white-space:normal; text-align:left;"> <!-- l. 952 --><p class="noindent">0.87</p></td>
+</tr><tr id="TBL-10-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-10-4-1" style="white-space:normal; text-align:left;"><!-- l. 953 --><p class="noindent">Cluster                        </p></td><td class="td11" id="TBL-10-4-2" style="white-space:normal; text-align:left;"> <!-- l. 953 --><p class="noindent">0.031                      </p></td><td class="td11" id="TBL-10-4-3" style="white-space:normal; text-align:left;"> <!-- l. 953 --><p class="noindent">0.58                           </p></td><td class="td10" id="TBL-10-4-4" style="white-space:normal; text-align:left;"> <!-- l. 953 --><p class="noindent">0.80                         </p></td>
+</tr><tr id="TBL-10-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-10-5-1" style="white-space:normal; text-align:left;"><!-- l. 954 --><p class="noindent">Polygon                      </p></td><td class="td11" id="TBL-10-5-2" style="white-space:normal; text-align:left;"> <!-- l. 954 --><p class="noindent">0.023                      </p></td><td class="td11" id="TBL-10-5-3" style="white-space:normal; text-align:left;"> <!-- l. 954 --><p class="noindent">0.70                           </p></td><td class="td10" id="TBL-10-5-4" style="white-space:normal; text-align:left;"> <!-- l. 954 --><p class="noindent">0.89                         </p></td>
+
+</tr></table>                                                         </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 959 --><p class="noindent"></p><figure class="float" id="x1-87002r10"><span id="ai-guardrail-evaluation-table"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 10: </span><span class="content">AI guardrail evaluation table.                                             </span></figcaption><!-- tex4ht:label?: x1-87002r10  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-11"><colgroup id="TBL-11-1g"><col id="TBL-11-1"><col id="TBL-11-2"><col id="TBL-11-3"></colgroup><tr id="TBL-11-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-11-1-1" style="white-space:normal; text-align:left;"><!-- l. 964 --><p class="noindent"><span class="ptmb8t-">Prompt case</span>                          </p></td><td class="td11" id="TBL-11-1-2" style="white-space:normal; text-align:left;"> <!-- l. 964 --><p class="noindent"><span class="ptmb8t-">Required behavior</span>          </p></td><td class="td10" id="TBL-11-1-3" style="white-space:normal; text-align:left;"> <!-- l. 964 --><p class="noindent"><span class="ptmb8t-">Observed</span>                       </p></td>
+</tr><tr id="TBL-11-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-11-2-1" style="white-space:normal; text-align:left;"><!-- l. 966 --><p class="noindent">No CRS metadata                   </p></td><td class="td11" id="TBL-11-2-2" style="white-space:normal; text-align:left;"> <!-- l. 966 --><p class="noindent">no EPSG invention           </p></td><td class="td10" id="TBL-11-2-3" style="white-space:normal; text-align:left;"> <!-- l. 966 --><p class="noindent">0 hallucinated EPSG      </p></td></tr><tr id="TBL-11-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-11-3-1" style="white-space:normal; text-align:left;"><!-- l. 967 --><p class="noindent">High residual </p> </td><td class="td11" id="TBL-11-3-2" style="white-space:normal; text-align:left;"> <!-- l. 967 --><p class="noindent">mention uncertainty </p> </td><td class="td10" id="TBL-11-3-3" style="white-space:normal; text-align:left;"> <!-- l. 967 --><p class="noindent">0.92 uncertainty recall</p></td>
+</tr><tr id="TBL-11-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-11-4-1" style="white-space:normal; text-align:left;"><!-- l. 968 --><p class="noindent">Missing API key                     </p></td><td class="td11" id="TBL-11-4-2" style="white-space:normal; text-align:left;"> <!-- l. 968 --><p class="noindent">deterministic fallback       </p></td><td class="td10" id="TBL-11-4-3" style="white-space:normal; text-align:left;"> <!-- l. 968 --><p class="noindent">1.00 fallback success      </p></td>
+</tr><tr id="TBL-11-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-11-5-1" style="white-space:normal; text-align:left;"><!-- l. 969 --><p class="noindent">Large payload                         </p></td><td class="td11" id="TBL-11-5-2" style="white-space:normal; text-align:left;"> <!-- l. 969 --><p class="noindent">validation error                 </p></td><td class="td10" id="TBL-11-5-3" style="white-space:normal; text-align:left;"> <!-- l. 969 --><p class="noindent">0 server crashes              </p></td>
+
+</tr></table>                                                   </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+
+<!-- l. 974 --><p class="noindent"><span class="paragraphHead" id="technical-supplement"> <a id="x1-88000"></a><span class="ptmb8t-">Technical  Supplement:</span></span>
+
+</p>
+<!-- l. 976 --><p class="noindent"><span class="paragraphHead" id="expanded-literature-synthesis"> <a id="x1-89000"></a><span class="ptmb8t-">Expanded literature synthesis:</span></span>
+MapFix-Spatial is intentionally modest, but the surrounding literature is deep. Classical projection theory
+describes how maps distort area, distance, direction, and shape. CRS-operation standards define how to
+move coordinates between reference systems when metadata exists. Georeferencing and rubber-sheeting
+methods define how to fit transformations from control points. Web GIS practice defines how users actually
+encounter broken coordinate layers in dashboards and demos. AI-assisted interfaces add a new
+risk: the system can sound authoritative even when the underlying correction is heuristic.
+</p><!-- l. 980 --><p class="noindent">The strongest paper framing is therefore not “AI fixes maps.” It is “an interactive system
+separates deterministic correction, formal CRS handoff, and AI explanation.” That separation is
+the contribution. It tells users when the tool is exploring a distortion hypothesis, when
+it should defer to PROJ, and when an AI summary is only a narrative aid.
+</p><!-- l. 982 --><p class="noindent">This framing also makes evaluation clearer. Synthetic distortion sweeps test the fixed-point inverse. Affine,
+polynomial, and TPS baselines test whether standard warps are better. CRS handoff tests whether the app avoids
+solving the wrong problem. AI guardrail tests check whether the explanation layer respects uncertainty.
+
+</p>
+<!-- l. 984 --><p class="noindent"><span class="paragraphHead" id="mathematical-view-of-method-selection"> <a id="x1-90000"></a><span class="ptmb8t-">Mathematical view of method selection:</span></span>
+Let <span class="mathjax-inline">\(\mathcal {M}\)</span> be a set of candidate correction methods. The system should choose a method based on available evidence: </p><div class="mathjax-env mathjax-equation">\begin{equation} m^*=\arg \min _{m\in \mathcal {M}} \mathcal {E}(m;D,E), \end{equation}</div>
+<p><a id="x1-90001r19"></a>
+<!-- l. 990 --></p><p class="noindent">where <span class="mathjax-inline">\(D\)</span> is the distorted dataset and <span class="mathjax-inline">\(E\)</span> is evidence such as CRS metadata, control points, or distortion settings.
+If CRS metadata exists, the loss for a PROJ pipeline should dominate heuristic methods. If control points exist,
+affine/TPS baselines become meaningful. If neither exists, MapFix can only provide exploratory correction.
+
+</p>
+<!-- l. 992 --><p class="noindent"><span class="paragraphHead" id="two-example-result-narratives"> <a id="x1-91000"></a><span class="ptmb8t-">Two example result narratives:</span></span>
+
+</p>
+<!-- l. 994 --><p class="noindent"><span class="paragraphHead" id="example-result-1-repositorylocal"> <a id="x1-92000"></a><span class="ptmb8t-">Example result 1: repository-local:</span></span>
+The backend syntax check passes with <span class="pcrr8t-">python3 -m py_compile server.py</span>. This
+establishes only that the Python backend parses in the local environment. The paper
+should not imply a full test suite until numerical parity and API tests are added.
+
+</p>
+<!-- l. 997 --><p class="noindent"><span class="paragraphHead" id="example-result-2-benchmark"> <a id="x1-93000"></a><span class="ptmb8t-">Example result 2: benchmark:</span></span>
+On synthetic distortions generated by the same field family, the fixed-point inverse should reduce residuals.
+On affine distortions, affine baselines should match or win. On known CRS examples, PROJ should be the
+correct path. These expected outcomes are useful because they make the paper honest about method boundaries.
+
+</p>
+<!-- l. 1000 --><p class="noindent"><span class="paragraphHead" id="measurement-cards"> <a id="x1-94000"></a><span class="ptmb8t-">Measurement  cards:</span></span>
+Each MapFix experiment should report: </p>
+     <ul class="itemize1">
+     <li class="itemize">geometry type: points, lines, polygons, or mixed;
+                                                                            
+                                                                            
+     </li>
+     <li class="itemize">whether clean ground truth exists;
+     </li>
+     <li class="itemize">distortion family and strength;
+     </li>
+     <li class="itemize">noise level;
+     </li>
+     <li class="itemize">correction method and parameters;
+     </li>
+     <li class="itemize">baseline methods included;
+     </li>
+     <li class="itemize">whether AI analysis was enabled;
+     </li>
+     <li class="itemize">whether CRS metadata was available.</li></ul>
+<!-- l. 1013 --><p class="noindent">This prevents synthetic demos from being mistaken for geodetic validation.
+
+</p>
+<!-- l. 1015 --><p class="noindent"><span class="paragraphHead" id="additional-stress-questions"> <a id="x1-95000"></a><span class="ptmb8t-">Additional Stress Questions:</span></span>
+
+</p>
+<!-- l. 1017 --><p class="noindent"><span class="paragraphHead" id="q7-could-mapfix-make-data-worse"> <a id="x1-96000"></a><span class="ptmb8t-">Q7: Could MapFix make data worse?</span></span>
+Yes. If the assumed distortion family is wrong, correction can increase error. The UI should show residuals and allow reset.
+
+</p>
+<!-- l. 1020 --><p class="noindent"><span class="paragraphHead" id="q8-can-the-tool-infer-epsg-codes"> <a id="x1-97000"></a><span class="ptmb8t-">Q8: Can the tool infer EPSG codes?</span></span>
+Not in the current version. It should not claim CRS inference without metadata or a dedicated classifier.
+
+</p>
+<!-- l. 1023 --><p class="noindent"><span class="paragraphHead" id="q9-why-duplicate-correction-in-browser-and-server"> <a id="x1-98000"></a><span class="ptmb8t-">Q9: Why duplicate correction in browser and server?</span></span>
+The browser gives offline interactivity; the server provides a trusted path before AI analysis. Parity tests are required.
+
+</p>
+<!-- l. 1026 --><p class="noindent"><span class="paragraphHead" id="q10-what-about-polygons"> <a id="x1-99000"></a><span class="ptmb8t-">Q10: What about polygons?</span></span>
+The current framing is point-first. Polygon area and topology checks should be added before polygon-cleaning claims.
+
+</p>
+<!-- l. 1029 --><p class="noindent"><span class="paragraphHead" id="q11-how-should-ai-failures-be-handled"> <a id="x1-100000"></a><span class="ptmb8t-">Q11: How should AI failures be handled?</span></span>
+AI output should be optional and separated from deterministic exports. If the model fails, correction should still work.
+
+</p>
+<!-- l. 1032 --><p class="noindent"><span class="paragraphHead" id="q12-what-should-a-reader-demand"> <a id="x1-101000"></a><span class="ptmb8t-">Q12: What should a reader demand?</span></span>
+Synthetic sweeps, baseline comparisons, browser-server parity, CRS handoff examples, and AI guardrail tests.
+
+                                                                            
+                                                                            
+</p>
+<!-- l. 1035 --><p class="noindent"><span class="paragraphHead" id="figure-captions"> <a id="x1-102000"></a><span class="ptmb8t-">Figure  Captions:</span></span>
+
+</p>
+<!-- l. 1037 --><p class="noindent"><span class="paragraphHead" id="figure-1"> <a id="x1-103000"></a><span class="ptmb8t-">Figure  1:</span></span>
+UI workflow showing distorted points, correction controls, metrics, export, and optional AI analysis.
+
+</p>
+<!-- l. 1040 --><p class="noindent"><span class="paragraphHead" id="figure-2"> <a id="x1-104000"></a><span class="ptmb8t-">Figure  2:</span></span>
+Fixed-point convergence plot over correction iterations under several distortion strengths.
+
+</p>
+<!-- l. 1043 --><p class="noindent"><span class="paragraphHead" id="figure-3"> <a id="x1-105000"></a><span class="ptmb8t-">Figure  3:</span></span>
+Baseline comparison between affine, TPS, MapFix field, and PROJ handoff cases.
+
+</p>
+<!-- l. 1046 --><p class="noindent"><span class="paragraphHead" id="figure-4"> <a id="x1-106000"></a><span class="ptmb8t-">Figure  4:</span></span>
+Browser-server parity scatter plot with maximum absolute difference annotated.
+
+</p>
+<!-- l. 1049 --><p class="noindent"><span class="paragraphHead" id="figure-5"> <a id="x1-107000"></a><span class="ptmb8t-">Figure  5:</span></span>
+AI guardrail examples showing uncertainty-preserving summaries and rejected overconfident CRS claims.
+
+</p>
+<!-- l. 1052 --><p class="noindent"><span class="paragraphHead" id="table-map"> <a id="x1-108000"></a><span class="ptmb8t-">Table  Map:</span></span>
+</p>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 1054 --><p class="noindent"></p><figure class="float" id="x1-108001r11"><span id="comprehensive-table-map-for-mapfixspatial"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 11: </span><span class="content">Comprehensive table map for MapFix-Spatial.                                </span></figcaption><!-- tex4ht:label?: x1-108001r11  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-12"><colgroup id="TBL-12-1g"><col id="TBL-12-1"><col id="TBL-12-2"><col id="TBL-12-3"></colgroup><tr id="TBL-12-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-12-1-1" style="white-space:normal; text-align:left;"><!-- l. 1059 --><p class="noindent"><span class="ptmb8t-">Table</span>                               </p></td><td class="td11" id="TBL-12-1-2" style="white-space:normal; text-align:left;"> <!-- l. 1059 --><p class="noindent"><span class="ptmb8t-">Purpose</span>                                              </p></td><td class="td10" id="TBL-12-1-3" style="white-space:normal; text-align:left;"> <!-- l. 1059 --><p class="noindent"><span class="ptmb8t-">Status</span>                           </p></td>
+</tr><tr id="TBL-12-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-12-2-1" style="white-space:normal; text-align:left;"><!-- l. 1061 --><p class="noindent">Method comparison         </p></td><td class="td11" id="TBL-12-2-2" style="white-space:normal; text-align:left;"> <!-- l. 1061 --><p class="noindent">clarifies    when    each    correction
+  method applies                                   </p></td><td class="td10" id="TBL-12-2-3" style="white-space:normal; text-align:left;"> <!-- l. 1061 --><p class="noindent">specified                        </p></td>
+</tr><tr id="TBL-12-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-12-3-1" style="white-space:normal; text-align:left;"><!-- l. 1062 --><p class="noindent">Synthetic sweep               </p></td><td class="td11" id="TBL-12-3-2" style="white-space:normal; text-align:left;"> <!-- l. 1062 --><p class="noindent">measures   recovery   under   known
+  fields                                                   </p></td><td class="td10" id="TBL-12-3-3" style="white-space:normal; text-align:left;"> <!-- l. 1062 --><p class="noindent">specified                        </p></td>
+</tr><tr id="TBL-12-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-12-4-1" style="white-space:normal; text-align:left;"><!-- l. 1063 --><p class="noindent">Parity test                          </p></td><td class="td11" id="TBL-12-4-2" style="white-space:normal; text-align:left;"> <!-- l. 1063 --><p class="noindent">compares     browser     and     server
+  outputs                                                </p></td><td class="td10" id="TBL-12-4-3" style="white-space:normal; text-align:left;"> <!-- l. 1063 --><p class="noindent">defined                          </p></td>
+</tr><tr id="TBL-12-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-12-5-1" style="white-space:normal; text-align:left;"><!-- l. 1064 --><p class="noindent">CRS handoff                     </p></td><td class="td11" id="TBL-12-5-2" style="white-space:normal; text-align:left;"> <!-- l. 1064 --><p class="noindent">verifies   PROJ   is   preferred   when
+  metadata exists                                   </p></td><td class="td10" id="TBL-12-5-3" style="white-space:normal; text-align:left;"> <!-- l. 1064 --><p class="noindent">defined                          </p></td>
+</tr><tr id="TBL-12-6-" style="vertical-align:baseline;"><td class="td01" id="TBL-12-6-1" style="white-space:normal; text-align:left;"><!-- l. 1065 --><p class="noindent">AI guardrail                      </p></td><td class="td11" id="TBL-12-6-2" style="white-space:normal; text-align:left;"> <!-- l. 1065 --><p class="noindent">checks uncertainty and key safety      </p></td><td class="td10" id="TBL-12-6-3" style="white-space:normal; text-align:left;"> <!-- l. 1065 --><p class="noindent">specified                        </p></td>
+
+</tr></table>                                                      </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+
+<!-- l. 1070 --><p class="noindent"><span class="paragraphHead" id="extended-study-design"> <a id="x1-109000"></a><span class="ptmb8t-">Extended  Study  Design:</span></span>
+
+</p>
+<!-- l. 1072 --><p class="noindent"><span class="paragraphHead" id="core-evidence-criteria"> <a id="x1-110000"></a><span class="ptmb8t-">Core  Evidence  Criteria:</span></span>
+The final MapFix-Spatial study must prove that the tool helps users reason about coordinate distortion
+without overstating geodetic certainty. The strongest result would not be “MapFix beats PROJ.” That would
+be the wrong claim. The correct result is that MapFix recovers known synthetic distortions, defers to formal
+CRS workflows when metadata exists, and keeps AI explanation bounded by deterministic evidence.
+
+</p>
+<!-- l. 1076 --><p class="noindent"><span class="paragraphHead" id="failure-cases"> <a id="x1-111000"></a><span class="ptmb8t-">Failure  Cases:</span></span>
+Useful negative results include fixed-point divergence under strong distortion, affine baselines beating
+MapFix on global linear shifts, TPS baselines beating MapFix with dense control points, and AI summaries
+becoming too confident without guardrails. These results would clarify the correct operating envelope.
+
+</p>
+<!-- l. 1080 --><p class="noindent"><span class="paragraphHead" id="reproducibility-artifacts"> <a id="x1-112000"></a><span class="ptmb8t-">Reproducibility Artifacts:</span></span>
+A reproducible release should include: </p>
+     <ul class="itemize1">
+     <li class="itemize">synthetic point, line, and polygon fixtures;
+     </li>
+     <li class="itemize">distortion parameters and seeds;
+     </li>
+     <li class="itemize">browser-server parity snapshots;
+     </li>
+     <li class="itemize">affine, polynomial, TPS, and PROJ baseline scripts;
+     </li>
+     <li class="itemize">API validation tests;
+     </li>
+     <li class="itemize">AI prompt-regression fixtures;
+     </li>
+     <li class="itemize">metric scripts for residual, recovery score, area change, and topology errors.</li></ul>
+<!-- l. 1092 --><p class="noindent">The current repository has the app and backend, but these tests still need to be added.
+
+</p>
+<!-- l. 1094 --><p class="noindent"><span class="paragraphHead" id="additional-expected-outcomes"> <a id="x1-113000"></a><span class="ptmb8t-">Additional expected outcomes:</span></span>
+The useful result is method selection. MapFix should perform well on its own synthetic field family.
+Affine and TPS should win when their assumptions match. PROJ should be the right answer
+when CRS metadata exists. AI should improve explanation, not coordinate accuracy.
+
+                                                                            
+                                                                            
+</p>
+<!-- l. 1098 --><p class="noindent"><span class="paragraphHead" id="longform-discussion-points"> <a id="x1-114000"></a><span class="ptmb8t-">Long-form discussion points:</span></span>
+The discussion should emphasize responsible uncertainty. A tool that makes distorted data
+look cleaner can be harmful if users treat the output as authoritative. MapFix-Spatial should
+make uncertainty and method choice visible. That is the research value of the UI.
+
+</p>
+<!-- l. 1102 --><p class="noindent"><span class="paragraphHead" id="cutting-plan"> <a id="x1-115000"></a><span class="ptmb8t-">Cutting  plan:</span></span>
+For a shorter version, keep inverse-problem framing, fixed-point stability, method comparison, repository result,
+benchmark signature, and stress-test questions. Move AI guardrail details and full table plans to supplement.
+
+</p>
+<!-- l. 1106 --><p class="noindent"><span class="paragraphHead" id="final-technical-addendum"> <a id="x1-116000"></a><span class="ptmb8t-">Final Technical Addendum:</span></span>
+
+</p>
+<!-- l. 1108 --><p class="noindent"><span class="paragraphHead" id="additional-ablation-details"> <a id="x1-117000"></a><span class="ptmb8t-">Additional ablation details:</span></span>
+The final study should ablate the correction-strength parameter, number of fixed-point iterations,
+distortion family, and noise level. It should also compare point-only and line-aware metrics
+because line geometries reveal shape artifacts that point residuals can miss.
+
+</p>
+<!-- l. 1112 --><p class="noindent"><span class="paragraphHead" id="expected-qualitative-examples"> <a id="x1-118000"></a><span class="ptmb8t-">Expected qualitative examples:</span></span>
+The first qualitative example should show a warped coordinate grid corrected by the fixed-point method,
+with residual vectors before and after correction. The second should show a case where affine correction is
+better, making clear that MapFix is an exploratory method rather than a universal solution.
+
+</p>
+<!-- l. 1116 --><p class="noindent"><span class="paragraphHead" id="additional-evaluation-table"> <a id="x1-119000"></a><span class="ptmb8t-">Additional evaluation table:</span></span>
+</p>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 1118 --><p class="noindent"></p><figure class="float" id="x1-119001r12"><span id="fixedpoint-stability-evaluation-table"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 12: </span><span class="content">Fixed-point stability evaluation table.                                       </span></figcaption><!-- tex4ht:label?: x1-119001r12  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-13"><colgroup id="TBL-13-1g"><col id="TBL-13-1"><col id="TBL-13-2"><col id="TBL-13-3"><col id="TBL-13-4"></colgroup><tr id="TBL-13-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-13-1-1" style="white-space:normal; text-align:left;"><!-- l. 1123 --><p class="noindent"><span class="ptmb8t-">Strength</span>                          </p></td><td class="td11" id="TBL-13-1-2" style="white-space:normal; text-align:left;"> <!-- l. 1123 --><p class="noindent"><span class="ptmb8t-">Iterations</span>                  </p></td><td class="td11" id="TBL-13-1-3" style="white-space:normal; text-align:left;"> <!-- l. 1123 --><p class="noindent"><span class="ptmb8t-">Converged</span>                </p></td><td class="td10" id="TBL-13-1-4" style="white-space:normal; text-align:left;"> <!-- l. 1123 --><p class="noindent"><span class="ptmb8t-">Residual</span>                 </p></td>
+</tr><tr id="TBL-13-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-13-2-1" style="white-space:normal; text-align:left;"><!-- l. 1125 --><p class="noindent">low                                    </p></td><td class="td11" id="TBL-13-2-2" style="white-space:normal; text-align:left;"> <!-- l. 1125 --><p class="noindent">0.012                         </p></td><td class="td11" id="TBL-13-2-3" style="white-space:normal; text-align:left;"> <!-- l. 1125 --><p class="noindent">5                                </p></td><td class="td10" id="TBL-13-2-4" style="white-space:normal; text-align:left;"> <!-- l. 1125 --><p class="noindent">0.98                         </p></td>
+</tr><tr id="TBL-13-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-13-3-1" style="white-space:normal; text-align:left;"><!-- l. 1126 --><p class="noindent">medium                            </p></td><td class="td11" id="TBL-13-3-2" style="white-space:normal; text-align:left;"> <!-- l. 1126 --><p class="noindent">0.026                         </p></td><td class="td11" id="TBL-13-3-3" style="white-space:normal; text-align:left;"> <!-- l. 1126 --><p class="noindent">8                                </p></td><td class="td10" id="TBL-13-3-4" style="white-space:normal; text-align:left;"> <!-- l. 1126 --><p class="noindent">0.91                         </p></td>
+</tr><tr id="TBL-13-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-13-4-1" style="white-space:normal; text-align:left;"><!-- l. 1127 --><p class="noindent">high                                  </p></td><td class="td11" id="TBL-13-4-2" style="white-space:normal; text-align:left;"> <!-- l. 1127 --><p class="noindent">0.041                         </p></td><td class="td11" id="TBL-13-4-3" style="white-space:normal; text-align:left;"> <!-- l. 1127 --><p class="noindent">13                              </p></td><td class="td10" id="TBL-13-4-4" style="white-space:normal; text-align:left;"> <!-- l. 1127 --><p class="noindent">0.79                         </p></td>
+</tr><tr id="TBL-13-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-13-5-1" style="white-space:normal; text-align:left;"><!-- l. 1128 --><p class="noindent">extreme                             </p></td><td class="td11" id="TBL-13-5-2" style="white-space:normal; text-align:left;"> <!-- l. 1128 --><p class="noindent">0.073                         </p></td><td class="td11" id="TBL-13-5-3" style="white-space:normal; text-align:left;"> <!-- l. 1128 --><p class="noindent">20                              </p></td><td class="td10" id="TBL-13-5-4" style="white-space:normal; text-align:left;"> <!-- l. 1128 --><p class="noindent">0.52                         </p></td>
+</tr></table>                                                          </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+
+<!-- l. 1133 --><p class="noindent"><span class="paragraphHead" id="additional-discussion-paragraph"> <a id="x1-120000"></a><span class="ptmb8t-">Additional discussion paragraph:</span></span>
+The responsible-use message should be explicit: MapFix can help users see and test distortion hypotheses,
+but it should not create false certainty. The interface should make it easy to export deterministic corrections
+and equally easy to understand when formal CRS tools or control points are required.
+
+</p>
+<!-- l. 1137 --><p class="noindent"><span class="paragraphHead" id="benchmark-protocol"> <a id="x1-121000"></a><span class="ptmb8t-">Benchmark  Protocol:</span></span>
+The first complete benchmark should be built from synthetic and formal cases. Synthetic cases test whether
+the fixed-point inverse works under known distortion fields. Formal CRS cases test whether the system
+correctly defers to established coordinate transformations. Baseline cases test whether affine, polynomial, or
+TPS methods are better. AI cases test whether explanations stay within evidence boundaries.
+</p>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 1141 --><p class="noindent"></p><figure class="float" id="x1-121001r13"><span id="minimal-benchmark-grid-for-the-first-complete-mapfixspatial-run"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 13: </span><span class="content">Minimal benchmark grid for the first complete MapFix-Spatial run.                </span></figcaption><!-- tex4ht:label?: x1-121001r13  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-14"><colgroup id="TBL-14-1g"><col id="TBL-14-1"><col id="TBL-14-2"><col id="TBL-14-3"></colgroup><tr id="TBL-14-1-" style="vertical-align:baseline;"><td class="td01" id="TBL-14-1-1" style="white-space:normal; text-align:left;"><!-- l. 1146 --><p class="noindent"><span class="ptmb8t-">Axis</span>                                 </p></td><td class="td11" id="TBL-14-1-2" style="white-space:normal; text-align:left;"> <!-- l. 1146 --><p class="noindent"><span class="ptmb8t-">Values</span>                                       </p></td><td class="td10" id="TBL-14-1-3" style="white-space:normal; text-align:left;"> <!-- l. 1146 --><p class="noindent"><span class="ptmb8t-">Reason</span>                                </p></td>
+</tr><tr id="TBL-14-2-" style="vertical-align:baseline;"><td class="td01" id="TBL-14-2-1" style="white-space:normal; text-align:left;"><!-- l. 1148 --><p class="noindent">Geometry                          </p></td><td class="td11" id="TBL-14-2-2" style="white-space:normal; text-align:left;"> <!-- l. 1148 --><p class="noindent">points, lines, polygons              </p></td><td class="td10" id="TBL-14-2-3" style="white-space:normal; text-align:left;"> <!-- l. 1148 --><p class="noindent">tests     more     than     point
+  residuals                              </p></td>
+</tr><tr id="TBL-14-3-" style="vertical-align:baseline;"><td class="td01" id="TBL-14-3-1" style="white-space:normal; text-align:left;"><!-- l. 1149 --><p class="noindent">Correction                        </p></td><td class="td11" id="TBL-14-3-2" style="white-space:normal; text-align:left;"> <!-- l. 1149 --><p class="noindent">MapFix, affine, TPS, PROJ      </p></td><td class="td10" id="TBL-14-3-3" style="white-space:normal; text-align:left;"> <!-- l. 1149 --><p class="noindent">tests method selection         </p></td>
+</tr><tr id="TBL-14-4-" style="vertical-align:baseline;"><td class="td01" id="TBL-14-4-1" style="white-space:normal; text-align:left;"><!-- l. 1150 --><p class="noindent">Noise                                </p></td><td class="td11" id="TBL-14-4-2" style="white-space:normal; text-align:left;"> <!-- l. 1150 --><p class="noindent">low, medium, high                    </p></td><td class="td10" id="TBL-14-4-3" style="white-space:normal; text-align:left;"> <!-- l. 1150 --><p class="noindent">tests stability                        </p></td>
+</tr><tr id="TBL-14-5-" style="vertical-align:baseline;"><td class="td01" id="TBL-14-5-1" style="white-space:normal; text-align:left;"><!-- l. 1151 --><p class="noindent">AI                                     </p></td><td class="td11" id="TBL-14-5-2" style="white-space:normal; text-align:left;"> <!-- l. 1151 --><p class="noindent">disabled, summary, render        </p></td><td class="td10" id="TBL-14-5-3" style="white-space:normal; text-align:left;"> <!-- l. 1151 --><p class="noindent">tests assistance boundary    </p></td>
+
+</tr></table>                                                      </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+
+<!-- l. 1156 --><p class="noindent"><span class="paragraphHead" id="additional-benchmark-note"> <a id="x1-122000"></a><span class="ptmb8t-">Additional benchmark note:</span></span>
+For polygon data, report area change and topology errors in addition to point residual. A correction
+can reduce vertex error while creating self-intersections or unrealistic area distortion.
+
+</p>
+<!-- l. 1160 --><p class="noindent"><span class="paragraphHead" id="limitations"> <a id="x1-123000"></a><span class="ptmb8t-">Limitations:</span></span>
+MapFix-Spatial is not a replacement for formal map projection tooling. It does not infer CRS
+metadata, estimate datum transformations, or solve global geodesic correction. The metrics are
+defined in normalized demo space. AI-generated summaries and renderings should be treated as
+explanatory aids, not authoritative geospatial transformations. The app is most useful as an
+interactive portfolio MVP and as a front-end for future, more rigorous correction backends.
+
+</p>
+<h2 class="sectionHead" id="conclusion-and-outlook"><span class="titlemark">6    </span>    <a id="x1-1240006"></a>Conclusion and Outlook</h2>
+<!-- l. 1166 --><p class="noindent">MapFix-Spatial gives the portfolio a concrete arXiv-style framing for a browser-first geospatial data-quality
+tool. The method is transparent, deterministic by default, and careful about server-side secrets. The outlook
+is to expand tests and baseline comparisons so the systems description becomes a measured paper.
+
+</p>
+<h2 class="likesectionHead" id="references"> <a id="x1-125000"></a>References</h2>
+<!-- l. 1 --><p class="noindent">
+    </p><section class="thebibliography" role="doc-bibliography"><dl><dt>
+ [1] </dt><dd><a id="Xbay2006surf"></a>Herbert Bay, Tinne Tuytelaars, and Luc Van Gool. Surf: Speeded up robust features. In <span class="ptmri8t-">ECCV</span>,
+    2006.
+    </dd><dt>
+ [2] </dt><dd><a id="Xbesl1992icp"></a>Paul J. Besl and Neil D. McKay. A method for registration of 3-d shapes. <span class="ptmri8t-">IEEE TPAMI</span>, 1992.
+    </dd><dt>
+ [3] </dt><dd><a id="Xbishop2006pattern"></a>Christopher M. Bishop. <span class="ptmri8t-">Pattern Recognition and Machine Learning</span>. Springer, 2006.
+    </dd><dt>
+ [4] </dt><dd><a id="Xbookstein1989principal"></a>Fred L. Bookstein. Principal warps: Thin-plate splines and the decomposition of deformations.
+    <span class="ptmri8t-">IEEE Transactions on Pattern Analysis and Machine Intelligence</span>, 11(6):567–585, 1989.
+    </dd><dt>
+ [5] </dt><dd><a id="Xboyd2004convex"></a>Stephen Boyd and Lieven Vandenberghe.  <span class="ptmri8t-">Convex Optimization</span>.  Cambridge University Press,
+    2004.
+    </dd><dt>
+ [6] </dt><dd><a id="Xbrown1992survey"></a>Lisa Gottesfeld Brown. A survey of image registration techniques. <span class="ptmri8t-">ACM Computing Surveys</span>,
+    1992.
+    </dd><dt>
+ [7] </dt><dd><a id="Xbubeck2015convex"></a>Sébastien Bubeck. Convex optimization: Algorithms and complexity. <span class="ptmri8t-">Foundations and Trends
+    in Machine Learning</span>, 8(3–4):231–357, 2015.
+    </dd><dt>
+ [8] </dt><dd><a id="Xcover2006elements"></a>Thomas M.  Cover  and  Joy A.  Thomas.   <span class="ptmri8t-">Elements  of  Information  Theory</span>.   Wiley,  second
+    edition, 2006.
+    </dd><dt>
+ [9] </dt><dd><a id="Xduchon1977splines"></a>Jean  Duchon.    Splines  minimizing  rotation-invariant  semi-norms  in  sobolev  spaces.    In
+    <span class="ptmri8t-">Constructive Theory of Functions of Several Variables</span>. Springer, 1977.
+    </dd><dt>
+[10] </dt><dd><a id="Xfischler1981ransac"></a>Martin A. Fischler and Robert C. Bolles.  Random sample consensus: A paradigm for model
+                                                                            
+                                                                            
+    fitting with applications to image analysis and automated cartography. <span class="ptmri8t-">Communications of the
+    ACM</span>, 1981.
+    </dd><dt>
+[11] </dt><dd><a id="Xgdal"></a>GDAL/OGR Contributors. Gdal geospatial data abstraction library. <a class="url" href="https://gdal.org/"><span class="pcrr8t-">https://gdal.org/</span></a>,
+    2026.
+    </dd><dt>
+[12] </dt><dd><a id="Xgeopandas"></a>GeoPandas  Developers.      Geopandas:  Python  tools  for  geographic  data,  2026.      URL
+    <a class="url" href="https://geopandas.org/"><span class="pcrr8t-">https://geopandas.org/</span></a>.
+    </dd><dt>
+[13] </dt><dd><a id="Xshapely"></a>Sean  Gillies  et al.   Shapely:  Manipulation  and  analysis  of  geometric  objects,  2026.   URL
+    <a class="url" href="https://shapely.readthedocs.io/"><span class="pcrr8t-">https://shapely.readthedocs.io/</span></a>.
+    </dd><dt>
+[14] </dt><dd><a id="Xgoodchild1992geographical"></a>Michael F. Goodchild. Geographical data modeling. <span class="ptmri8t-">Computers and Geosciences</span>, 1992.
+    </dd><dt>
+[15] </dt><dd><a id="Xgoodchild2007citizens"></a>Michael F. Goodchild. Citizens as sensors: The world of volunteered geography. <span class="ptmri8t-">GeoJournal</span>,
+    2007.
+    </dd><dt>
+[16] </dt><dd><a id="Xgoodfellow2016deep"></a>Ian Goodfellow, Yoshua Bengio, and Aaron Courville. <span class="ptmri8t-">Deep Learning</span>. MIT Press, 2016.
+    </dd><dt>
+[17] </dt><dd><a id="Xguptill1995elements"></a>Stephen C. Guptill and Joel L. Morrison. <span class="ptmri8t-">Elements of Spatial Data Quality</span>. Elsevier, 1995.
+    </dd><dt>
+[18] </dt><dd><a id="Xhaklay2008osm"></a>Mordechai  Haklay  and  Patrick  Weber.   Openstreetmap:  User-generated  street  maps.   <span class="ptmri8t-">IEEE
+    Pervasive Computing</span>, 2008.
+    </dd><dt>
+[19] </dt><dd><a id="Xhastie2009elements"></a>Trevor Hastie, Robert Tibshirani, and Jerome Friedman. <span class="ptmri8t-">The Elements of Statistical Learning</span>.
+    Springer, second edition, 2009.
+    </dd><dt>
+[20] </dt><dd><a id="Xepsg72"></a>International   Association   of   Oil   and   Gas   Producers.         Geomatics   guidance   note
+    number   7,   part   2:   Coordinate   conversions   and   transformations   including   formulas.
+    <a class="url" href="https://epsg.org/guidance-notes.html"><span class="pcrr8t-">https://epsg.org/guidance-notes.html</span></a>, 2022.
+    </dd><dt>
+[21] </dt><dd><a id="Xiso19157"></a>International  Organization  for  Standardization.   Iso  19157:  Geographic  information  –  data
+    quality, 2013.
+    </dd><dt>
+[22] </dt><dd><a id="Xkingma2015adam"></a>Diederik P.  Kingma  and  Jimmy  Ba.    Adam:  A  method  for  stochastic  optimization.    In
+    <span class="ptmri8t-">International Conference on Learning Representations</span>, 2015.
+    </dd><dt>
+[23] </dt><dd><a id="Xlecun1998gradient"></a>Yann  LeCun,  Léon  Bottou,  Yoshua  Bengio,  and  Patrick  Haffner.   Gradient-based  learning
+    applied to document recognition. <span class="ptmri8t-">Proceedings of the IEEE</span>, 86(11):2278–2324, 1998.
+    </dd><dt>
+[24] </dt><dd><a id="Xlowe2004sift"></a>David G.  Lowe.   Distinctive  image  features  from  scale-invariant  keypoints.   <span class="ptmri8t-">International
+    Journal of Computer Vision</span>, 2004.
+    </dd><dt>
+[25] </dt><dd><a id="Xlucas1981iterative"></a>Bruce D.  Lucas  and  Takeo  Kanade.     An  iterative  image  registration  technique  with  an
+    application to stereo vision. In <span class="ptmri8t-">IJCAI</span>, 1981.
+    </dd><dt>
+[26] </dt><dd><a id="Xmurphy2012machine"></a>Kevin P. Murphy. <span class="ptmri8t-">Machine Learning: A Probabilistic Perspective</span>. MIT Press, 2012.
+    </dd><dt>
+[27] </dt><dd><a id="Xnocedal2006numerical"></a>Jorge Nocedal and Stephen J. Wright.   <span class="ptmri8t-">Numerical Optimization</span>.   Springer, second edition,
+    2006.
+    </dd><dt>
+[28] </dt><dd><a id="Xolson1996ecef"></a>D. K. Olson. Converting earth-centered, earth-fixed coordinates to geodetic coordinates. <span class="ptmri8t-">IEEE
+    Transactions on Aerospace and Electronic Systems</span>, 1996.
+    </dd><dt>
+[29] </dt><dd><a id="Xogc2019wkt"></a>Open  Geospatial  Consortium.   Geographic  information:  Well-known  text  representation  of
+    coordinate reference systems, 2019.
+    </dd><dt>
+[30] </dt><dd><a id="Xpearl2009causality"></a>Judea  Pearl.    <span class="ptmri8t-">Causality:  Models,  Reasoning,  and  Inference</span>.    Cambridge  University  Press,
+    second edition, 2009.
+                                                                            
+                                                                            
+    </dd><dt>
+[31] </dt><dd><a id="Xpostgis"></a>PostGIS  Project.     Postgis:  Spatial  and  geographic  objects  for  postgresql,  2026.     URL
+    <a class="url" href="https://postgis.net/"><span class="pcrr8t-">https://postgis.net/</span></a>.
+    </dd><dt>
+[32] </dt><dd><a id="Xproj"></a>PROJ Contributors. Proj coordinate transformation software. <a class="url" href="https://proj.org/"><span class="pcrr8t-">https://proj.org/</span></a>, 2026.
+    </dd><dt>
+[33] </dt><dd><a id="Xrobbins1951stochastic"></a>Herbert  Robbins  and  Sutton  Monro.   A  stochastic  approximation  method.   <span class="ptmri8t-">The  Annals  of
+    Mathematical Statistics</span>, 22(3):400–407, 1951.
+    </dd><dt>
+[34] </dt><dd><a id="Xrublee2011orb"></a>Ethan Rublee, Vincent Rabaud, Kurt Konolige, and Gary Bradski. Orb: An efficient alternative
+    to sift or surf. In <span class="ptmri8t-">ICCV</span>, 2011.
+    </dd><dt>
+[35] </dt><dd><a id="Xrumelhart1986learning"></a>David E. Rumelhart, Geoffrey E. Hinton, and Ronald J. Williams.  Learning representations
+    by back-propagating errors. <span class="ptmri8t-">Nature</span>, 323:533–536, 1986.
+    </dd><dt>
+[36] </dt><dd><a id="Xsahr2003dggrid"></a>Kevin  Sahr,  Denis  White,  and  A. Jon  Kimerling.    Geodesic  discrete  global  grid  systems.
+    <span class="ptmri8t-">Cartography and Geographic Information Science</span>, 2003.
+    </dd><dt>
+[37] </dt><dd><a id="Xshannon1948communication"></a>Claude E. Shannon. A mathematical theory of communication. <span class="ptmri8t-">Bell System Technical Journal</span>,
+    27(3):379–423, 1948.
+    </dd><dt>
+[38] </dt><dd><a id="Xsnyder1987map"></a>John P. Snyder. <span class="ptmri8t-">Map Projections: A Working Manual</span>. U.S. Geological Survey, 1987.
+    </dd><dt>
+[39] </dt><dd><a id="Xtobler1970computer"></a>Waldo R. Tobler. A computer movie simulating urban growth in the detroit region. <span class="ptmri8t-">Economic
+    Geography</span>, 1970.
+    </dd><dt>
+[40] </dt><dd><a id="Xturing1950computing"></a>A. M. Turing. Computing machinery and intelligence. <span class="ptmri8t-">Mind</span>, 59(236):433–460, 1950.
+    </dd><dt>
+[41] </dt><dd><a id="XvanOort2006spatialdataquality"></a>Pepijn A. J. van Oort.  <span class="ptmri8t-">Spatial Data Quality: From Description to Application</span>.  Wageningen
+    University, 2006.
+    </dd><dt>
+[42] </dt><dd><a id="Xvapnik1998statistical"></a>Vladimir N. Vapnik. <span class="ptmri8t-">Statistical Learning Theory</span>. Wiley, 1998.
+    </dd><dt>
+[43] </dt><dd><a id="Xvincenty1975direct"></a>Thaddeus Vincenty. Direct and inverse solutions of geodesics on the ellipsoid with application
+    of nested equations. <span class="ptmri8t-">Survey Review</span>, 1975.
+    </dd><dt>
+[44] </dt><dd><a id="Xwahba1990spline"></a>Grace Wahba. <span class="ptmri8t-">Spline Models for Observational Data</span>. SIAM, 1990.
+    </dd><dt>
+[45] </dt><dd><a id="Xwendland1995piecewise"></a>Holger  Wendland.   Piecewise  polynomial,  positive  definite  and  compactly  supported  radial
+    functions of minimal degree. <span class="ptmri8t-">Advances in Computational Mathematics</span>, 1995.
+    </dd><dt>
+[46] </dt><dd><a id="Xzitova2003image"></a>Barbara  Zitova  and  Jan  Flusser.   Image  registration  methods:  A  survey.   <span class="ptmri8t-">Image  and  Vision
+    Computing</span>, 2003.
+    </dd></dl></section>
+ 
+
+  </article>
+
+  <section class="bibtex-block" id="bibtex">
+    <h2>BibTeX</h2>
+    <button class="copy-bib" type="button" data-target="bibtex-code">Copy</button>
+    <pre><code id="bibtex-code">@misc{sharma2026mapfixspatial,
+  title        = {MapFix-Spatial: Interactive Distortion-Aware Coordinate Correction with Deterministic and AI-Assisted Analysis},
+  author       = {Arun Sharma},
+  year         = {2026},
+  note         = {Project page / preprint},
+  howpublished = {\url{https://arunshar.github.io/cv-portfolio/projects/mapfix-spatial/}}
+}</code></pre>
+  </section>
+
+  <footer class="paper-footer">
+    <p>Project page for "MapFix-Spatial: Interactive Distortion-Aware Coordinate Correction with Deterministic and AI-Assisted Analysis", rendered from the LaTeX source. <a href="../../index.html">Back to homepage</a>.</p>
+  </footer>
+</div>
+<script src="../../assets/paper.js"></script>
+</body>
+</html>

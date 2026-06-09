@@ -87,12 +87,13 @@ body.home{
 .pub-entry .pub-links a{ white-space:nowrap; }
 .pub-entry .pub-links .ico-link{ display:inline-flex; align-items:center; vertical-align:middle; }
 .pub-entry .pub-links .ico-link svg{ width:14px; height:14px; }
-.pub-fold{ font-size:14px; margin:.25rem 0; }
-.pub-fold summary{ cursor:pointer; color:var(--link); width:max-content; }
+/* pub-fold: inline-block so PDF · Abstract · BibTeX sit on one row */
+.pub-fold{ font-size:14px; display:inline-block; vertical-align:top; }
+.pub-fold summary{ cursor:pointer; color:var(--link); }
 .pub-fold summary:hover{ color:var(--link-hover); }
 .pub-fold[open] summary{ margin-bottom:.3rem; }
 .pub-fold p{ margin:.2rem 0; }
-.pub-fold pre{ background:var(--code-bg); border:1px solid #e2e2e2; padding:.7rem .9rem; overflow-x:auto; font-size:13px; white-space:pre; }
+.pub-fold pre{ display:block; background:var(--code-bg); border:1px solid #e2e2e2; padding:.7rem .9rem; overflow-x:auto; font-size:13px; white-space:pre; }
 
 /* education & experience ------------------------------------------------ */
 .cv-item{ margin:0 0 1rem; }

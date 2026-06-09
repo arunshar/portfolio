@@ -51,21 +51,21 @@
           }
           return '<a href="' + href + '">' + escapeHtml(link.label) + "</a>";
         });
+        if (p.abstract) {
+          chips.push('<details class="pub-fold"><summary>Abstract</summary><p>' +
+            escapeHtml(p.abstract) + "</p></details>");
+        }
+        if (p.bibtex) {
+          chips.push('<details class="pub-fold"><summary>BibTeX</summary><pre>' +
+            escapeHtml(p.bibtex) + "</pre></details>");
+        }
         var linkRow = chips.length
-          ? '<p class="pub-links">' + chips.join(" &middot; ") + "</p>"
+          ? '<div class="pub-links">' + chips.join(" &middot; ") + "</div>"
           : "";
         var venue = p.venue ? '<p class="pub-venue">' + escapeHtml(p.venue) + "</p>" : "";
-        var abstract = p.abstract
-          ? '<details class="pub-fold"><summary>Abstract</summary><p>' +
-            escapeHtml(p.abstract) + "</p></details>"
-          : "";
-        var bibtex = p.bibtex
-          ? '<details class="pub-fold"><summary>BibTeX</summary><pre>' +
-            escapeHtml(p.bibtex) + "</pre></details>"
-          : "";
         var meta = "<h3>" + title + "</h3>" +
           '<p class="pub-authors">' + authors + "</p>" +
-          venue + linkRow + abstract + bibtex;
+          venue + linkRow;
         if (p.image) {
           return '<article class="pub-entry has-thumb" id="pub-' + escapeHtml(p.id) + '">' +
             '<a class="pub-thumb" href="' + escapeHtml(p.titleUrl || "#") + '" target="_blank" rel="noopener">' +

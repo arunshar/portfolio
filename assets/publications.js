@@ -44,7 +44,12 @@ window.LEGACY_PUBLICATIONS = [
     "titleUrl": "https://dl.acm.org/doi/10.1145/3764915.3770717",
     "authors": "Arun Sharma, Majid Farhadloo, Mingzhou Yang, Bharat Jayaprakash, William Northrop, and Shashi Shekhar",
     "venue": "The 1st ACM SIGSPATIAL International Workshop on Generative and Agentic AI for Multi-Modality Space-Time Intelligence (GeoGenAgent '25), Minneapolis, MN, USA, 5 pages, 2025",
-    "links": [],
+    "links": [
+      {
+        "label": "paper",
+        "href": "https://dl.acm.org/doi/pdf/10.1145/3764915.3770717"
+      }
+    ],
     "abstract": "This work introduces physics-guided generative foundation models (PgGenFMs), a class of generative models that systematically integrate broad and narrow physical knowledge into data, training, and architecture design. The paper motivates PgGenFMs by outlining key limitations of purely data-driven foundation models, including poor out-of-distribution behavior, violations of physical laws, and lack of interpretability in scientific and engineering domains. It proposes a conceptual framework and taxonomy that contrast PgGenFMs with conventional foundation models and physics-guided task-specific models, and discusses how physical constraints can be embedded via loss terms, architectures, surrogate simulations, and hybrid designs. The paper also highlights open problems around where and how to inject domain knowledge, how to handle location dependence and bias in geospatial settings, and how to scale PgGenFMs while preserving physical consistency and transparency.",
     "bibtex": "@inproceedings{10.1145/3764915.3770717,\n    author    = {Sharma, Arun and Farhadloo, Majid and Yang, Mingzhou and Jayaprakash, Bharat and Northrop, William and Shekhar, Shashi},\n    title     = {Towards Physics-guided Generative Foundation Models},\n    year      = {2025},\n    publisher = {Association for Computing Machinery},\n    address   = {New York, NY, USA},\n    url       = {https://doi.org/10.1145/3764915.3770717},\n    doi       = {10.1145/3764915.3770717},\n    booktitle = {The 1st ACM SIGSPATIAL International Workshop on Generative and Agentic AI for Multi-Modality Space-Time Intelligence},\n    series    = {GeoGenAgent '25},\n    pages     = {1--5},\n    numpages  = {5},\n    keywords  = {Physics-guided Generative Foundation Models, Foundation Models, Physics-guided Machine Learning}\n  }",
     "image": "assets/figures/pub-pggenfm.png"
@@ -57,7 +62,12 @@ window.LEGACY_PUBLICATIONS = [
     "titleUrl": "https://doi.org/10.1145/3764921.3770153",
     "authors": "Shengya Zhang, Arun Sharma, Majid Farhadloo, Mingzhou Yang, Ruolei Zeng, Subhankar Ghosh, Yao Zhang, Mu Hong, Licheng Liu, David Mulla and Shashi Shekhar",
     "venue": "Proceedings of the 8th ACM SIGSPATIAL International Workshop on Geospatial Simulation (GeoSIM '25), pp. 57-69, 2025",
-    "links": [],
+    "links": [
+      {
+        "label": "paper",
+        "href": "https://dl.acm.org/doi/pdf/10.1145/3764921.3770153"
+      }
+    ],
     "abstract": "The goal is to develop an efficient and accurate surrogate model for Daycent, a widely used but computationally expensive ecosystem model. This problem is important due to its societal applications in sustainable agriculture. Challenges include balancing the trade-off between prediction time and solution quality (e.g., accuracy), as well as the need to capture spatial relationships both within and across sites, while also accounting for varied crop management practices that introduce irregular and non-stationary patterns, reducing predictability. Related work on surrogate models with traditional feed-forward artificial neural networks (SM-ANN) has shown that these models have limited accuracy and often fail to capture spatial dependencies. To address these limitations, we explore novel Surrogate Models with Hybrid Spatial Neural Networks (SM-Hybrid) capable of explicitly modeling spatial autocorrelation and tele-connections. Experimental results show that the proposed SM-Hybrid is more accurate than SM-ANN and is twice as fast as the Daycent model.",
     "bibtex": "@inproceedings{10.1145/3764921.3770153,\n    author    = {Zhang, Shengya and Sharma, Arun and Farhadloo, Majid and Yang, Mingzhou and Zeng, Ruolei and Ghosh, Subhankar and Zhang, Yao and Hong, Mu and Liu, Licheng and Mulla, David and Shekhar, Shashi},\n    title     = {Towards Surrogate Models with Hybrid Spatial Neural Networks: A Summary of Results},\n    year      = {2025},\n    isbn      = {9798400721847},\n    publisher = {Association for Computing Machinery},\n    address   = {New York, NY, USA},\n    url       = {https://doi.org/10.1145/3764921.3770153},\n    doi       = {10.1145/3764921.3770153},\n    booktitle = {Proceedings of the 8th ACM SIGSPATIAL International Workshop on Geospatial Simulation},\n    series    = {GeoSIM '25},\n    pages     = {57--69},\n    numpages  = {13},\n    keywords  = {surrogate modeling, spatial neural network, spatial autocorrelation, spatial teleconnection, sustainable agriculture, daycent model},\n    location  = {The Graduate Hotel Minneapolis, Minneapolis, MN, USA}\n  }",
     "image": "assets/figures/pub-smhybrid.png"
@@ -139,10 +149,15 @@ window.LEGACY_PUBLICATIONS = [
     "representative": true,
     "year": "",
     "title": "Physics-based Abnormal Trajectory Gap Detection",
-    "titleUrl": "https://dl.acm.org/doi/pdf/10.1145/3673235",
+    "titleUrl": "https://dl.acm.org/doi/10.1145/3673235",
     "authors": "Arun Sharma, Subhankar Ghosh and Shashi Shekhar",
     "venue": "ACM Transactions on Intelligent Systems and Technology 15 (5), 1-31",
-    "links": [],
+    "links": [
+      {
+        "label": "paper",
+        "href": "https://dl.acm.org/doi/pdf/10.1145/3673235"
+      }
+    ],
     "abstract": "Given trajectories with gaps (i.e., missing data), we investigate algorithms to identify abnormal gaps in trajectories which occur when a given moving object did not report its location, but other moving objects in the same geographic region periodically did. The problem is important due to its societal applications, such as improving maritime safety and regulatory enforcement for global security concerns such as illegal fishing, illegal oil transfers, and trans-shipments. The problem is challenging due to the difficulty of bounding the possible locations of the moving object during a trajectory gap, and the very high computational cost of detecting gaps in such a large volume of location data. The current literature on anomalous trajectory detection assumes linear interpolation within gaps, which may not be able to detect abnormal gaps since objects within a given region may have traveled away from their shortest path. In preliminary work, we introduced an abnormal gap measure that uses a classical space-time prism model to bound an object's possible movement during the trajectory gap and provided a scalable memoized gap detection algorithm (Memo-AGD). In this paper, we propose a Space Time-Aware Gap Detection (STAGD) approach to leverage space-time indexing and merging of trajectory gaps. We also incorporate a Dynamic Region Merge-based (DRM) approach to efficiently compute gap abnormality scores. We provide theoretical proofs that both algorithms are correct and complete and also provide analysis of asymptotic time complexity. Experimental results on synthetic and real-world maritime trajectory data show that the proposed approach substantially improves computation time over the baseline technique.",
     "bibtex": "@article{sharma2024physics,\n    title={Physics-based abnormal trajectory gap detection},\n    author={Sharma, Arun and Ghosh, Subhankar and Shekhar, Shashi},\n    journal={ACM Transactions on Intelligent Systems and Technology},\n    volume={15},\n    number={5},\n    pages={1--31},\n    year={2024},\n    publisher={ACM New York, NY, USA}\n}",
     "image": "assets/figures/pub-intexpl.png"
@@ -159,9 +174,13 @@ window.LEGACY_PUBLICATIONS = [
       {
         "label": "paper",
         "href": "https://epubs.siam.org/doi/pdf/10.1137/1.9781611978032.71/"
+      },
+      {
+        "label": "arXiv",
+        "href": "https://arxiv.org/abs/2402.14974"
       }
     ],
-    "abstract": "",
+    "abstract": "Given multi-category point sets from different place-types, our goal is to develop a spatially-lucid classifier that can distinguish between two classes based on the arrangements of their points. This problem is important for many applications, such as oncology, for analyzing immune-tumor relationships and designing new immunotherapies. It is challenging due to spatial variability and interpretability needs. Previously proposed techniques require dense training data or have limited ability to handle significant spatial variability within a single place-type. Most importantly, these deep neural network (DNN) approaches are not designed to work in non-Euclidean space, particularly point sets. Existing non-Euclidean DNN methods are limited to one-size-fits-all approaches. We explore a spatial ensemble framework that explicitly uses different training strategies, including weighted-distance learning rate and spatial domain adaptation, on various place-types for spatially-lucid classification. Experimental results on real-world datasets (e.g., MxIF oncology data) show that the proposed framework provides higher prediction accuracy than baseline methods.",
     "bibtex": "@inproceedings{farhadloo2024towards,\n      title={Towards Spatially-Lucid AI Classification in Non-Euclidean Space: An Application for MxIF Oncology Data},\n      author={Farhadloo, Majid and Sharma, Arun and Gupta, Jayant and Leontovich, Alexey and Markovic, Svetomir N and Shekhar, Shashi},\n      booktitle={Proceedings of the 2024 SIAM International Conference on Data Mining (SDM)},\n      pages={616--624},\n      year={2024},\n      organization={SIAM}\n    }",
     "image": "assets/figures/pub-extreme-parkour.png"
   },
@@ -173,7 +192,12 @@ window.LEGACY_PUBLICATIONS = [
     "titleUrl": "https://dl.acm.org/doi/10.1145/3679201",
     "authors": "Majid Farhadloo, Arun Sharma, Shashi Shekhar, and Svetomir N Markovic",
     "venue": "ACM Transactions on Spatial Algorithms and Systems 10, no. 3 (2024): 1-36.",
-    "links": [],
+    "links": [
+      {
+        "label": "paper",
+        "href": "https://dl.acm.org/doi/pdf/10.1145/3679201"
+      }
+    ],
     "abstract": "We consider the problem of reducing the time needed by healthcare professionals to understand patient medical history via the next generation of biomedical decision support. This problem is societally important because it has the potential to improve healthcare quality and patient outcomes. However, navigating electronic health records is challenging due to the high patient-doctor ratios, potentially long medical histories, the urgency of treatment for some medical conditions, and patient variability. The current electronic health record systems provides only a longitudinal view of patient medical history, which is time-consuming to browse, and doctors often need to engage nurses, residents, and others for initial analysis. To overcome this limitation, we envision an alternative spatial representation of patients' histories (e.g., electronic health records (EHRs)) and other biomedical data in the form of Atlas-EHR. Just like Google Maps allows a global, national, regional, and local view, the Atlas-EHR may start with an overview of the patient's anatomy and history before drilling down to spatially anatomical sub-systems, their individual components, or sub-components. Atlas-EHR presents a compelling opportunity for spatial computing since healthcare is almost a fifth of the US economy. However, the traditional spatial computing designed for geographic use cases (e.g., navigation, land-surveys, mapping) faces many hurdles in the biomedical domain. This paper presents a number of open research questions under this theme in five broad areas of spatial computing.",
     "bibtex": "@article{10.1145/3679201,\n            author = {Farhadloo, Majid and Sharma, Arun and Shekhar, Shashi and Markovic, Svetomir},\n            title = {Spatial Computing Opportunities in Biomedical Decision Support: The Atlas-EHR Vision},\n            year = {2024},\n            issue_date = {September 2024},\n            publisher = {Association for Computing Machinery},\n            address = {New York, NY, USA},\n            volume = {10},\n            number = {3},\n            issn = {2374-0353},\n            url = {https://doi.org/10.1145/3679201},\n            doi = {10.1145/3679201},\n            month = sep,\n            articleno = {21},\n            numpages = {36},\n            keywords = {Atlas-EHR, biomedical decision support, inner space, spatial computing, vision}\n            }",
     "image": "assets/figures/pub-diffcls.png"

@@ -32,6 +32,8 @@ from pathlib import Path
 import lxml.html
 from lxml import etree
 
+from render_tikz import render_all
+
 ROOT = Path(__file__).resolve().parent.parent          # cv-portfolio/
 TOOLS = ROOT / "tools"
 BUILD = TOOLS / "_build"
@@ -220,6 +222,18 @@ def build_project(p, cfg):
     bdir, html, stem = compile_paper(slug, p["source"], p.get("texfile", "main.tex"))
     title, body, toc, svgs = sanitize(html, fig_dir)
     title = title or slug
+
+    # replace make4ht's figure SVGs with clean pdflatex-rendered, scale-spread
+    # ones (fixes the tight/overlapping TikZ boxes); falls back to make4ht on any issue
+    if svgs:
+        src_tex = ROOT / p["source"] / p.get("texfile", "main.tex")
+        try:
+            rendered = render_all(src_tex, fig_dir, names=svgs)
+            print(f"  [{slug}] tikz: "
+                  + (f"replaced {len(rendered)} figs (pdflatex+scale)" if rendered
+                     else "kept make4ht figs"), flush=True)
+        except Exception as e:
+            sys.stderr.write(f"  [{slug}] tikz render error: {e}\n")
 
     # markdown copy from the sanitized body (clean: no title block / rules)
     md_ok = False

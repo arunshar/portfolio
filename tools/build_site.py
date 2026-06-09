@@ -294,6 +294,7 @@ def build_project(p, cfg):
     }
     page = fill(TEMPLATE, {
         "TITLE": title,
+        "CANONICAL": f"https://arunshar.github.io/portfolio/projects/{slug}/",
         "BLURB": p.get("blurb", title),
         "AUTHOR": author,
         "AFFILIATION": affil,

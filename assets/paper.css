@@ -12,7 +12,7 @@
   color-scheme:light;
 }
 
-html{ -webkit-text-size-adjust:100%; color-scheme:light; }
+html{ -webkit-text-size-adjust:100%; color-scheme:light; scroll-behavior:smooth; scroll-padding-top:1rem; }
 body.project-page{
   margin:0 !important; max-width:none !important; padding:0 !important;
   background:#fff; color:var(--ink);

@@ -35,16 +35,6 @@
     });
   });
 
-  // smooth scroll for same-page anchors (TOC, BibTeX jump)
-  document.querySelectorAll('a[href^="#"]').forEach(function (a) {
-    a.addEventListener("click", function (e) {
-      var id = a.getAttribute("href").slice(1);
-      var el = id && document.getElementById(id);
-      if (el) {
-        e.preventDefault();
-        el.scrollIntoView({ behavior: "smooth", block: "start" });
-        if (history.replaceState) history.replaceState(null, "", "#" + id);
-      }
-    });
-  });
+  // in-page anchor scrolling (TOC, BibTeX jump) is handled natively by the
+  // browser plus CSS `scroll-behavior:smooth` (robust even without JS).
 })();

@@ -13,7 +13,7 @@
 }
 
 *{ box-sizing:border-box; }
-html{ -webkit-text-size-adjust:100%; color-scheme:light; }
+html{ -webkit-text-size-adjust:100%; color-scheme:light; scroll-behavior:smooth; }
 body.home{
   margin:0; background:#fff; color:var(--ink);
   font-family:'Titillium Web', Verdana, Helvetica, sans-serif;

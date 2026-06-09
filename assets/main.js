@@ -103,20 +103,6 @@
     ol.insertAdjacentElement("afterend", btn);
   }
 
-  function smoothAnchors() {
-    document.querySelectorAll('a[href^="#"]').forEach(function (a) {
-      a.addEventListener("click", function (e) {
-        var id = a.getAttribute("href").slice(1);
-        var el = id && document.getElementById(id);
-        if (el) {
-          e.preventDefault();
-          el.scrollIntoView({ behavior: "smooth", block: "start" });
-        }
-      });
-    });
-  }
-
   renderPublications();
   collapseNews(10);
-  smoothAnchors();
 })();

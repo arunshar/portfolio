@@ -584,7 +584,7 @@ This system extends prior work conducted at the University of Minnesota with Pro
 <span id="Xghallab1998pddl"></span> M. Ghallab et al. PDDL: The planning domain definition language. Technical report, 1998.
 
 \[13\]  
-<span id="Xgoogle2024a2a"></span> Google. The Agent2Agent (A2A) protocol. 2024. <a href="https://google.github.io/A2A/" class="url"><span class="pcrr8t-">https://google.github.io/A2A/</span></a>.
+<span id="Xgoogle2024a2a"></span> Google. The Agent2Agent (A2A) protocol. 2024. <a href="https://a2a-protocol.org/" class="url"><span class="pcrr8t-">https://a2a-protocol.org/</span></a>.
 
 \[14\]  
 <span id="Xgoodchild1992geographical"></span> M. F. Goodchild. Geographical information science. <span class="ptmri8t-">International Journal of Geographical Information Systems</span>, 6(1):31–45, 1992.

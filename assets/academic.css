@@ -69,6 +69,10 @@ body.home{
 .proj-blurb{ margin:.2rem 0 .4rem; font-size:15px; }
 .proj-links{ font-size:15px; }
 .proj-links a{ white-space:nowrap; }
+.proj-links .ico-link{ display:inline-flex; align-items:center; vertical-align:middle; }
+.proj-links .ico{ display:inline-block; vertical-align:middle; }
+.proj-links .ico-link svg{ width:14px; height:14px; }
+.proj-links .ico.hf-ico{ font-size:15px; line-height:1; }
 
 /* publications ---------------------------------------------------------- */
 .pub-highlights, .publication-list{ display:flex; flex-direction:column; gap:1rem; }

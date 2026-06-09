@@ -44,9 +44,13 @@ body.project-page{
   color:var(--link); text-decoration:none;
 }
 .buttons .btn:hover{ background:#fff6ec; border-color:#f0a262; color:var(--link-hover); }
+.buttons .btn-icon{ display:inline-flex; align-items:center; justify-content:center; padding:.32rem .72rem; }
+.btn-icon .ico{ display:block; line-height:1; }
+.ico.hf-ico{ font-size:16px; line-height:1; }
 
 /* teaser ---------------------------------------------------------------- */
-.teaser{ margin:0 0 2rem; text-align:center; }
+.teaser{ margin:0 0 2rem; text-align:center; border:1px solid #d8d8d8; background:#fcfcfc;
+  border-radius:8px; padding:1.1rem; box-shadow:0 1px 4px rgba(0,0,0,0.05); }
 .teaser img{ max-width:100%; height:auto; }
 
 /* table of contents ----------------------------------------------------- */
@@ -79,9 +83,10 @@ body.project-page{
 .paper-body code, .paper-body tt, .paper-body .pcrr8t-{ font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace; font-size:.9em; }
 
 /* figures */
-.paper-body figure{ margin:1.5rem auto; text-align:center; }
+.paper-body figure{ margin:1.7rem auto; text-align:center; border:1px solid #d8d8d8;
+  background:#fcfcfc; border-radius:8px; padding:1.1rem; box-shadow:0 1px 4px rgba(0,0,0,0.05); }
 .paper-body figure img{ max-width:100%; height:auto; }
-.paper-body figcaption, .paper-body .caption{ font-size:14px; color:var(--muted); margin-top:.5rem; text-align:left; }
+.paper-body figcaption, .paper-body .caption{ font-size:14px; color:var(--muted); margin-top:.6rem; text-align:left; }
 
 /* math */
 .paper-body .mathjax-env{ overflow-x:auto; margin:1rem 0; }

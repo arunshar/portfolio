@@ -44,6 +44,20 @@ CFG = json.loads((TOOLS / "projects.json").read_text())
 MK4_FILTER = "html5+dvisvgm_hashes"
 MK4_OPTS = "mathjax"
 
+# inline brand icons (currentColor so they take link colour / hover)
+ICON_GH = (
+    '<svg class="ico" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" '
+    'focusable="false"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 '
+    '2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49'
+    '-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23'
+    '.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0'
+    '-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82A7.65 7.65 0 0 1 '
+    '8 3.86c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51'
+    '.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 '
+    '1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>'
+)
+ICON_HF = '<span class="ico hf-ico" aria-hidden="true">\U0001F917</span>'
+
 
 def run(cmd, cwd, check=True, quiet=True):
     """Run a command, return CompletedProcess. Raise on failure when check."""
@@ -70,7 +84,14 @@ def compile_paper(slug, source, texfile="main.tex"):
     tex = src / texfile
     if not tex.exists():
         raise FileNotFoundError(f"missing paper source: {tex}")
+    stem = Path(texfile).stem
     bdir = BUILD / slug
+    html = bdir / f"{stem}.html"
+    # cache: skip the (slow) make4ht compile when the paper sources are unchanged
+    src_mtime = max((f.stat().st_mtime for f in src.iterdir() if f.is_file()), default=0)
+    if html.exists() and html.stat().st_mtime >= src_mtime:
+        print(f"  [{slug}] make4ht cache hit (paper unchanged)", flush=True)
+        return bdir, html, stem
     if bdir.exists():
         shutil.rmtree(bdir)
     bdir.mkdir(parents=True)
@@ -80,7 +101,6 @@ def compile_paper(slug, source, texfile="main.tex"):
         elif item.is_dir():
             shutil.copytree(item, bdir / item.name)
 
-    stem = Path(texfile).stem
     mk4 = ["make4ht", "-f", MK4_FILTER, "-u", texfile, MK4_OPTS]
     print(f"  [{slug}] make4ht pass 1 ...", flush=True)
     run(mk4, bdir)
@@ -169,19 +189,19 @@ def gen_bibtex(title, slug, site_base, author):
 
 
 def buttons_html(slug, links):
-    order = [
-        ("Paper (PDF)", links.get("pdf")),
-        ("arXiv", links.get("arxiv")),
-        ("Code", links.get("github")),
-        ("Demo", links.get("demo")),
-        ("Markdown", links.get("markdown")),
-    ]
     out = []
-    for label, href in order:
-        if href:
-            ext = href.startswith("http")
-            tgt = " target=\"_blank\" rel=\"noopener\"" if ext else ""
-            out.append(f'<a class="btn" href="{href}"{tgt}>{label}</a>')
+    if links.get("pdf"):
+        out.append(f'<a class="btn" href="{links["pdf"]}">PDF</a>')
+    if links.get("arxiv"):
+        out.append(f'<a class="btn" href="{links["arxiv"]}" target="_blank" rel="noopener">arXiv</a>')
+    if links.get("github"):
+        out.append(f'<a class="btn btn-icon" href="{links["github"]}" target="_blank" '
+                   f'rel="noopener" title="Code on GitHub" aria-label="Code on GitHub">{ICON_GH}</a>')
+    if links.get("demo"):
+        out.append(f'<a class="btn btn-icon" href="{links["demo"]}" target="_blank" '
+                   f'rel="noopener" title="Demo on Hugging Face" aria-label="Demo on Hugging Face">{ICON_HF}</a>')
+    if links.get("markdown"):
+        out.append(f'<a class="btn" href="{links["markdown"]}">Markdown</a>')
     out.append('<a class="btn" href="#bibtex">BibTeX</a>')
     return "\n      ".join(out)
 
@@ -301,9 +321,11 @@ def render_entries(manifest):
         if m.get("pdf"):
             links.append(f'<a href="{m["pdf"]}">PDF</a>')
         if m.get("github"):
-            links.append(f'<a href="{m["github"]}" target="_blank" rel="noopener">code</a>')
+            links.append(f'<a class="ico-link" href="{m["github"]}" target="_blank" '
+                         f'rel="noopener" title="Code on GitHub" aria-label="Code on GitHub">{ICON_GH}</a>')
         if m.get("demo"):
-            links.append(f'<a href="{m["demo"]}" target="_blank" rel="noopener">demo</a>')
+            links.append(f'<a class="ico-link" href="{m["demo"]}" target="_blank" '
+                         f'rel="noopener" title="Hugging Face" aria-label="Hugging Face">{ICON_HF}</a>')
         out.append(
             '      <article class="proj-entry">\n'
             f'        {thumb}\n'

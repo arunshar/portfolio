@@ -1,0 +1,69 @@
+name: Mirror to root site (arunshar.github.io)
+
+# Mirrors arunshar/portfolio -> arunshar/arunshar.github.io so the site is live at
+# both https://arunshar.github.io/portfolio/ (primary) and https://arunshar.github.io/ (root).
+# Requires a repo secret MIRROR_PAT: a token with Contents: read+write on
+# arunshar/arunshar.github.io. Until that secret exists the job no-ops (run stays green).
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: mirror-root
+  cancel-in-progress: true
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      MIRROR_PAT: ${{ secrets.MIRROR_PAT }}
+    steps:
+      - name: Notice when secret missing
+        if: env.MIRROR_PAT == ''
+        run: echo "MIRROR_PAT secret not set; skipping mirror. Add it to enable auto-mirroring."
+
+      - name: Checkout portfolio (source)
+        if: env.MIRROR_PAT != ''
+        uses: actions/checkout@v4
+        with:
+          path: portfolio
+
+      - name: Checkout root site (target)
+        if: env.MIRROR_PAT != ''
+        uses: actions/checkout@v4
+        with:
+          repository: arunshar/arunshar.github.io
+          token: ${{ secrets.MIRROR_PAT }}
+          path: rootsite
+
+      - name: Sync content into mirror
+        if: env.MIRROR_PAT != ''
+        run: |
+          set -e
+          # wipe tracked files in the mirror, keep its git history
+          find rootsite -mindepth 1 -maxdepth 1 ! -name '.git' -exec rm -rf {} +
+          # copy the whole portfolio site (skip vcs + this workflow dir)
+          rsync -a --exclude '.git' --exclude '.github' portfolio/ rootsite/
+          # self-contain the mirror: repoint absolute CV/statement/thesis download links
+          # to the root site. Canonical tags intentionally stay pointing to /portfolio.
+          if [ -f rootsite/index.html ]; then
+            sed -i 's#https://arunshar.github.io/portfolio/data/#https://arunshar.github.io/data/#g' rootsite/index.html
+          fi
+
+      - name: Commit and push if changed
+        if: env.MIRROR_PAT != ''
+        run: |
+          cd rootsite
+          git config user.name "Arun Sharma"
+          git config user.email "sharm485@umn.edu"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to mirror."
+          else
+            git commit -m "Mirror from arunshar/portfolio@${GITHUB_SHA:0:7}"
+            git push
+          fi

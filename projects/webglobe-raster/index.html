@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WebGlobe - A cloud-based geospatial analysis framework for interacting with climate data - Arun Sharma</title>
+<meta name="description" content="Tiled map-reduce raster aggregation for cloud-scale climate data (WebGlobe).">
+<link rel="canonical" href="https://arunshar.github.io/portfolio/projects/webglobe-raster/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css?family=Titillium+Web:300,300italic,400,400italic,600,600italic" rel="stylesheet">
+<link rel="stylesheet" href="paper.gen.css?v=20260608f">
+<link rel="stylesheet" href="../../assets/paper.css?v=20260608f">
+<script>window.MathJax = { tex: { tags: "ams" } };</script>
+<script async id="MathJax-script" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js"></script>
+</head>
+<body class="project-page">
+<div class="wrap">
+  <nav class="topnav"><a href="../../index.html">Arun Sharma</a> <span aria-hidden="true">/</span> <a href="../../index.html#projects">Selected Projects</a></nav>
+
+  <header class="paper-header">
+    <h1>WebGlobe - A cloud-based geospatial analysis framework for interacting with climate data</h1>
+    <p class="authors">Arun Sharma, Syed Mohammed Arshad Zaidi, Varun Chandola, Melissa R Allen, and Budhendra L Bhaduri</p>
+    <p class="affiliation">University of Minnesota, Twin Cities</p>
+    <p class="venue">ACM BIGSPATIAL 2018</p>
+    <div class="buttons"><a class="btn" href="https://dl.acm.org/doi/abs/10.1145/3282834.3282835" target="_blank" rel="noopener">Paper</a>
+      <a class="btn btn-icon" href="https://github.com/arunshar/webglobe-raster" target="_blank" rel="noopener" title="Code on GitHub" aria-label="Code on GitHub"><svg class="ico" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82A7.65 7.65 0 0 1 8 3.86c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg></a>
+      <a class="btn" href="#bibtex">BibTeX</a></div>
+  </header>
+
+  <figure class="teaser"><img src="../../assets/figures/pub-vision-loco.png" alt="WebGlobe - A cloud-based geospatial analysis framework for interacting with climate data figure" loading="lazy"></figure>
+
+  <nav class="toc" aria-label="Contents"><h2>Contents</h2><ul><li><a href="#abstract">Abstract</a></li><li><a href="#algorithm">Algorithm</a></li><li><a href="#reference-implementation">Reference implementation</a></li><li><a href="#scope">Scope</a></li><li><a href="#bibtex">BibTeX</a></li></ul></nav>
+
+  <article class="paper-body">
+<section id="abstract" class="abstract-block">
+  <h2>Abstract</h2>
+  <p>While climate models have evolved over time to produce high fidelity and high resolution climate forecasts, visualization and analysis of the output of the model simulations has been limited, typically constrained to single dimensional charts for visualization and basic aggregate statistics for analytics. Same is true for the large troves of observational data available from meteorological stations all over the world. For richer understanding of climate and the impact of climate change, one needs computational tools that allow researchers, policymakers, and general public, to interact with the climate data. In this paper, we describe webGlobe, a browser-based GIS framework for interacting with climate data, and other datasets available in similar format. webGlobe is a unique resource that allows unprecedented access to climate data through a browser-based framework and also allows for deploying machine learning based analytical applications on the climate data without putting computational burden on the client. Instead, webGlobe uses a client-server framework, where the server, deployed on a cloud infrastructure, allows for dynamic allocation of resources for running compute-intensive applications. The capabilities of the framework will be discussed in context of a use case: identifying extreme events from real and simulated climate data using a Gaussian process based change detection algorithm.</p>
+</section>
+
+<section id="algorithm">
+  <h2>Algorithm</h2>
+  <p>WebGlobe aggregates large climate rasters with a tiled map-reduce: the raster is partitioned into tiles, per-tile partial aggregates (sum, count, max) are precomputed, and a bounding-box query combines only the relevant tiles. The framework&#x27;s correctness invariant is that this tiled aggregation equals the direct full-array aggregation.</p>
+</section>
+
+<section id="reference-implementation">
+  <h2>Reference implementation</h2>
+  <p>This page accompanies the open-source reference implementation at
+    <a href="https://github.com/arunshar/webglobe-raster" target="_blank" rel="noopener">github.com/arunshar/webglobe-raster</a>:
+    a faithful numpy reimplementation of the paper's core algorithm on synthetic data, runnable end to end.</p>
+  <p><strong>Measured (synthetic).</strong> On a 180x360 global raster partitioned into a 6x8 tile grid, the tiled mean and max match the direct reference to ~3e-8 (the expected float64 accumulation-order difference). The test asserts agreement within a 1e-6 tolerance across several seeds and a non-tile-aligned bounding box.</p>
+  <pre><code>pip install -e .
+pytest
+python -m webglobe.demo</code></pre>
+</section>
+
+<section id="scope">
+  <h2>Scope</h2>
+  <p>The numbers above are measured on synthetic, structured inputs that exercise the algorithm; they are
+    not a reproduction of the paper's datasets or reported results. See the published paper (linked above)
+    for the full method, datasets, and evaluation.</p>
+</section>
+  </article>
+
+  <section class="bibtex-block" id="bibtex">
+    <h2>BibTeX</h2>
+    <button class="copy-bib" type="button" data-target="bibtex-code">Copy</button>
+    <pre><code id="bibtex-code">@inproceedings{sharma2018webgiobe,
+      title={WebGIobe-A cloud-based geospatial analysis framework for interacting with climate data},
+      author={Sharma, Arun and Zaidi, Syed Mohammed Arshad and Chandola, Varun and Allen, Melissa R and Bhaduri, Budhendra L},
+      booktitle={Proceedings of the 7th ACM SIGSPATIAL International Workshop on Analytics for Big Geospatial Data},
+      pages={42--46},
+      year={2018}
+    }</code></pre>
+  </section>
+
+  <footer class="paper-footer">
+    <p>Project page for "WebGlobe - A cloud-based geospatial analysis framework for interacting with climate data", a reference-implementation landing page for the linked publication. <a href="../../index.html">Back to homepage</a>.</p>
+  </footer>
+</div>
+<script src="../../assets/paper.js?v=20260608f"></script>
+</body>
+</html>

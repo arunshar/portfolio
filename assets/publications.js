@@ -160,6 +160,10 @@ window.LEGACY_PUBLICATIONS = [
       {
         "label": "code",
         "href": "https://github.com/arunshar/stagd-trajectory-gap"
+      },
+      {
+        "label": "page",
+        "href": "projects/stagd-trajectory-gap/"
       }
     ],
     "abstract": "Given trajectories with gaps (i.e., missing data), we investigate algorithms to identify abnormal gaps in trajectories which occur when a given moving object did not report its location, but other moving objects in the same geographic region periodically did. The problem is important due to its societal applications, such as improving maritime safety and regulatory enforcement for global security concerns such as illegal fishing, illegal oil transfers, and trans-shipments. The problem is challenging due to the difficulty of bounding the possible locations of the moving object during a trajectory gap, and the very high computational cost of detecting gaps in such a large volume of location data. The current literature on anomalous trajectory detection assumes linear interpolation within gaps, which may not be able to detect abnormal gaps since objects within a given region may have traveled away from their shortest path. In preliminary work, we introduced an abnormal gap measure that uses a classical space-time prism model to bound an object's possible movement during the trajectory gap and provided a scalable memoized gap detection algorithm (Memo-AGD). In this paper, we propose a Space Time-Aware Gap Detection (STAGD) approach to leverage space-time indexing and merging of trajectory gaps. We also incorporate a Dynamic Region Merge-based (DRM) approach to efficiently compute gap abnormality scores. We provide theoretical proofs that both algorithms are correct and complete and also provide analysis of asymptotic time complexity. Experimental results on synthetic and real-world maritime trajectory data show that the proposed approach substantially improves computation time over the baseline technique.",
@@ -258,6 +262,10 @@ window.LEGACY_PUBLICATIONS = [
       {
         "label": "code",
         "href": "https://github.com/arunshar/tgard-rendezvous"
+      },
+      {
+        "label": "page",
+        "href": "projects/tgard-rendezvous/"
       }
     ],
     "abstract": "Given trajectories with gaps, we investigate methods to tighten spatial bounds on areas (e.g., nodes in a spatial network) where possible rendezvous activity could have occurred. The problem is important for reducing manual effort to post-process possible rendezvous areas using satellite imagery and has many societal applications to improve public safety, security, and health. The problem of rendezvous detection is challenging due to the difficulty of interpreting missing data within a trajectory gap and the very high cost of detecting gaps in such a large volume of location data. Most recent literature presents formal models, namely space-time prism, to track an object's rendezvous patterns within trajectory gaps on a spatial network. However, the bounds derived from the space-time prism are rather loose, resulting in unnecessarily extensive postprocessing manual effort. To address these limitations, we propose a Time Slicing-based Gap-Aware Rendezvous Detection (TGARD) algorithm to tighten the spatial bounds in spatial networks. We propose a Dual Convergence TGARD (DC-TGARD) algorithm to improve computational efficiency using a bi-directional pruning approach. Theoretical results show the proposed spatial bounds on the area of possible rendezvous are tighter than that from related work (space-time prism). Experimental results on synthetic and real-world spatial networks (e.g., road networks) show that the proposed DC-TGARD is more scalable than the TGARD algorithm.",
@@ -280,6 +288,10 @@ window.LEGACY_PUBLICATIONS = [
       {
         "label": "code",
         "href": "https://github.com/arunshar/tss-rendezvous-region"
+      },
+      {
+        "label": "page",
+        "href": "projects/tss-rendezvous-region/"
       }
     ],
     "abstract": "Given trajectory data with gaps, we investigate methods to identify possible rendezvous regions. The problem has societal applications such as improving maritime safety and regulatory enforcement. The challenges come from two aspects. First, gaps in trajectory data make it difficult to identify regions where moving objects may have rendezvoused for nefarious reasons. Hence, traditional linear or shortest path interpolation methods may not be able to detect such activities, since objects in a rendezvous may have traveled away from their usual routes to meet. Second, user detecting a rendezvous regions involve a large number of gaps and associated trajectories, making the task computationally very expensive. In preliminary work, we proposed a more effective way of handling gaps and provided examples to illustrate potential rendezvous regions. In this article, we are providing detailed experiments with both synthetic and real-world data. Experiments on synthetic data show that the accuracy improved by 50 percent, which is substantial as compared to the baseline approach. In this article, we propose a refined algorithm Temporal Selection Search for finding a potential rendezvous region and finding an optimal temporal range to improve computational efficiency. We also incorporate two novel spatial filters: (i) a Static Ellipse Intersection Filter and (ii) a Dynamic Circle Intersection Spatial Filter. Both the baseline and proposed approaches account for every possible rendezvous pattern. We provide a theoretical evaluation of the algorithms correctness and completeness along with a time complexity analysis. Experimental results on synthetic and real-world maritime trajectory data show that the proposed approach substantially improves the area pruning effectiveness and computation time over the baseline technique. We also performed experiments based on accuracy and precision on synthetic dataset on both proposed and baseline techniques.",
@@ -352,6 +364,10 @@ window.LEGACY_PUBLICATIONS = [
       {
         "label": "code",
         "href": "https://github.com/arunshar/stdm-survey-toolkit"
+      },
+      {
+        "label": "page",
+        "href": "projects/stdm-survey-toolkit/"
       }
     ],
     "abstract": "Spatiotemporal data mining aims to discover interesting, useful but non-trivial patterns in big spatial and spatiotemporal data. They are used in various application domains such as public safety, ecology, epidemiology, earth science etc. This problem is challenging because of the high societal cost of spurious patterns and exorbitant computational cost. Recent surveys of spatiotemporal data mining need update due to rapid growth. In addition, they did not adequately survey parallel techniques for spatiotemporal data mining. This paper provides a more up-to-date survey of spatiotemporal data mining methods. Furthermore, it has a detailed survey of parallel formulations of spatiotemporal data mining.",
@@ -410,6 +426,10 @@ window.LEGACY_PUBLICATIONS = [
       {
         "label": "code",
         "href": "https://github.com/arunshar/webglobe-raster"
+      },
+      {
+        "label": "page",
+        "href": "projects/webglobe-raster/"
       }
     ],
     "abstract": "While climate models have evolved over time to produce high fidelity and high resolution climate forecasts, visualization and analysis of the output of the model simulations has been limited, typically constrained to single dimensional charts for visualization and basic aggregate statistics for analytics. Same is true for the large troves of observational data available from meteorological stations all over the world. For richer understanding of climate and the impact of climate change, one needs computational tools that allow researchers, policymakers, and general public, to interact with the climate data. In this paper, we describe webGlobe, a browser-based GIS framework for interacting with climate data, and other datasets available in similar format. webGlobe is a unique resource that allows unprecedented access to climate data through a browser-based framework and also allows for deploying machine learning based analytical applications on the climate data without putting computational burden on the client. Instead, webGlobe uses a client-server framework, where the server, deployed on a cloud infrastructure, allows for dynamic allocation of resources for running compute-intensive applications. The capabilities of the framework will be discussed in context of a use case: identifying extreme events from real and simulated climate data using a Gaussian process based change detection algorithm.",

@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Towards a tighter bound on possible-rendezvous areas: preliminary results - Arun Sharma</title>
+<meta name="description" content="TGARD reachable-set intersection for a tighter bound on possible-rendezvous areas.">
+<link rel="canonical" href="https://arunshar.github.io/portfolio/projects/tgard-rendezvous/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css?family=Titillium+Web:300,300italic,400,400italic,600,600italic" rel="stylesheet">
+<link rel="stylesheet" href="paper.gen.css?v=20260608f">
+<link rel="stylesheet" href="../../assets/paper.css?v=20260608f">
+<script>window.MathJax = { tex: { tags: "ams" } };</script>
+<script async id="MathJax-script" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js"></script>
+</head>
+<body class="project-page">
+<div class="wrap">
+  <nav class="topnav"><a href="../../index.html">Arun Sharma</a> <span aria-hidden="true">/</span> <a href="../../index.html#projects">Selected Projects</a></nav>
+
+  <header class="paper-header">
+    <h1>Towards a tighter bound on possible-rendezvous areas: preliminary results</h1>
+    <p class="authors">Arun Sharma, Jayant Gupta, Subhankar Ghosh</p>
+    <p class="affiliation">University of Minnesota, Twin Cities</p>
+    <p class="venue">International Conference on Advances in Geographic Information Systems (ACM SIGSPATIAL 2022) (Oral)</p>
+    <div class="buttons"><a class="btn" href="https://dl.acm.org/doi/abs/10.1145/3557915.3561033" target="_blank" rel="noopener">Paper</a>
+      <a class="btn btn-icon" href="https://github.com/arunshar/tgard-rendezvous" target="_blank" rel="noopener" title="Code on GitHub" aria-label="Code on GitHub"><svg class="ico" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82A7.65 7.65 0 0 1 8 3.86c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg></a>
+      <a class="btn" href="#bibtex">BibTeX</a></div>
+  </header>
+
+  <figure class="teaser"><img src="../../assets/figures/pub-sear.png" alt="Towards a tighter bound on possible-rendezvous areas: preliminary results figure" loading="lazy"></figure>
+
+  <nav class="toc" aria-label="Contents"><h2>Contents</h2><ul><li><a href="#abstract">Abstract</a></li><li><a href="#algorithm">Algorithm</a></li><li><a href="#reference-implementation">Reference implementation</a></li><li><a href="#scope">Scope</a></li><li><a href="#bibtex">BibTeX</a></li></ul></nav>
+
+  <article class="paper-body">
+<section id="abstract" class="abstract-block">
+  <h2>Abstract</h2>
+  <p>Given trajectories with gaps, we investigate methods to tighten spatial bounds on areas (e.g., nodes in a spatial network) where possible rendezvous activity could have occurred. The problem is important for reducing manual effort to post-process possible rendezvous areas using satellite imagery and has many societal applications to improve public safety, security, and health. The problem of rendezvous detection is challenging due to the difficulty of interpreting missing data within a trajectory gap and the very high cost of detecting gaps in such a large volume of location data. Most recent literature presents formal models, namely space-time prism, to track an object&#x27;s rendezvous patterns within trajectory gaps on a spatial network. However, the bounds derived from the space-time prism are rather loose, resulting in unnecessarily extensive postprocessing manual effort. To address these limitations, we propose a Time Slicing-based Gap-Aware Rendezvous Detection (TGARD) algorithm to tighten the spatial bounds in spatial networks. We propose a Dual Convergence TGARD (DC-TGARD) algorithm to improve computational efficiency using a bi-directional pruning approach. Theoretical results show the proposed spatial bounds on the area of possible rendezvous are tighter than that from related work (space-time prism). Experimental results on synthetic and real-world spatial networks (e.g., road networks) show that the proposed DC-TGARD is more scalable than the TGARD algorithm.</p>
+</section>
+
+<section id="algorithm">
+  <h2>Algorithm</h2>
+  <p>Given two trajectory gaps on a road network, the nodes where the two objects could possibly have met are bounded by the intersection of their reachable sets. TGARD computes each reachable set with a budget test on shortest-path distances (dist(start, v) + dist(v, end) &lt;= time * speed) and intersects them, a far tighter bound than the naive axis-aligned bounding box of the gap endpoints.</p>
+</section>
+
+<section id="reference-implementation">
+  <h2>Reference implementation</h2>
+  <p>This page accompanies the open-source reference implementation at
+    <a href="https://github.com/arunshar/tgard-rendezvous" target="_blank" rel="noopener">github.com/arunshar/tgard-rendezvous</a>:
+    a faithful numpy reimplementation of the paper's core algorithm on synthetic data, runnable end to end.</p>
+  <p><strong>Measured (synthetic).</strong> On a grid network, TGARD returns 9 candidate rendezvous nodes versus 24 for the naive bounding box, and the TGARD set is a strict subset of the box. The test asserts the strict reduction and the subset relation.</p>
+  <pre><code>pip install -e .
+pytest
+python -m tgard.demo</code></pre>
+</section>
+
+<section id="scope">
+  <h2>Scope</h2>
+  <p>The numbers above are measured on synthetic, structured inputs that exercise the algorithm; they are
+    not a reproduction of the paper's datasets or reported results. See the published paper (linked above)
+    for the full method, datasets, and evaluation.</p>
+</section>
+  </article>
+
+  <section class="bibtex-block" id="bibtex">
+    <h2>BibTeX</h2>
+    <button class="copy-bib" type="button" data-target="bibtex-code">Copy</button>
+    <pre><code id="bibtex-code">@inproceedings{sharma2022towards,
+      title={Towards a tighter bound on possible-rendezvous areas: preliminary results},
+      author={Sharma, Arun and Gupta, Jayant and Ghosh, Subhankar},
+      booktitle={Proceedings of the 30th International Conference on Advances in Geographic Information Systems},
+      pages={1--11},
+      year={2022}
+    }</code></pre>
+  </section>
+
+  <footer class="paper-footer">
+    <p>Project page for "Towards a tighter bound on possible-rendezvous areas: preliminary results", a reference-implementation landing page for the linked publication. <a href="../../index.html">Back to homepage</a>.</p>
+  </footer>
+</div>
+<script src="../../assets/paper.js?v=20260608f"></script>
+</body>
+</html>

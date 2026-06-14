@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Physics-based Abnormal Trajectory Gap Detection - Arun Sharma</title>
+<meta name="description" content="Space-time prism + Abnormal Gap Measure for detecting abnormal trajectory gaps.">
+<link rel="canonical" href="https://arunshar.github.io/portfolio/projects/stagd-trajectory-gap/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css?family=Titillium+Web:300,300italic,400,400italic,600,600italic" rel="stylesheet">
+<link rel="stylesheet" href="paper.gen.css?v=20260608f">
+<link rel="stylesheet" href="../../assets/paper.css?v=20260608f">
+<script>window.MathJax = { tex: { tags: "ams" } };</script>
+<script async id="MathJax-script" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js"></script>
+</head>
+<body class="project-page">
+<div class="wrap">
+  <nav class="topnav"><a href="../../index.html">Arun Sharma</a> <span aria-hidden="true">/</span> <a href="../../index.html#projects">Selected Projects</a></nav>
+
+  <header class="paper-header">
+    <h1>Physics-based Abnormal Trajectory Gap Detection</h1>
+    <p class="authors">Arun Sharma, Subhankar Ghosh and Shashi Shekhar</p>
+    <p class="affiliation">University of Minnesota, Twin Cities</p>
+    <p class="venue">ACM Transactions on Intelligent Systems and Technology 15 (5), 1-31</p>
+    <div class="buttons"><a class="btn" href="https://dl.acm.org/doi/10.1145/3673235" target="_blank" rel="noopener">Paper</a>
+      <a class="btn btn-icon" href="https://github.com/arunshar/stagd-trajectory-gap" target="_blank" rel="noopener" title="Code on GitHub" aria-label="Code on GitHub"><svg class="ico" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82A7.65 7.65 0 0 1 8 3.86c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg></a>
+      <a class="btn" href="#bibtex">BibTeX</a></div>
+  </header>
+
+  <figure class="teaser"><img src="../../assets/figures/pub-intexpl.png" alt="Physics-based Abnormal Trajectory Gap Detection figure" loading="lazy"></figure>
+
+  <nav class="toc" aria-label="Contents"><h2>Contents</h2><ul><li><a href="#abstract">Abstract</a></li><li><a href="#algorithm">Algorithm</a></li><li><a href="#reference-implementation">Reference implementation</a></li><li><a href="#scope">Scope</a></li><li><a href="#bibtex">BibTeX</a></li></ul></nav>
+
+  <article class="paper-body">
+<section id="abstract" class="abstract-block">
+  <h2>Abstract</h2>
+  <p>Given trajectories with gaps (i.e., missing data), we investigate algorithms to identify abnormal gaps in trajectories which occur when a given moving object did not report its location, but other moving objects in the same geographic region periodically did. The problem is important due to its societal applications, such as improving maritime safety and regulatory enforcement for global security concerns such as illegal fishing, illegal oil transfers, and trans-shipments. The problem is challenging due to the difficulty of bounding the possible locations of the moving object during a trajectory gap, and the very high computational cost of detecting gaps in such a large volume of location data. The current literature on anomalous trajectory detection assumes linear interpolation within gaps, which may not be able to detect abnormal gaps since objects within a given region may have traveled away from their shortest path. In preliminary work, we introduced an abnormal gap measure that uses a classical space-time prism model to bound an object&#x27;s possible movement during the trajectory gap and provided a scalable memoized gap detection algorithm (Memo-AGD). In this paper, we propose a Space Time-Aware Gap Detection (STAGD) approach to leverage space-time indexing and merging of trajectory gaps. We also incorporate a Dynamic Region Merge-based (DRM) approach to efficiently compute gap abnormality scores. We provide theoretical proofs that both algorithms are correct and complete and also provide analysis of asymptotic time complexity. Experimental results on synthetic and real-world maritime trajectory data show that the proposed approach substantially improves computation time over the baseline technique.</p>
+</section>
+
+<section id="algorithm">
+  <h2>Algorithm</h2>
+  <p>A trajectory gap between two reported positions is bounded by a space-time prism: the locations reachable in the gap duration at the maximum speed, which projects to a 2D geo-ellipse with foci at the endpoints, semi-major axis a = v_max * dt / 2, and semi-minor axis b = sqrt(a^2 - c^2) where c is half the endpoint distance. The Abnormal Gap Measure (AGM) is the fraction of signal-covered grid cells inside this prism; a gap whose prism sweeps a large, well-covered region yet did not report is flagged as abnormal.</p>
+</section>
+
+<section id="reference-implementation">
+  <h2>Reference implementation</h2>
+  <p>This page accompanies the open-source reference implementation at
+    <a href="https://github.com/arunshar/stagd-trajectory-gap" target="_blank" rel="noopener">github.com/arunshar/stagd-trajectory-gap</a>:
+    a faithful numpy reimplementation of the paper's core algorithm on synthetic data, runnable end to end.</p>
+  <p><strong>Measured (synthetic).</strong> On two gaps sharing the same endpoints (10 km apart), a normal gap (dt = 1.5 h) yields a tight prism while an abnormal gap (dt = 8 h) yields a prism 37.9x larger that sweeps 469 signal-covered cells versus 14. The test asserts the abnormal prism area and covered-cell count both exceed the normal gap&#x27;s.</p>
+  <pre><code>pip install -e .
+pytest
+python -m stagd.demo</code></pre>
+</section>
+
+<section id="scope">
+  <h2>Scope</h2>
+  <p>The numbers above are measured on synthetic, structured inputs that exercise the algorithm; they are
+    not a reproduction of the paper's datasets or reported results. See the published paper (linked above)
+    for the full method, datasets, and evaluation.</p>
+</section>
+  </article>
+
+  <section class="bibtex-block" id="bibtex">
+    <h2>BibTeX</h2>
+    <button class="copy-bib" type="button" data-target="bibtex-code">Copy</button>
+    <pre><code id="bibtex-code">@article{sharma2024physics,
+    title={Physics-based abnormal trajectory gap detection},
+    author={Sharma, Arun and Ghosh, Subhankar and Shekhar, Shashi},
+    journal={ACM Transactions on Intelligent Systems and Technology},
+    volume={15},
+    number={5},
+    pages={1--31},
+    year={2024},
+    publisher={ACM New York, NY, USA}
+}</code></pre>
+  </section>
+
+  <footer class="paper-footer">
+    <p>Project page for "Physics-based Abnormal Trajectory Gap Detection", a reference-implementation landing page for the linked publication. <a href="../../index.html">Back to homepage</a>.</p>
+  </footer>
+</div>
+<script src="../../assets/paper.js?v=20260608f"></script>
+</body>
+</html>

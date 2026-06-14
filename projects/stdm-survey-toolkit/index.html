@@ -46,8 +46,8 @@
 <section id="reference-implementation">
   <h2>Reference implementation</h2>
   <p>This page accompanies the open-source reference implementation at
-    <a href="https://github.com/arunshar/stdm-survey-toolkit" target="_blank" rel="noopener">github.com/arunshar/stdm-survey-toolkit</a>:
-    a faithful numpy reimplementation of the paper's core algorithm on synthetic data, runnable end to end.</p>
+    <a href="https://github.com/arunshar/stdm-survey-toolkit" target="_blank" rel="noopener">github.com/arunshar/stdm-survey-toolkit</a>,
+    a faithful reimplementation of the paper's core algorithm on synthetic data, runnable end to end.</p>
   <p><strong>Measured (synthetic).</strong> Moran&#x27;s I is 0.934 on a spatially-autocorrelated field versus 0.043 on a random field, and a planted spatial outlier is flagged. The test asserts the clustered field&#x27;s Moran&#x27;s I clears 0.2 and exceeds the random field&#x27;s, and that the outlier is detected.</p>
   <pre><code>pip install -e .
 pytest

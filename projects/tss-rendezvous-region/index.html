@@ -46,8 +46,8 @@
 <section id="reference-implementation">
   <h2>Reference implementation</h2>
   <p>This page accompanies the open-source reference implementation at
-    <a href="https://github.com/arunshar/tss-rendezvous-region" target="_blank" rel="noopener">github.com/arunshar/tss-rendezvous-region</a>:
-    a faithful numpy reimplementation of the paper's core algorithm on synthetic data, runnable end to end.</p>
+    <a href="https://github.com/arunshar/tss-rendezvous-region" target="_blank" rel="noopener">github.com/arunshar/tss-rendezvous-region</a>,
+    a faithful reimplementation of the paper's core algorithm on synthetic data, runnable end to end.</p>
   <p><strong>Measured (synthetic).</strong> Two gaps produce prisms of 266 and 258 cells; their intersection (the rendezvous region) is 224 cells, non-empty and strictly smaller than both. The test asserts 0 &lt; region &lt; min(prism1, prism2).</p>
   <pre><code>pip install -e .
 pytest

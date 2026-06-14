@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Towards Physics-informed Diffusion for Anomaly Detection in Trajectories: A Summary of Results - Arun Sharma</title>
+<meta name="description" content="Physics-informed conditional diffusion that scores trajectory anomalies via reconstruction + kinematic residuals.">
+<link rel="canonical" href="https://arunshar.github.io/portfolio/projects/pi-dpm-trajectory-anomaly/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css?family=Titillium+Web:300,300italic,400,400italic,600,600italic" rel="stylesheet">
+<link rel="stylesheet" href="paper.gen.css?v=20260608f">
+<link rel="stylesheet" href="../../assets/paper.css?v=20260608f">
+<script>window.MathJax = { tex: { tags: "ams" } };</script>
+<script async id="MathJax-script" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js"></script>
+</head>
+<body class="project-page">
+<div class="wrap">
+  <nav class="topnav"><a href="../../index.html">Arun Sharma</a> <span aria-hidden="true">/</span> <a href="../../index.html#projects">Selected Projects</a></nav>
+
+  <header class="paper-header">
+    <h1>Towards Physics-informed Diffusion for Anomaly Detection in Trajectories: A Summary of Results</h1>
+    <p class="authors">Arun Sharma, Mingzhou Yang, Majid Farhadloo, Subhankar Ghosh, Bharat Jayaprakash and Shashi Shekhar</p>
+    <p class="affiliation">University of Minnesota, Twin Cities</p>
+    <p class="venue">Proceedings of the 2nd ACM SIGSPATIAL International Workshop on Geospatial Anomaly Detection (GeoAnomalies &#x27;25), pp. 11-24, 2025</p>
+    <div class="buttons"><a class="btn" href="https://doi.org/10.1145/3764914.3770595" target="_blank" rel="noopener">Paper</a>
+      <a class="btn btn-icon" href="https://github.com/arunshar/pi-grpo" target="_blank" rel="noopener" title="Code on GitHub" aria-label="Code on GitHub"><svg class="ico" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82A7.65 7.65 0 0 1 8 3.86c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg></a>
+      <a class="btn" href="#bibtex">BibTeX</a></div>
+  </header>
+
+  <figure class="teaser"><img src="../../assets/figures/pub-pidiff.png" alt="Towards Physics-informed Diffusion for Anomaly Detection in Trajectories: A Summary of Results figure" loading="lazy"></figure>
+
+  <nav class="toc" aria-label="Contents"><h2>Contents</h2><ul><li><a href="#abstract">Abstract</a></li><li><a href="#algorithm">Algorithm</a></li><li><a href="#reference-implementation">Reference implementation</a></li><li><a href="#scope">Scope</a></li><li><a href="#bibtex">BibTeX</a></li></ul></nav>
+
+  <article class="paper-body">
+<section id="abstract" class="abstract-block">
+  <h2>Abstract</h2>
+  <p>Given a dataset of moving object trajectories, a domain-specific study area, and a user-defined error threshold, we aim to identify anomalous trajectories indicative of possible GPS spoofing (e.g., broadcasting fake signals). The problem is societally important to curb illegal activities such as unauthorized fishing and illicit oil transfers in international waters. The problem is challenging due to advances in AI-generated deep fakes (e.g., additive noise, fake trajectories) and the scarcity of labeled samples for ground-truth verification. Current state-of-the-art methods ignore fine-scale spatiotemporal dependencies and prior physical knowledge, resulting in lower accuracy. In this paper, we propose a physics-informed anomaly detection framework based on an encoder-decoder architecture that incorporates kinematic constraints to identify trajectories that violate physical laws. Experimental results on maritime and urban domains demonstrate that the proposed approach yields higher solution quality and lower estimation error for anomaly detection and trajectory reconstruction tasks, respectively.</p>
+</section>
+
+<section id="algorithm">
+  <h2>Algorithm</h2>
+  <p>Pi-DPM is a conditional diffusion model over trajectories whose anomaly score combines the diffusion reconstruction residual with a scale-free kinematic-smoothness residual derived from a single-axle kinematic-bicycle prior. A trajectory the model reconstructs poorly, or that violates the physical motion envelope, receives a high anomaly score, flagging GPS spoofing or denial-based deception.</p>
+</section>
+
+<section id="reference-implementation">
+  <h2>Reference implementation</h2>
+  <p>This page accompanies the open-source reference implementation at
+    <a href="https://github.com/arunshar/pi-grpo" target="_blank" rel="noopener">github.com/arunshar/pi-grpo</a>,
+    a faithful reimplementation of the paper's core algorithm on synthetic data, runnable end to end.</p>
+  <p><strong>Measured (synthetic).</strong> On synthetic trajectories with planted teleport, excess-speed and freeze anomalies, the reference implementation reaches AUROC 0.988 / AP 0.992 on CPU, cleanly separating the three anomaly families from normal tracks. The model lives in the pi-grpo repository (app/components/pidpm/) and feeds its physics-aware reward.</p>
+  <pre><code>pip install -e .
+pytest</code></pre>
+</section>
+
+<section id="scope">
+  <h2>Scope</h2>
+  <p>The numbers above are measured on synthetic, structured inputs that exercise the algorithm; they are
+    not a reproduction of the paper's datasets or reported results. See the published paper (linked above)
+    for the full method, datasets, and evaluation.</p>
+</section>
+  </article>
+
+  <section class="bibtex-block" id="bibtex">
+    <h2>BibTeX</h2>
+    <button class="copy-bib" type="button" data-target="bibtex-code">Copy</button>
+    <pre><code id="bibtex-code">@inproceedings{10.1145/3764914.3770595,
+    author    = {Sharma, Arun and Yang, Mingzhou and Farhadloo, Majid and Ghosh, Subhankar and Jayaprakash, Bharat and Shekhar, Shashi},
+    title     = {Towards Physics-informed Diffusion for Anomaly Detection in Trajectories: A Summary of Results},
+    year      = {2025},
+    isbn      = {9798400722608},
+    publisher = {Association for Computing Machinery},
+    address   = {New York, NY, USA},
+    url       = {https://doi.org/10.1145/3764914.3770595},
+    doi       = {10.1145/3764914.3770595},
+    booktitle = {Proceedings of the 2nd ACM SIGSPATIAL International Workshop on Geospatial Anomaly Detection},
+    series    = {GeoAnomalies &#x27;25},
+    pages     = {11--24},
+    numpages  = {14},
+    keywords  = {Physics-informed Neural Network, Trajectory Reconstruction, Spatiotemporal Data Mining, Anomaly Detection}
+  }</code></pre>
+  </section>
+
+  <footer class="paper-footer">
+    <p>Project page for "Towards Physics-informed Diffusion for Anomaly Detection in Trajectories: A Summary of Results", a reference-implementation landing page for the linked publication. <a href="../../index.html">Back to homepage</a>.</p>
+  </footer>
+</div>
+<script src="../../assets/paper.js?v=20260608f"></script>
+</body>
+</html>

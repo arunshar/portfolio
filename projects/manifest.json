@@ -161,5 +161,38 @@
     "pdf": "https://doi.org/10.4337/9781789903942.00029",
     "github": "https://github.com/arunshar/stdm-survey-toolkit",
     "kind": "publication-reference"
+  },
+  {
+    "slug": "pi-dpm-trajectory-anomaly",
+    "title": "Towards Physics-informed Diffusion for Anomaly Detection in Trajectories: A Summary of Results",
+    "venue": "Proceedings of the 2nd ACM SIGSPATIAL International Workshop on Geospatial Anomaly Detection (GeoAnomalies '25), pp. 11-24, 2025",
+    "blurb": "Physics-informed conditional diffusion that scores trajectory anomalies via reconstruction + kinematic residuals.",
+    "teaser": "assets/figures/pub-pidiff.png",
+    "page": "projects/pi-dpm-trajectory-anomaly/",
+    "pdf": "https://doi.org/10.1145/3764914.3770595",
+    "github": "https://github.com/arunshar/pi-grpo",
+    "kind": "publication-reference"
+  },
+  {
+    "slug": "physics-guided-genfm",
+    "title": "Towards Physics-guided Generative Foundation Models",
+    "venue": "The 1st ACM SIGSPATIAL International Workshop on Generative and Agentic AI for Multi-Modality Space-Time Intelligence (GeoGenAgent '25), Minneapolis, MN, USA, 5 pages, 2025",
+    "blurb": "Physics-guided projection of generated samples to cut constraint violation in generative foundation models.",
+    "teaser": "assets/figures/pub-pggenfm.png",
+    "page": "projects/physics-guided-genfm/",
+    "pdf": "https://dl.acm.org/doi/10.1145/3764915.3770717",
+    "github": "https://github.com/arunshar/physflow-earth",
+    "kind": "publication-reference"
+  },
+  {
+    "slug": "kriging-informed-diffusion",
+    "title": "Towards Kriging-informed Conditional Diffusion for Regional Sea-Level Data Downscaling: A Summary of Results",
+    "venue": "Proceedings of the 32nd ACM International Conference on Advances in Geographic Information Systems (SIGSPATIAL '24), pp. 372-383, 2024",
+    "blurb": "Kriging-informed conditional diffusion for regional sea-level data downscaling.",
+    "teaser": "assets/figures/pub-kicdpm.png",
+    "page": "projects/kriging-informed-diffusion/",
+    "pdf": "https://doi.org/10.1145/3678717.3691304",
+    "github": "https://github.com/arunshar/physflow-earth",
+    "kind": "publication-reference"
   }
 ]

@@ -46,8 +46,8 @@
 <section id="reference-implementation">
   <h2>Reference implementation</h2>
   <p>This page accompanies the open-source reference implementation at
-    <a href="https://github.com/arunshar/stagd-trajectory-gap" target="_blank" rel="noopener">github.com/arunshar/stagd-trajectory-gap</a>:
-    a faithful numpy reimplementation of the paper's core algorithm on synthetic data, runnable end to end.</p>
+    <a href="https://github.com/arunshar/stagd-trajectory-gap" target="_blank" rel="noopener">github.com/arunshar/stagd-trajectory-gap</a>,
+    a faithful reimplementation of the paper's core algorithm on synthetic data, runnable end to end.</p>
   <p><strong>Measured (synthetic).</strong> On two gaps sharing the same endpoints (10 km apart), a normal gap (dt = 1.5 h) yields a tight prism while an abnormal gap (dt = 8 h) yields a prism 37.9x larger that sweeps 469 signal-covered cells versus 14. The test asserts the abnormal prism area and covered-cell count both exceed the normal gap&#x27;s.</p>
   <pre><code>pip install -e .
 pytest

@@ -12,6 +12,14 @@ window.LEGACY_PUBLICATIONS = [
       {
         "label": "paper",
         "href": "https://dl.acm.org/doi/10.1145/3764914.3770595"
+      },
+      {
+        "label": "page",
+        "href": "projects/pi-dpm-trajectory-anomaly/"
+      },
+      {
+        "label": "code",
+        "href": "https://github.com/arunshar/pi-grpo"
       }
     ],
     "abstract": "Given a dataset of moving object trajectories, a domain-specific study area, and a user-defined error threshold, we aim to identify anomalous trajectories indicative of possible GPS spoofing (e.g., broadcasting fake signals). The problem is societally important to curb illegal activities such as unauthorized fishing and illicit oil transfers in international waters. The problem is challenging due to advances in AI-generated deep fakes (e.g., additive noise, fake trajectories) and the scarcity of labeled samples for ground-truth verification. Current state-of-the-art methods ignore fine-scale spatiotemporal dependencies and prior physical knowledge, resulting in lower accuracy. In this paper, we propose a physics-informed anomaly detection framework based on an encoder-decoder architecture that incorporates kinematic constraints to identify trajectories that violate physical laws. Experimental results on maritime and urban domains demonstrate that the proposed approach yields higher solution quality and lower estimation error for anomaly detection and trajectory reconstruction tasks, respectively.",
@@ -48,6 +56,14 @@ window.LEGACY_PUBLICATIONS = [
       {
         "label": "paper",
         "href": "https://dl.acm.org/doi/pdf/10.1145/3764915.3770717"
+      },
+      {
+        "label": "page",
+        "href": "projects/physics-guided-genfm/"
+      },
+      {
+        "label": "code",
+        "href": "https://github.com/arunshar/physflow-earth"
       }
     ],
     "abstract": "This work introduces physics-guided generative foundation models (PgGenFMs), a class of generative models that systematically integrate broad and narrow physical knowledge into data, training, and architecture design. The paper motivates PgGenFMs by outlining key limitations of purely data-driven foundation models, including poor out-of-distribution behavior, violations of physical laws, and lack of interpretability in scientific and engineering domains. It proposes a conceptual framework and taxonomy that contrast PgGenFMs with conventional foundation models and physics-guided task-specific models, and discusses how physical constraints can be embedded via loss terms, architectures, surrogate simulations, and hybrid designs. The paper also highlights open problems around where and how to inject domain knowledge, how to handle location dependence and bias in geospatial settings, and how to scale PgGenFMs while preserving physical consistency and transparency.",
@@ -138,6 +154,14 @@ window.LEGACY_PUBLICATIONS = [
       {
         "label": "paper",
         "href": "https://dl.acm.org/doi/pdf/10.1145/3678717.3691304"
+      },
+      {
+        "label": "page",
+        "href": "projects/kriging-informed-diffusion/"
+      },
+      {
+        "label": "code",
+        "href": "https://github.com/arunshar/physflow-earth"
       }
     ],
     "abstract": "Given coarser-resolution projections from global climate models or satellite data, the downscaling problem aims to estimate finer-resolution regional climate data, capturing fine-scale spatial patterns and variability. Downscaling is any method to derive high-resolution data from low-resolution variables, often to provide more detailed and local predictions and analyses. This problem is societally crucial for effective adaptation, mitigation, and resilience against significant risks from climate change. The challenge arises from spatial heterogeneity and the need to recover finer-scale features while ensuring model generalization. Most downscaling methods fail to capture the spatial dependencies at finer scales and underperform on real-world climate datasets, such as sea-level rise. We propose a novel Kriging-informed Conditional Diffusion Probabilistic Model (Ki-CDPM) to capture spatial variability while preserving fine-scale features. Experimental results on climate data show that our proposed method is more accurate than state-of-the-art downscaling techniques.",
@@ -328,6 +352,10 @@ window.LEGACY_PUBLICATIONS = [
       {
         "label": "paper",
         "href": "https://drops.dagstuhl.de/storage/00lipics/lipics-vol240-cosit2022/LIPIcs.COSIT.2022.26/LIPIcs.COSIT.2022.26.pdf"
+      },
+      {
+        "label": "page",
+        "href": "projects/stagd-trajectory-gap/"
       }
     ],
     "abstract": "Given trajectories with gaps (ie, missing data), we investigate algorithms to identify abnormal gaps for testing possible hypotheses of anomalous regions. Here, an abnormal gap within a trajectory is defined as an area where a given moving object did not report its location, but other moving objects did periodically. The problem is important due to its societal applications, such as improving maritime safety and regulatory enforcement for global security concerns such as illegal fishing, illegal oil transfer, and trans-shipments. The problem is challenging due to the difficulty of interpreting missing data within a trajectory gap, and the high computational cost of detecting gaps in such a large volume of location data proves computationally very expensive. The current literature assumes linear interpolation within gaps, which may not be able to detect abnormal gaps since objects within a given region may have traveled away from their shortest path. To overcome this limitation, we propose an abnormal gap detection (AGD) algorithm that leverages the concepts of a space-time prism model where we assume space-time interpolation. We then propose a refined memoized abnormal gap detection (Memo-AGD) algorithm that reduces comparison operations. We validated both algorithms using synthetic and real-world data. The results show that abnormal gaps detected by our algorithms give better estimates of abnormality than linear interpolation and can be used for further investigation from the human analysts.",
@@ -404,6 +432,10 @@ window.LEGACY_PUBLICATIONS = [
       {
         "label": "paper",
         "href": "https://drops.dagstuhl.de/storage/00lipics/lipics-vol177-giscience2021/LIPIcs.GIScience.2021.I.13/LIPIcs.GIScience.2021.I.13.pdf"
+      },
+      {
+        "label": "page",
+        "href": "projects/tss-rendezvous-region/"
       }
     ],
     "abstract": "Given trajectory data with gaps, we investigate methods to identify possible rendezvous regions. Societal applications include improving maritime safety and regulations. The challenges come from two aspects. If trajectory data are not available around the rendezvous then either linear or shortest-path interpolation may fail to detect the possible rendezvous. Furthermore, the problem is computationally expensive due to the large number of gaps and associated trajectories. In this paper, we first use the plane sweep algorithm as a baseline. Then we propose a new filtering framework using the concept of a space-time grid. Experimental results and case study on real-world maritime trajectory data show that the proposed approach substantially improves the Area Pruning Efficiency over the baseline technique.",

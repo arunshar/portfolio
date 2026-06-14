@@ -46,8 +46,8 @@
 <section id="reference-implementation">
   <h2>Reference implementation</h2>
   <p>This page accompanies the open-source reference implementation at
-    <a href="https://github.com/arunshar/tgard-rendezvous" target="_blank" rel="noopener">github.com/arunshar/tgard-rendezvous</a>:
-    a faithful numpy reimplementation of the paper's core algorithm on synthetic data, runnable end to end.</p>
+    <a href="https://github.com/arunshar/tgard-rendezvous" target="_blank" rel="noopener">github.com/arunshar/tgard-rendezvous</a>,
+    a faithful reimplementation of the paper's core algorithm on synthetic data, runnable end to end.</p>
   <p><strong>Measured (synthetic).</strong> On a grid network, TGARD returns 9 candidate rendezvous nodes versus 24 for the naive bounding box, and the TGARD set is a strict subset of the box. The test asserts the strict reduction and the subset relation.</p>
   <pre><code>pip install -e .
 pytest

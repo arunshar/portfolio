@@ -46,8 +46,8 @@
 <section id="reference-implementation">
   <h2>Reference implementation</h2>
   <p>This page accompanies the open-source reference implementation at
-    <a href="https://github.com/arunshar/webglobe-raster" target="_blank" rel="noopener">github.com/arunshar/webglobe-raster</a>:
-    a faithful numpy reimplementation of the paper's core algorithm on synthetic data, runnable end to end.</p>
+    <a href="https://github.com/arunshar/webglobe-raster" target="_blank" rel="noopener">github.com/arunshar/webglobe-raster</a>,
+    a faithful reimplementation of the paper's core algorithm on synthetic data, runnable end to end.</p>
   <p><strong>Measured (synthetic).</strong> On a 180x360 global raster partitioned into a 6x8 tile grid, the tiled mean and max match the direct reference to ~3e-8 (the expected float64 accumulation-order difference). The test asserts agreement within a 1e-6 tolerance across several seeds and a non-tile-aligned bounding box.</p>
   <pre><code>pip install -e .
 pytest

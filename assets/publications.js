@@ -412,8 +412,16 @@ window.LEGACY_PUBLICATIONS = [
     "venue": "AGILE: GIScience 2022",
     "links": [
       {
-        "label": "paper",
-        "href": "https://agile-giss.copernicus.org/articles/3/14/2022/agile-giss-3-14-2022.pdf"
+        "label": "PDF",
+        "href": "assets/papers/covid-mobility.pdf"
+      },
+      {
+        "label": "article",
+        "href": "https://agile-giss.copernicus.org/articles/3/14/2022/"
+      },
+      {
+        "label": "dashboard",
+        "href": "projects/covid-mobility/"
       }
     ],
     "abstract": "Given aggregated mobile device data, the goal is to understand the impact of COVID-19 policy interventions on mobility. This problem is vital due to important societal use cases, such as safely reopening the economy. Challenges include understanding and interpreting questions of interest to policymakers, cross-jurisdictional variability in choice and time of interventions, the large data volume, and unknown sampling bias. The related work has explored the COVID-19 impact on travel distance, time spent at home, and the number of visitors at different points of interest. However, many policymakers are interested in long-duration visits to high-risk business categories and understanding the spatial selection bias to interpret summary reports. We provide an Entity Relationship diagram, system architecture, and implementation to support queries on long-duration visits in addition to fine resolution device count maps to understand spatial bias. We closely collaborated with policymakers to derive the system requirements and evaluate the system components, the summary reports, and visualizations.",

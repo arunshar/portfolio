@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>COVID-19 Mobility Decision Support - Arun Sharma</title>
+<meta name="description" content="A Grafana-style observability dashboard for the COVID-19 mobility decision-support project (Sharma et al., AGILE GIScience 2022): weekly long-duration visits to bars and restaurants in Minnesota with policy-intervention markers.">
+<link rel="canonical" href="https://arunshar.github.io/portfolio/projects/covid-mobility/">
+<style>
+  :root{color-scheme:dark}
+  *{box-sizing:border-box}
+  body{margin:0;background:#0c0e12;color:#c7ccd4;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;line-height:1.6}
+  a{color:#5794f2;text-decoration:none}
+  a:hover{color:#ff9830}
+  .wrap{max-width:1040px;margin:0 auto;padding:18px 20px 48px}
+  .topnav{font-size:13px;color:#8a909a;margin-bottom:18px}
+  .topnav a{color:#9aa0aa}
+  h1{font-size:24px;font-weight:500;color:#e6e9ee;margin:0 0 4px}
+  .meta{font-size:13px;color:#8a909a;margin:0 0 14px}
+  .btns{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:22px}
+  .btn{font-size:13px;color:#cdd2d9;border:0.5px solid #2a2e37;border-radius:8px;padding:6px 12px;background:#161922}
+  .btn:hover{border-color:#5794f2;color:#fff}
+  .pan{background:#181b20;border:0.5px solid #2a2e37;border-radius:8px;padding:10px}
+  .ttl{font-size:11px;color:#8a909a;letter-spacing:.04em;text-transform:uppercase;margin:0 0 6px}
+  .big{font-size:24px;font-weight:500;line-height:1}
+  .sub{font-size:11px;color:#8a909a;margin-top:3px}
+  .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:12px}
+  .grid3{display:grid;grid-template-columns:1.15fr 0.85fr 1fr;gap:12px}
+  .head{display:flex;align-items:center;gap:10px;margin-bottom:12px;background:#11141a;border:0.5px solid #2a2e37;border-radius:8px;padding:10px 12px}
+  .pill{font-size:11px;color:#cdd2d9;border:0.5px solid #2a2e37;border-radius:6px;padding:4px 8px}
+  .pill.warn{color:#ffb357;border-color:#5a4523;background:#241d10}
+  .about{margin-top:26px;font-size:14px;color:#aeb4be;max-width:780px}
+  .about h2{font-size:17px;font-weight:500;color:#e6e9ee;margin:22px 0 8px}
+  .note{margin-top:14px;font-size:12.5px;color:#8a909a;border-left:2px solid #5a4523;padding:8px 12px;background:#16140d;border-radius:0}
+  @media(max-width:760px){.grid4{grid-template-columns:repeat(2,1fr)}.grid3{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav class="topnav"><a href="../../index.html">Arun Sharma</a> / <a href="../../index.html#projects">Selected Projects</a> / COVID-19 mobility</nav>
+
+  <h1>COVID-19 mobility decision support</h1>
+  <p class="meta">A Grafana-style observability view of the community-engaged COVID-19 mobility decision-support system. Minnesota, March 2020 to June 2021.</p>
+  <div class="btns">
+    <a class="btn" href="../../assets/papers/covid-mobility.pdf">Paper PDF</a>
+    <a class="btn" href="https://agile-giss.copernicus.org/articles/3/14/2022/" target="_blank" rel="noopener">Article (AGILE 2022)</a>
+    <a class="btn" href="https://www.spatial.cs.umn.edu/Project/covid_19.html" target="_blank" rel="noopener">Project and data</a>
+    <a class="btn" href="../../index.html#publications">All publications</a>
+  </div>
+
+  <div class="head">
+    <div style="flex:1">
+      <div style="font-size:15px;font-weight:500;color:#e6e9ee">SafeGraph long-duration visits</div>
+      <div style="font-size:11px;color:#8a909a">weekly index, pre-pandemic baseline = 100</div>
+    </div>
+    <span class="pill">Mar 2020 to Jun 2021</span>
+    <span class="pill">1w</span>
+    <span class="pill warn">Illustrative</span>
+  </div>
+
+  <div class="grid4">
+    <div class="pan"><div class="ttl">Bars, trough vs base</div><div class="big" style="color:#f2495c">-86%</div><div style="height:28px;position:relative"><canvas id="sp1" role="img" aria-label="Bars sparkline"></canvas></div></div>
+    <div class="pan"><div class="ttl">Full-service, trough</div><div class="big" style="color:#f2495c">-78%</div><div style="height:28px;position:relative"><canvas id="sp2" role="img" aria-label="Full-service sparkline"></canvas></div></div>
+    <div class="pan"><div class="ttl">Limited-service, trough</div><div class="big" style="color:#ff9830">-42%</div><div style="height:28px;position:relative"><canvas id="sp3" role="img" aria-label="Limited-service sparkline"></canvas></div></div>
+    <div class="pan"><div class="ttl">Recovery by Jun 2021</div><div class="big" style="color:#73bf69">~74%</div><div style="height:28px;position:relative"><canvas id="sp4" role="img" aria-label="Recovery sparkline"></canvas></div></div>
+  </div>
+
+  <div class="pan" style="margin-bottom:12px">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:6px">
+      <div class="ttl" style="margin:0">Weekly long-duration visit index by venue</div>
+      <div style="display:flex;gap:14px;font-size:11px;color:#8a909a">
+        <span style="display:flex;align-items:center;gap:5px"><span style="width:14px;height:3px;background:#ff9830;display:inline-block"></span>Bars (solid)</span>
+        <span style="display:flex;align-items:center;gap:5px"><span style="width:14px;height:0;border-top:2px dashed #5794f2;display:inline-block"></span>Full-service (dashed)</span>
+        <span style="display:flex;align-items:center;gap:5px"><span style="width:14px;height:0;border-top:2px dotted #73bf69;display:inline-block"></span>Limited-service (dotted)</span>
+      </div>
+    </div>
+    <div style="height:300px;position:relative"><canvas id="ts" role="img" aria-label="Weekly long-duration visit index for bars, full-service and limited-service restaurants from March 2020 to June 2021, showing a sharp March 2020 collapse, partial recovery, a winter 2020 dip at the dining closure, and recovery through spring 2021."></canvas></div>
+  </div>
+
+  <div class="grid3">
+    <div class="pan">
+      <div class="ttl">Latest-week index by venue</div>
+      <div style="height:160px;position:relative"><canvas id="bar" role="img" aria-label="Latest-week visit index by venue."></canvas></div>
+    </div>
+    <div class="pan" style="text-align:center">
+      <div class="ttl">Data sampling coverage</div>
+      <div style="height:120px;position:relative"><canvas id="g" role="img" aria-label="Sampling coverage gauge at 62 percent."></canvas>
+        <div style="position:absolute;top:60%;left:0;right:0"><div style="font-size:22px;font-weight:500;color:#e6e9ee">62%</div></div>
+      </div>
+      <div class="sub">device panel vs ACS population</div>
+    </div>
+    <div class="pan">
+      <div class="ttl">Mobility index by region</div>
+      <div id="regions" style="display:grid;grid-template-columns:1fr 1fr;gap:8px"></div>
+    </div>
+  </div>
+
+  <div class="about">
+    <h2>About this dashboard</h2>
+    <p>The COVID-19 pandemic reshaped where and how long people gathered. This panel reframes the
+    community-engaged decision-support system from Sharma <em>et al.</em> (AGILE: GIScience Series,
+    2022) as an observability dashboard. The underlying system was built with policymakers in public
+    health, economic management, transportation, and transit to answer questions about long-duration
+    visits to high-risk venue categories (bars, full-service restaurants, limited-service
+    restaurants) from aggregated, privacy-protected mobile-device data, alongside fine-resolution
+    device-count maps to expose spatial sampling bias.</p>
+    <p>The time series tracks the weekly long-duration-visit index per venue type, normalized to a
+    pre-pandemic baseline of 100, with markers at the major Minnesota policy interventions
+    (stay-at-home order, phased reopening, the winter 2020 dining closure, and spring 2021
+    reopening). The gauge and the regional panel summarize data quality and geographic spread, the
+    two recurring concerns end-users raised when interpreting the reports.</p>
+    <div class="note">Illustrative UI. The curves model the documented 2020 to 2021 mobility pattern
+    and are not the project's measured weekly figures. For the measured data and the weekly report
+    archive, see the <a href="https://www.spatial.cs.umn.edu/Project/covid_19.html" target="_blank" rel="noopener">project page</a>.
+    Source: Arun Sharma, Majid Farhadloo, Yan Li, Jayant Gupta, Aditya Kulkarni, Shashi Shekhar,
+    "Understanding COVID-19 Effects on Mobility: A Community-Engaged Approach,"
+    <a href="https://doi.org/10.5194/agile-giss-3-14-2022" target="_blank" rel="noopener">AGILE: GIScience Series 3:14 (2022)</a>, CC-BY 4.0.</div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+(function(){
+  var n=69;
+  function lerp(a){var o=[];for(var w=0;w<n;w++){var lo=a[0],hi=a[a.length-1];for(var i=0;i<a.length-1;i++){if(w>=a[i][0]&&w<=a[i+1][0]){lo=a[i];hi=a[i+1];break;}}var t=hi[0]===lo[0]?0:(w-lo[0])/(hi[0]-lo[0]);o.push(lo[1]+(hi[1]-lo[1])*t);}return o;}
+  var seed=42;function rnd(){seed=(seed*1103515245+12345)&0x7fffffff;return seed/0x7fffffff;}
+  function jit(arr,amp){return arr.map(function(v){return Math.max(0,Math.round((v+(rnd()-0.5)*2*amp)*10)/10);});}
+  var bars=jit(lerp([[0,100],[3,90],[5,18],[7,14],[12,30],[20,48],[30,55],[35,50],[38,22],[42,20],[46,35],[52,50],[60,62],[68,72]]),2.2);
+  var fsr =jit(lerp([[0,100],[3,92],[6,26],[8,22],[14,45],[22,58],[32,62],[38,30],[43,33],[50,55],[60,68],[68,74]]),2);
+  var lsr =jit(lerp([[0,100],[4,70],[7,58],[12,72],[20,82],[30,88],[38,78],[44,82],[52,88],[60,92],[68,94]]),1.6);
+  var labels=[];var d=new Date(2020,2,2);var mo=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  for(var i=0;i<n;i++){labels.push((d.getDate()<=7?mo[d.getMonth()]+(d.getMonth()===0?" '"+String(d.getFullYear()).slice(2):""):''));d=new Date(d.getTime()+7*864e5);}
+  var grid='rgba(140,144,154,0.13)',tick='#8a909a';
+  function spark(id,data,col){new Chart(document.getElementById(id),{type:'line',data:{labels:data.map(function(_,i){return i;}),datasets:[{data:data,borderColor:col,borderWidth:1.5,pointRadius:0,tension:.35,fill:false}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{enabled:false}},scales:{x:{display:false},y:{display:false}}}});}
+  spark('sp1',bars,'#ff9830');spark('sp2',fsr,'#5794f2');spark('sp3',lsr,'#ff9830');spark('sp4',bars.slice(40),'#73bf69');
+
+  var vlines={id:'vl',afterDraw:function(c){var a=c.$vl||[];var ca=c.chartArea,x=c.scales.x,ctx=c.ctx;ctx.save();a.forEach(function(o){var px=x.getPixelForValue(o.i);ctx.strokeStyle='rgba(200,205,215,0.32)';ctx.setLineDash([4,4]);ctx.beginPath();ctx.moveTo(px,ca.top);ctx.lineTo(px,ca.bottom);ctx.stroke();ctx.setLineDash([]);ctx.fillStyle='#aeb4be';ctx.font='11px sans-serif';ctx.fillText(o.t,px+3,ca.top+11);});ctx.restore();}};
+  var ts=new Chart(document.getElementById('ts'),{type:'line',plugins:[vlines],data:{labels:labels,datasets:[
+    {label:'Bars',data:bars,borderColor:'#ff9830',borderWidth:1.8,pointRadius:0,tension:.3},
+    {label:'Full-service',data:fsr,borderColor:'#5794f2',borderWidth:1.8,borderDash:[6,4],pointRadius:0,tension:.3},
+    {label:'Limited-service',data:lsr,borderColor:'#73bf69',borderWidth:1.8,borderDash:[2,3],pointRadius:0,tension:.3}
+  ]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{display:false},tooltip:{backgroundColor:'#0c0e12',borderColor:'#2a2e37',borderWidth:1}},scales:{x:{grid:{color:grid},ticks:{color:tick,autoSkip:false,maxRotation:0,font:{size:11}}},y:{grid:{color:grid},ticks:{color:tick,font:{size:11}},title:{display:true,text:'index (base=100)',color:tick,font:{size:11}}}}});
+  ts.$vl=[{i:4,t:'stay-at-home'},{i:14,t:'phase reopen'},{i:38,t:'dining closed'},{i:50,t:'reopen'}];ts.update();
+
+  new Chart(document.getElementById('bar'),{type:'bar',data:{labels:['Bars','Full-service','Limited-service'],datasets:[{data:[bars[68],fsr[68],lsr[68]],backgroundColor:['#ff9830','#5794f2','#73bf69'],borderRadius:3}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{enabled:true}},scales:{x:{grid:{color:grid},ticks:{color:tick,font:{size:11}},suggestedMax:100},y:{grid:{display:false},ticks:{color:'#c7ccd4',font:{size:11}}}}});
+
+  new Chart(document.getElementById('g'),{type:'doughnut',data:{datasets:[{data:[62,38],backgroundColor:['#73bf69','#23272f'],borderWidth:0,circumference:260,rotation:230}]},options:{responsive:true,maintainAspectRatio:false,cutout:'74%',plugins:{legend:{display:false},tooltip:{enabled:false}}}});
+
+  var reg=[['Twin Cities Metro',58],['Rochester',64],['Duluth',61],['St. Cloud',69],['Mankato',72],['Greater MN',75]];
+  function hcol(v){var t=(v-55)/22;t=Math.max(0,Math.min(1,t));var r=Math.round(242+(115-242)*t),g=Math.round(73+(191-73)*t),b=Math.round(92+(105-92)*t);return 'rgb('+r+','+g+','+b+')';}
+  document.getElementById('regions').innerHTML=reg.map(function(o){return '<div style="background:#14171c;border:0.5px solid #2a2e37;border-radius:6px;padding:6px 8px"><div style="font-size:11px;color:#aeb4be">'+o[0]+'</div><div style="font-size:16px;font-weight:500;color:'+hcol(o[1])+'">'+o[1]+'</div></div>';}).join('');
+})();
+</script>
+</body>
+</html>

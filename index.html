@@ -282,6 +282,24 @@
             </li>
           </ul>
         </article>
+        <article class="cv-item">
+          <p class="cv-head"><strong>Open-Source ML Infrastructure</strong> <span class="cv-when">2024 - Present</span></p>
+          <p class="cv-role">Contributor</p>
+          <ul>
+            <li>
+              Merged an upstream contribution to DeepSpeed adding type hints to its
+              top-level public API
+              (<a href="https://github.com/deepspeedai/DeepSpeed/pull/8079">deepspeedai/DeepSpeed #8079</a>),
+              correcting the public return annotations to the real runtime types after
+              maintainer review.
+            </li>
+            <li>
+              Reproduced a ZeRO gradient-bucket cross-stream race with a deterministic
+              A/B harness; distributed PyTorch training on Slurm and Ray with ZeRO
+              sharding and checkpoint-resume on an H100 GPU cluster.
+            </li>
+          </ul>
+        </article>
       </section>
 
       <section id="teaching">

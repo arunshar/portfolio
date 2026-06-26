@@ -53,6 +53,9 @@ jobs:
           if [ -f rootsite/index.html ]; then
             sed -i 's#https://arunshar.github.io/portfolio/data/#https://arunshar.github.io/data/#g' rootsite/index.html
           fi
+          # Preserve the custom domain: the find/rsync above wipes CNAME, which
+          # un-sets arunshar.com on the root site (Pages 404). Re-write it every run.
+          echo "arunshar.com" > rootsite/CNAME
 
       - name: Commit and push if changed
         if: env.MIRROR_PAT != ''

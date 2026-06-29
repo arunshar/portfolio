@@ -1,0 +1,92 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>MBOR — Explained</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800&family=Noto+Sans:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet"><style>
+:root{--bg:#fbfcfe;--panel:#fff;--ink:#16202c;--mut:#5b6776;--line:#e6eaf0;--acc:#2257d6;--ok:#0e9f6e;--warn:#b45309;--code:#f3f5f9}
+@media(prefers-color-scheme:dark){:root{--bg:#0e1116;--panel:#161b22;--ink:#e7ecf3;--mut:#9aa6b4;--line:#252c37;--acc:#6ea8fe;--ok:#54d6a0;--warn:#ffb454;--code:#11151b}}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:'Noto Sans',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;line-height:1.65;font-size:16px}
+.wrap{max-width:860px;margin:0 auto;padding:0 22px 64px}
+nav.top{font-size:13.5px;color:var(--mut);padding:18px 0;border-bottom:1px solid var(--line)}
+nav.top a{color:var(--acc);text-decoration:none}nav.top a:hover{text-decoration:underline}
+h1,h2,h3,h4{font-family:Montserrat,system-ui,sans-serif;line-height:1.2}
+h1{font-size:30px;margin:26px 0 4px}h2{font-size:21px;margin:30px 0 8px;padding-top:14px;border-top:1px solid var(--line)}
+h3{font-size:16.5px;margin:20px 0 4px}
+a{color:var(--acc)}p{margin:10px 0}
+blockquote{margin:14px 0;padding:.4rem 0 .4rem 1rem;border-left:4px solid var(--acc);color:var(--ink);font-size:17px}
+code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13.5px;background:var(--code);padding:1px 5px;border-radius:5px}
+pre{background:var(--code);border:1px solid var(--line);border-radius:10px;padding:12px 14px;overflow-x:auto}
+pre code{background:none;padding:0}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:14.5px}
+th,td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top}
+th{background:var(--code);font-family:Montserrat;font-size:13px}
+ul,ol{padding-left:22px}li{margin:5px 0}
+strong{font-weight:600}
+.foot{margin-top:30px;padding-top:14px;border-top:1px solid var(--line);color:var(--mut);font-size:13.5px}
+</style></head><body><div class="wrap"><nav class="top"><a href="../../index.html">Arun Sharma</a> / <a href="./">MBOR (paper page)</a> / Explained</nav><h1 id="mbor-multi-level-bi-objective-routing--explained">MBOR (Multi-Level Bi-Objective Routing) — Explained</h1>
+<blockquote>
+<p><strong>One line:</strong> real-time electric-vehicle route planning that returns the whole <strong>Pareto-optimal set</strong> of routes trading off energy against travel time, made interactive by <strong>precomputing and reusing</strong> the Pareto structure over a region-partitioned graph instead of recomputing it per query.</p>
+</blockquote>
+<p><strong>Honest status up front.</strong> MBOR is <strong>preliminary research</strong> (algorithm design plus a reported timing result), developed with Prof. Shashi Shekhar and tied to Task 4 of his NSF proposal on multi-objective path selection. The reported result, more than <strong>10x faster online</strong> than prior methods on real-world road-network data, comes from that preliminary work; it is <strong>not yet a public, reproducible benchmark</strong>, and unlike the other portfolio projects (GeoSAM-3D, MapFix, DarkVesselNet) there is <strong>no public code repository, test suite, or live demo</strong> yet. The paper is in preparation. In short: "the design and the data structures are mine; the 10x is a preliminary result I would reproduce as a public benchmark before claiming it as final."</p>
+<hr />
+<h2 id="1-what-it-is-and-the-gap-it-fills">1. What it is and the gap it fills</h2>
+<p>An electric vehicle does not have one best route, it has a <strong>trade-off curve</strong>. The fastest route can drain the battery; the most energy-efficient can be slow. The correct object to return is the <strong>Pareto-optimal set</strong>: every route for which you cannot improve travel time without spending more energy, and vice versa. The driver (or the fleet policy) then picks a point on that curve.</p>
+<p>The gap: computing the Pareto set is expensive. <strong>Bi-objective shortest path is NP-hard in the worst case</strong>, the frontier can contain exponentially many non-dominated paths, and recomputing it per query over a city-scale graph is far too slow for real-time use. Single-objective routing solved its scale problem with <strong>preprocess-once, query-fast</strong> hierarchies (contraction hierarchies, hub labelling, Shekhar's boundary multigraph). MBOR lifts that bet to <strong>two objectives</strong>.</p>
+<hr />
+<h2 id="2-architecture-and-data-flow">2. Architecture and data flow</h2>
+<pre><code> PREPROCESS (once):
+   road network ─► partition into regions ─► boundary multigraph (BMR)
+                                              │  (Pareto inter-region trade-offs as multi-edges)
+                                              ▼
+                                   multi-level encoded Pareto frontier view
+                                              │  (compact non-dominated sets, multiple granularities)
+ QUERY (real-time):
+   origin/destination + driver trade-off ─► 2D cost-interval + multi-edge pruning
+                                              │  (drop dominated fragments early; reuse precomputed frontier)
+                                              ▼
+                                   complete Pareto-optimal route set</code></pre>
+<hr />
+<h2 id="3-the-three-data-structures-the-contribution">3. The three data structures (the contribution)</h2>
+<p><strong>Boundary multigraph (BMR).</strong> Partition the road network into regions; for each pair of boundary nodes, summarize the Pareto-optimal inter-region trade-offs as <strong>parallel (multi) edges</strong>. A query then hops region-to-region over this small graph instead of expanding the full network, the hierarchical-acceleration idea (Shekhar's boundary multigraph) generalized from one cost to a two-cost frontier.</p>
+<p><strong>Multi-level encoded Pareto frontier view.</strong> Store the non-dominated (energy, time) cost sets <strong>compactly and at multiple levels of granularity</strong>, so the precomputed frontier can be retrieved and stitched at query time rather than re-derived. This is what turns "recompute the exponential frontier" into "look it up and combine."</p>
+<p><strong>2D cost-interval pruning with multi-edge pruning.</strong> At query time, bound each partial path by a <strong>2D (energy, time) cost interval</strong> and discard fragments that are already dominated, and collapse redundant parallel edges. The search therefore never enumerates the full frontier; it prunes aggressively against the precomputed bounds.</p>
+<hr />
+<h2 id="4-the-core-idea-from-scratch">4. The core idea, from scratch</h2>
+<p><strong>Domination.</strong> Route A dominates route B if A is no worse on both energy and time and strictly better on at least one. The <strong>Pareto frontier</strong> is the set of non-dominated routes. Bi-objective label-setting (Martins', NAMOA<em>dr, BOA</em>) computes it by keeping, at each node, a set of non-dominated cost labels, the difficulty is that this set can blow up.</p>
+<p><strong>Why preprocessing wins.</strong> Most of the work in answering many queries is repeated: the inter-region trade-offs do not depend on the specific origin/destination inside far-away regions. Precompute those once into the boundary multigraph and the frontier view, then a query only stitches boundary-to-boundary frontiers and prunes locally. That is the same reason contraction hierarchies answer single-objective city queries in microseconds, applied to the two-cost case.</p>
+<p><strong>Energy as a path-dependent cost.</strong> EV energy is not a fixed per-edge number, it depends on speed, mass, and gradient history. The proposal's <strong>Pgraph (path-dependent)</strong> representation lifts costs from edges to nodes that stand for entire path fragments, so an energy model that depends on the prior trajectory can be expressed exactly. MBOR's frontier machinery is what makes that richer cost tractable.</p>
+<hr />
+<h2 id="5-whats-real-vs-scaffold">5. What's real vs scaffold</h2>
+<table>
+<thead>
+<tr>
+<th>Piece</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Algorithm design (boundary multigraph, Pareto frontier view, cost-interval pruning)</td>
+<td><strong>Designed</strong> (preliminary research)</td>
+</tr>
+<tr>
+<td>"More than 10x faster online" vs prior methods on real road-network data</td>
+<td><strong>Reported preliminary result</strong>, not a public reproducible benchmark</td>
+</tr>
+<tr>
+<td>Public code / test suite / live demo</td>
+<td><strong>None yet</strong> (unlike the other three projects)</td>
+</tr>
+<tr>
+<td>Peer-reviewed paper</td>
+<td><strong>In preparation</strong> (Shekhar NSF proposal, Task 4)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="6-what-id-do-next">6. What I'd do next</h2>
+<ol type="1">
+<li><strong>Release a runnable reference implementation</strong> on a public OSM-derived graph (a metro road network) with a simple energy model.</li>
+<li><strong>Report a reproducible benchmark</strong>: query latency and Pareto-set completeness against NAMOA<em>dr / BOA</em> baselines, the same "make one thing real and measured" bar the other projects meet.</li>
+<li><strong>Add the Pgraph path-dependent energy cost</strong> end to end and show it changes the frontier vs an edge-additive energy model.</li>
+<li><strong>An interactive demo</strong>: drag the energy-vs-time preference and watch the chosen route move along the frontier.</li>
+</ol>
+<hr />
+<div class="foot">Plain-language explainer for MBOR, grounded in the real code and honest about scope. <a href="./">Full paper page</a> &middot; <a href="../../index.html">Portfolio</a></div></div></body></html>

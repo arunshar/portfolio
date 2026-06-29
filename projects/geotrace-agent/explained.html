@@ -1,0 +1,182 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>geotrace-agent — Explained</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800&family=Noto+Sans:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet"><style>
+:root{--bg:#fbfcfe;--panel:#fff;--ink:#16202c;--mut:#5b6776;--line:#e6eaf0;--acc:#2257d6;--ok:#0e9f6e;--warn:#b45309;--code:#f3f5f9}
+@media(prefers-color-scheme:dark){:root{--bg:#0e1116;--panel:#161b22;--ink:#e7ecf3;--mut:#9aa6b4;--line:#252c37;--acc:#6ea8fe;--ok:#54d6a0;--warn:#ffb454;--code:#11151b}}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:'Noto Sans',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;line-height:1.65;font-size:16px}
+.wrap{max-width:860px;margin:0 auto;padding:0 22px 64px}
+nav.top{font-size:13.5px;color:var(--mut);padding:18px 0;border-bottom:1px solid var(--line)}
+nav.top a{color:var(--acc);text-decoration:none}nav.top a:hover{text-decoration:underline}
+h1,h2,h3,h4{font-family:Montserrat,system-ui,sans-serif;line-height:1.2}
+h1{font-size:30px;margin:26px 0 4px}h2{font-size:21px;margin:30px 0 8px;padding-top:14px;border-top:1px solid var(--line)}
+h3{font-size:16.5px;margin:20px 0 4px}
+a{color:var(--acc)}p{margin:10px 0}
+blockquote{margin:14px 0;padding:.4rem 0 .4rem 1rem;border-left:4px solid var(--acc);color:var(--ink);font-size:17px}
+code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13.5px;background:var(--code);padding:1px 5px;border-radius:5px}
+pre{background:var(--code);border:1px solid var(--line);border-radius:10px;padding:12px 14px;overflow-x:auto}
+pre code{background:none;padding:0}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:14.5px}
+th,td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top}
+th{background:var(--code);font-family:Montserrat;font-size:13px}
+ul,ol{padding-left:22px}li{margin:5px 0}
+strong{font-weight:600}
+.foot{margin-top:30px;padding-top:14px;border-top:1px solid var(--line);color:var(--mut);font-size:13.5px}
+</style></head><body><div class="wrap"><nav class="top"><a href="../../index.html">Arun Sharma</a> / <a href="./">geotrace-agent (paper page)</a> / Explained</nav><h1 id="geotrace-agent--explained">GeoTrace-Agent — Explained</h1>
+<blockquote>
+<p>A plain-language tour of what the system actually does and, more importantly, <strong>why each design decision was made</strong>. Written to be read end to end, in the spirit of "here is the one idea, here is the analogy, here is the rationale." Companion to the <a href="https://arunshar.com">project website</a> and the <a href="https://arunshar.com/projects/geotrace-agent/">full paper</a>.</p>
+</blockquote>
+<hr />
+<h2 id="0-the-one-mental-model">0. The one mental model</h2>
+<p>GeoTrace-Agent answers natural-language questions about moving objects ("could these two vessels have met near here, in this window?"). The single idea that organizes everything:</p>
+<blockquote>
+<p><strong>The LLM plans. Deterministic kernels compute. A validator gates. The LLM never decides anything that has a ground truth.</strong></p>
+</blockquote>
+<p>Think of it as <strong>a compiler and a type system wrapped around a language model.</strong> The LLM writes a program (a plan); the runtime type-checks that program, runs the parts that are exact math with exact math, and refuses to return any answer that is physically impossible. The LLM is used only where judgment is genuinely needed (deciding the steps, narrating the result), not where the answer is decidable by geometry.</p>
+<p>Everything below is downstream of that one decision.</p>
+<hr />
+<h2 id="1-the-temporal-style-analogy">1. The Temporal-style analogy</h2>
+<p>If durable execution is the one concept that makes Temporal "click," here is the equivalent table for GeoTrace-Agent. Each row is a familiar systems idea mapped onto an agent concept.</p>
+<table>
+<thead>
+<tr>
+<th>Systems concept you know</th>
+<th>GeoTrace-Agent equivalent</th>
+<th>Why the analogy holds</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A compile-checked workflow DAG</td>
+<td>The <strong>typed PlanGraph</strong></td>
+<td>The plan is a DAG of typed nodes validated against a schema before anything runs; cycles and over-budget plans are rejected at "compile time."</td>
+</tr>
+<tr>
+<td>A workflow engine running tasks in parallel</td>
+<td>The <strong>Orchestrator</strong></td>
+<td>It topo-sorts the DAG and runs each independent layer concurrently with <code>asyncio.gather</code>, under a hard token / tool / wallclock budget.</td>
+</tr>
+<tr>
+<td>A type system (rejects ill-typed programs)</td>
+<td>The <strong>kinematic validator</strong></td>
+<td>It rejects any state that violates the physics envelope, raising <code>KinematicViolation</code> rather than letting an impossible answer through.</td>
+</tr>
+<tr>
+<td>gRPC / typed RPC between services</td>
+<td><strong>MCP</strong> (tools) + <strong>A2A</strong> (agents)</td>
+<td>The geometry kernel is an MCP server; the agent advertises a capability card and accepts JSON-RPC Agent-to-Agent calls.</td>
+</tr>
+<tr>
+<td>Distributed tracing (spans, sampling)</td>
+<td><strong>OpenTelemetry + the cost ledger</strong></td>
+<td>Every stage emits a span with token / cost / cache-hit attributes; traces are tail-sampled; a per-stage ledger answers "what did this query cost?"</td>
+</tr>
+<tr>
+<td>A feedback loop into model training</td>
+<td><strong>HITL queue to Pi-GRPO</strong></td>
+<td>Low-confidence traces go to a human-review queue whose verdicts export as preference pairs for DPO / GRPO post-training.</td>
+</tr>
+<tr>
+<td>Durable activity boundaries (serialize state across steps)</td>
+<td><code>Prism.to_payload</code> / <code>from_payload</code></td>
+<td>The prism serializes losslessly so a PRISM step can hand its result to a downstream TGARD step across a Temporal activity boundary.</td>
+</tr>
+</tbody>
+</table>
+<p>The single sentence to remember: <strong>GeoTrace-Agent treats an LLM agent like a distributed program, with a type system (physics), a scheduler (the orchestrator), typed interfaces (MCP / A2A), and full observability, instead of treating it like a chatbot you hope gets it right.</strong></p>
+<hr />
+<h2 id="2-how-the-agents-actually-interact">2. How the agents actually interact</h2>
+<p>This is grounded in <code>app/services/orchestrator.py</code>. One request flows through <code>run()</code>:</p>
+<pre><code>run(q):
+  guard.check(question)                      # input safety
+  plan   = planner.plan(q)                   # LLM -&gt; typed PlanGraph
+  results = execute_plan(plan)               # the interesting part
+  answer = summarize(plan, results)          # LLM narrates the computed facts
+  regions = collect_regions(results)
+  confidence = aggregate_confidence(...)
+  out_filter.scrub(answer)                   # output safety
+  if confidence &lt; threshold: hitl.enqueue(...)   # human review
+  return QueryOut(answer, regions, trace_id, tokens, cost, hitl_required)</code></pre>
+<p><code>execute_plan</code> is where the multi-agent coordination lives:</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> layer <span class="kw">in</span> plan.topo_layers():                       <span class="co"># dependency layers</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>    tasks <span class="op">=</span> [execute_node(node, ...) <span class="cf">for</span> node <span class="kw">in</span> layer]</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>    outs  <span class="op">=</span> <span class="cf">await</span> asyncio.gather(<span class="op">*</span>tasks, return_exceptions<span class="op">=</span><span class="va">True</span>)  <span class="co"># parallel</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> node, out <span class="kw">in</span> <span class="bu">zip</span>(layer, outs):</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="bu">isinstance</span>(out, KinematicViolation): <span class="cf">raise</span> out  <span class="co"># hard gate, fail loud</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>        results[node.<span class="bu">id</span>] <span class="op">=</span> out</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>    <span class="va">self</span>._enforce_budget(q.budget, ctx)                <span class="co"># stop if over budget</span></span></code></pre></div>
+<p>Read that closely, it encodes several decisions at once:</p>
+<ul>
+<li><strong>Topo layers + <code>asyncio.gather</code></strong>: nodes with no remaining dependencies run <em>concurrently</em>. Computing two prisms is two parallel tasks, not two sequential calls.</li>
+<li><strong><code>return_exceptions=True</code></strong>: one node failing does not crash the run; the orchestrator records the error and continues, except for <code>KinematicViolation</code>, which is re-raised immediately (an impossible answer must abort, not degrade).</li>
+<li><strong>Budget enforced after every layer</strong>: token, tool-call, and wallclock budgets are checked between layers; an overrun sets <code>terminated_by_budget</code> and raises <code>BudgetExceeded</code>. The agent can never run away.</li>
+<li><strong>Per-stage ledger</strong>: each stage runs inside <code>_StageContextManager</code>, which opens an OpenTelemetry span and appends a <code>StageTrace</code> (tokens in/out, cost, cache-hit). That ledger is how cost is attributed per query.</li>
+</ul>
+<p><code>execute_node</code> is a dispatch table on the node's typed <code>kind</code>: <code>PRISM</code> to the SpaceTimeReasoner, <code>GAPS</code> to the GapDetector, <code>TGARD/DC_TGARD</code> to the RendezvousFinder, <code>VALIDATE</code> to the ValidatorAgent, <code>SUMMARIZE</code> handled at the end. Each agent has a typed input and a typed output, so the orchestrator never parses free text to decide what to do next.</p>
+<hr />
+<h2 id="3-the-design-decisions-and-the-rationale-the-heart-of-it">3. The design decisions and the rationale (the heart of it)</h2>
+<p>Each decision below is stated as <strong>what, why, and what the alternative would have cost.</strong></p>
+<h3 id="31-a-typed-plangraph-instead-of-free-form-chain-of-thought">3.1 A typed PlanGraph instead of free-form chain-of-thought</h3>
+<p><strong>What.</strong> The planner (<code>app/agents/planner.py</code>) does not emit prose. It returns a JSON object validated against a strict schema: a DAG of nodes, each one of <code>prism.compute</code>, <code>gaps.detect</code>, <code>rendezvous.tgard</code>, <code>rendezvous.dc_tgard</code>, <code>validate.kinematic</code>, <code>retrieve.semantic</code>, <code>summarize</code>, with <code>deps</code>, <code>inputs</code>, <code>expected_tokens</code>, and a <code>confidence_prior</code>. <strong>Why.</strong> Four properties fall out for free: (a) <strong>auditable</strong>, every reasoning step is a typed record you can inspect; (b) <strong>replayable</strong>, the plan plus the prompt version reproduce the run exactly; (c) <strong>parallelizable</strong>, a DAG has topo layers, so independent steps run concurrently; (d) <strong>bounded</strong>, <code>sum(expected_tokens)</code> is checked against the budget <em>before</em> any work runs (<code>PlanInfeasible</code> otherwise). It also makes caching effective, because a typed plan has stable keys. <strong>Alternative cost.</strong> Free-form CoT is a string you cannot statically check, cannot safely parallelize, and cannot bound. You would be parsing prose to decide control flow, the thing that makes agents flaky.</p>
+<h3 id="32-deterministic-kernel-before-the-llm">3.2 Deterministic kernel before the LLM</h3>
+<p><strong>What.</strong> Every spatially-decidable sub-problem is computed by a numerical kernel (<code>app/components/space_time_prism.py</code>), not the LLM. The space-time prism, the geo-ellipse, the bounding rectangle, the prism intersection, all exact. <strong>Why.</strong> LLMs hallucinate distances and skip the physics check. Reachability has a <em>ground truth</em>: given two anchors and a max speed, the set of reachable points is a geo-ellipse with semi-major axis <code>a = 0.5 * v_max * duration</code>. There is no reason to ask a model to approximate something you can compute exactly, reproducibly, and cheaply. <strong>Alternative cost.</strong> Trusting the LLM for geometry means occasional confident-but-wrong answers, which in maritime safety or homeland security is unacceptable.</p>
+<h3 id="33-a-single-tokenoptimizer-choke-point">3.3 A single <code>TokenOptimizer</code> choke-point</h3>
+<p><strong>What.</strong> Every LLM call in the system goes through one class (<code>app/services/token_optimizer.py</code>). It owns five jobs: prompt compression, prefix-cache-aware assembly (<code>cache_control: ephemeral</code>), structured-output enforcement with one delta-correction retry, a per-call <code>max_tokens</code> clamp against the remaining budget, and cost accounting (returns <code>tokens_in, tokens_out, cost_usd, cache_hit</code>). <strong>Why.</strong> Cross-cutting concerns belong in one place. Budget, caching, retries, timeouts, and cost attribution are <em>uniform</em> because there is exactly one door every call walks through. The orchestrator can never overshoot the budget on a planner regression, because the clamp lives at the door. <strong>Alternative cost.</strong> Scattering LLM calls means scattering budget logic, cost accounting, and retry policy, which drift apart and leak spend.</p>
+<h3 id="34-the-efficiency-stack">3.4 The efficiency stack</h3>
+<p><strong>What.</strong> (1) <strong>Adaptive prompt compression</strong>, prompts over a threshold are head-tail truncated with an elision marker. (2) <strong>Hybrid semantic cache</strong>, an exact-key lookup layered over a near-key embedding lookup, so identical anchor pairs return in O(1) and near-duplicate questions reuse prior answers. (3) <strong>In-flight tool deduplication</strong>, the <code>ToolBatcher</code> keys concurrent calls by <code>(tool, sha256(args))</code> and collapses duplicates into one awaitable; it is implemented but not yet wired into the orchestrator run path, so it does not contribute to the measured numbers. <strong>Why.</strong> The two active layers are complementary: the cache eliminates LLM cost on repeated or near-duplicate queries, and compression shrinks each call. On a live golden-set run with Claude Sonnet 4.6 the full pipeline costs about 0.026 USD per query (~2,736 tokens), and a repeated query drops to zero LLM cost on a cache hit (cold to warm; see <code>evaluation/eval_results/</code> and <code>evaluation/ablation_results/</code>). The cache does not fire on novel queries, so there is no blanket per-query reduction. <strong>Alternative cost.</strong> Any one layer alone leaves money on the table; the dedup-vs-cache distinction (in-run duplicates vs cross-run repeats) is the subtle part most systems miss.</p>
+<h3 id="35-the-kinematic-validator-as-a-hard-gate-and-a-subtle-rationale">3.5 The kinematic validator as a hard gate (and a subtle rationale)</h3>
+<p><strong>What.</strong> <code>app/agents/validator.py</code> is the last thing every region passes through. It enforces the Hagerstrand feasibility condition on the <strong>observations</strong>: consecutive anchors must be mutually reachable, <code>dist(A, B) &lt;= v_max * (t_B - t_A)</code> (with a 5% tolerance). Failure raises <code>KinematicViolation</code>, surfaced as HTTP 422. <strong>Why this exact form.</strong> The code comment captures a real lesson: an earlier version gated on the rendezvous region's <strong>bounding-box diagonal divided by the meet window</strong> as a "required speed." That was wrong, a region is the <em>set of alternative meeting points</em>, not a path to traverse, and its extent scales with the prism duration while the meet window is shorter, so that proxy rejected every valid region. The fix gates the physics where the physics actually lives (the observations), not on a derived artifact. <strong>Why a hard gate, not a soft penalty.</strong> Physical feasibility is an invariant, not a preference. A soft score could be overridden by a confident summary; a hard gate cannot. The system would rather return nothing than return an impossible region. <strong>Alternative cost.</strong> A soft penalty, or no gate, lets physically impossible answers reach users, the failure mode that erodes trust fastest.</p>
+<h3 id="36-mcp-for-tools-a2a-for-agents">3.6 MCP for tools, A2A for agents</h3>
+<p><strong>What.</strong> The prism kernel is exposed as a Model Context Protocol server (<code>prism.compute</code>, <code>prism.intersect</code>, <code>prism.merge_dynamic</code>); the orchestrator advertises a capability card and accepts JSON-RPC 2.0 Agent-to-Agent calls. <strong>Why.</strong> The geometry kernel is genuinely reusable; making it an MCP server means any MCP-aware client, IDE plugin, or sibling agent can call it without going through this app. A2A makes GeoTrace-Agent a first-class citizen other agents can invoke. This is the same reason you put a typed RPC interface on a useful service. <strong>Alternative cost.</strong> Burying the kernel behind one app's HTTP surface makes it un-reusable and un-composable with the broader agent ecosystem.</p>
+<h3 id="37-opentelemetry-plus-a-per-stage-cost-ledger">3.7 OpenTelemetry plus a per-stage cost ledger</h3>
+<p><strong>What.</strong> <code>observability/tracer.py</code> wraps every tool call in a span carrying <code>tool.name, cache_hit, cost_usd, tokens_in/out</code>; traces are <strong>tail-sampled</strong> (100% of errors, 1% of successes). <code>observability/cost_tracker.py</code> writes one row per <code>(trace_id, stage)</code>. <strong>Why.</strong> You cannot optimize what you cannot measure. Per-stage attribution is what made the efficiency work legible (the reproduced per-query cost and the cache cold-to-warm saving came from this ledger, not a guess). Tail sampling keeps every failure for debugging while bounding storage, the right default for an eval stack. <strong>Alternative cost.</strong> Aggregate metrics tell you the system is slow or expensive but not <em>where</em>; you cannot do targeted optimization or honest cost claims without per-stage traces.</p>
+<h3 id="38-offline-golden-set-ci-gate-plus-online-drift-monitor">3.8 Offline golden-set CI gate plus online drift monitor</h3>
+<p><strong>What.</strong> Offline (<code>evaluation/offline_eval.py</code>): replay a labeled golden set, score structure, tool-trajectory (which algorithm), feasibility, tightness, tokens, latency, and <strong>fail CI if pass-rate &lt; 0.8</strong>. Online (<code>evaluation/online_monitor.py</code>): sample 1% of traffic, recompute the validator independently, re-run a frozen-prompt plan and alert on <strong>plan drift</strong>. <strong>Why.</strong> Evaluation is a discipline, not an afterthought. The CI gate means a prompt or model change that regresses the agent fails the build. The drift monitor catches the silent case, a new model quietly changes the plan distribution on live traffic. <strong>Alternative cost.</strong> Without a gate, regressions ship; without a drift monitor, you find out from users.</p>
+<h3 id="39-a-deterministic-feasibility-oracle-instead-of-an-llm-judge">3.9 A deterministic feasibility oracle instead of an LLM judge</h3>
+<p><strong>What.</strong> The core evaluator is the prism feasibility oracle, not an LLM-as-judge. A claimed region is valid only if it sits inside the physically reachable prism. <strong>Why.</strong> The domain has ground truth, so a deterministic check is reproducible, has zero judge variance, and is cheap enough to run on 100% of outputs as a guardrail. An LLM judge is itself a model that drifts across versions and needs its own calibration. <strong>Honest limit.</strong> This covers the structured, checkable parts. It does <strong>not</strong> judge the free-text summary's quality or faithfulness; that is exactly where a calibrated LLM judge belongs, and it is the open piece.</p>
+<h3 id="310-hitl-queue-that-closes-the-loop-to-rl">3.10 HITL queue that closes the loop to RL</h3>
+<p><strong>What.</strong> Traces below a confidence threshold flow to a Postgres human-in-the-loop queue; reviewer verdicts export as preference triples for the sibling <strong>Pi-GRPO</strong> project (DPO / GRPO post-training). <strong>Why.</strong> It connects agentic reasoning to reward-modeled fine-tuning without changing the LLM call surface or the validator. Human judgment becomes training signal. <strong>Alternative cost.</strong> A dead-end review queue collects labels nobody uses; wiring it to Pi-GRPO turns review into model improvement.</p>
+<hr />
+<h2 id="4-core-file-walkthrough-the-8-files-that-matter">4. Core-file walkthrough (the ~8 files that matter)</h2>
+<ul>
+<li><strong><code>app/services/orchestrator.py</code></strong> , the conductor. <code>run()</code> is the request lifecycle; <code>_execute_plan</code> is the topo-layer parallel loop; <code>_enforce_budget</code> is the governor; <code>_StageContextManager</code> is the span + ledger. Start here.</li>
+<li><strong><code>app/agents/planner.py</code></strong> , the only place the LLM decides control flow. Emits the typed PlanGraph against <code>_PLAN_JSON_SCHEMA</code>; <code>_coerce_plan</code> validates the DAG, attaches anchors to <code>prism.compute</code> nodes, runs the cycle check, and enforces the token budget.</li>
+<li><strong><code>app/models.py</code></strong> , the type system: <code>PlanGraph</code> / <code>PlanNode</code> / <code>PlanNodeKind</code>, <code>topo_layers()</code>, <code>Budget</code>, <code>RendezvousRegion</code>, <code>GeoEllipse</code>. These types are the contract every agent honors.</li>
+<li><strong><code>app/components/space_time_prism.py</code></strong> , the geometry IP. <code>Prism.compute</code> (semi-major <code>0.5 * v_max * duration</code>, feasibility <code>d_ab &lt;= L</code>), <code>ellipse_at(t)</code>, <code>mobr</code>, <code>ellipse_polygon</code>, <code>merge_dynamic</code> (DRM), and <code>intersect</code> (time-slice prism intersection, the operation TGARD rides on). Note <code>to_payload</code>/<code>from_payload</code>, lossless serialization for durable (Temporal) activity boundaries.</li>
+<li><strong><code>app/services/token_optimizer.py</code></strong> , the single LLM door (section 3.3). Also holds the offline stub that returns a deterministic plan when no API key is set, which is why the demo runs without a key.</li>
+<li><strong><code>app/agents/validator.py</code></strong> , the hard kinematic gate (section 3.5); short, but the rationale comment is the most instructive in the codebase.</li>
+<li><strong><code>evaluation/offline_eval.py</code> + <code>evaluation/online_monitor.py</code></strong> , the two eval surfaces (section 3.8).</li>
+<li><strong><code>observability/tracer.py</code> + <code>observability/cost_tracker.py</code></strong> , spans, tail sampling, and the per-stage cost ledger (section 3.7).</li>
+<li><strong><code>spaces/hf-demo/streamlit_app.py</code></strong> , the demo (section 5).</li>
+</ul>
+<p>The other agents (<code>space_time_reasoner.py</code>, <code>gap_detector.py</code>, <code>rendezvous_finder.py</code>) are thin, typed clients over the prism kernel; the gap detector additionally fuses a Pi-DPM anomaly term into the Abnormal Gap Measure when torch is available, and falls back to a deterministic surrogate otherwise.</p>
+<hr />
+<h2 id="5-the-demo-and-how-to-read-it">5. The demo, and how to read it</h2>
+<p>The Hugging Face Space (<code>spaces/hf-demo/streamlit_app.py</code>) is the system in miniature, CPU-only, no database. <strong>Sidebar:</strong> pick a preset (rendezvous / gap audit / prism-only), edit the question, the vessel anchors (lat, lon, time), and a budget; click Run. <strong>Main panel, four views of the same run:</strong></p>
+<ol type="1">
+<li><strong>Chain of thought (typed PlanGraph)</strong> , the plan rendered as a flowchart. This is the agent's "program."</li>
+<li><strong>Map</strong> , the space-time prism ellipses, their bounding rectangles, and (in green) the candidate rendezvous region. This is the geometry the kernel computed.</li>
+<li><strong>Validator</strong> , regions returned, methods used, and <code>kinematic_pass</code>. This is the gate's verdict.</li>
+<li><strong>Cost / tokens</strong> and the raw <strong>Result JSON</strong> , what the run spent and produced.</li>
+</ol>
+<p>It felt opaque before because it shows the <em>machinery</em> (plan + map + JSON), not a narrated paragraph. Without an API key it runs the deterministic stub, so the geometry always renders even with no LLM. The fix, if you want it to read more easily, is a one-line "what just happened" summary panel.</p>
+<hr />
+<h2 id="6-the-full-paper-section-by-section">6. The full paper, section by section</h2>
+<p>The README is the NeurIPS-style paper. Map of where each idea is detailed:</p>
+<ul>
+<li>Section 1 (Introduction) , the deterministic-first thesis and the typed-agent contributions.</li>
+<li>Section 3 (System Architecture) , the request path and the four separated concerns (geometric truth, semantic reasoning, budgets, provenance).</li>
+<li>Section 4 (Methods) , the typed PlanGraph (4.1), token optimization (4.2), tool optimization (4.3), the prism / ellipse / MOBR / DRM math (4.4), STAGD-DRM and TGARD / DC-TGARD (4.5), the S-KBM validator (4.6), MCP and A2A (4.7).</li>
+<li>Section 5 (Experiments) , the golden dataset and the latency / token / cost table (reproduced live; see <code>evaluation/eval_results/</code> and <code>evaluation/ablation_results/</code>).</li>
+<li>Section 6 (Discussion) , the honest limitations.</li>
+</ul>
+<hr />
+<h2 id="7-what-evaluation-still-needs-doing-the-next-phase">7. What evaluation still needs doing (the next phase)</h2>
+<p>Stated plainly so the work is clear:</p>
+<ol type="1">
+<li><strong>Reproduce the numbers (done).</strong> <code>offline_eval</code> was run end to end with a live key on Claude Sonnet 4.6; the <code>evaluation/eval_results/&lt;timestamp&gt;.{md,json}</code> report, the cache ablation (<code>evaluation/ablation_results/</code>), and the validator audit (<code>evaluation/validator_audit_results/</code>) are checked in. Remaining: grow the golden set beyond 3 queries and wire the in-flight tool deduplicator into the run path.</li>
+<li><strong>Judge the free-text summary.</strong> Add a calibrated LLM-as-judge (with a small human-labeled set) for the one part the deterministic oracle does not cover.</li>
+<li><strong>Train the anomaly head.</strong> Load or train a Pi-DPM checkpoint on the live trajectory distribution so the Abnormal Gap Measure's data term is real, not default-initialized.</li>
+<li><strong>Grow and stratify the golden set.</strong> Three anchor cases prove the harness; a larger, stratified set (by domain, difficulty, region count) makes the pass-rate meaningful.</li>
+</ol>
+<p><strong>Honesty rails (stated in the paper and on the site):</strong> GeoTrace-Agent is a research-engineering blueprint with production-shaped architecture. The efficiency numbers are reproduced from a live golden-set run and a cache ablation (checked in under <code>evaluation/</code>), on a small 3-query golden set; the in-flight tool deduplicator is implemented but not yet wired into the run path. It is not running at production traffic.</p>
+<hr />
+<div class="foot">Plain-language explainer for geotrace-agent, grounded in the real code and honest about scope. <a href="./">Full paper page</a> &middot; <a href="../../index.html">Portfolio</a></div></div></body></html>

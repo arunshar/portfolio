@@ -1,0 +1,90 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Pi-GRPO — Explained</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800&family=Noto+Sans:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet"><style>
+:root{--bg:#fbfcfe;--panel:#fff;--ink:#16202c;--mut:#5b6776;--line:#e6eaf0;--acc:#2257d6;--ok:#0e9f6e;--warn:#b45309;--code:#f3f5f9}
+@media(prefers-color-scheme:dark){:root{--bg:#0e1116;--panel:#161b22;--ink:#e7ecf3;--mut:#9aa6b4;--line:#252c37;--acc:#6ea8fe;--ok:#54d6a0;--warn:#ffb454;--code:#11151b}}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:'Noto Sans',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;line-height:1.65;font-size:16px}
+.wrap{max-width:860px;margin:0 auto;padding:0 22px 64px}
+nav.top{font-size:13.5px;color:var(--mut);padding:18px 0;border-bottom:1px solid var(--line)}
+nav.top a{color:var(--acc);text-decoration:none}nav.top a:hover{text-decoration:underline}
+h1,h2,h3,h4{font-family:Montserrat,system-ui,sans-serif;line-height:1.2}
+h1{font-size:30px;margin:26px 0 4px}h2{font-size:21px;margin:30px 0 8px;padding-top:14px;border-top:1px solid var(--line)}
+h3{font-size:16.5px;margin:20px 0 4px}
+a{color:var(--acc)}p{margin:10px 0}
+blockquote{margin:14px 0;padding:.4rem 0 .4rem 1rem;border-left:4px solid var(--acc);color:var(--ink);font-size:17px}
+code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13.5px;background:var(--code);padding:1px 5px;border-radius:5px}
+pre{background:var(--code);border:1px solid var(--line);border-radius:10px;padding:12px 14px;overflow-x:auto}
+pre code{background:none;padding:0}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:14.5px}
+th,td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top}
+th{background:var(--code);font-family:Montserrat;font-size:13px}
+ul,ol{padding-left:22px}li{margin:5px 0}
+strong{font-weight:600}
+.foot{margin-top:30px;padding-top:14px;border-top:1px solid var(--line);color:var(--mut);font-size:13.5px}
+</style></head><body><div class="wrap"><nav class="top"><a href="../../index.html">Arun Sharma</a> / <a href="./">Pi-GRPO (paper page)</a> / Explained</nav><h1 id="pi-grpo--explained">Pi-GRPO — Explained</h1>
+<blockquote>
+<p><strong>One line:</strong> physics-informed reinforcement-learning post-training for trajectory generation that treats hard physical constraints as a <strong>reward floor</strong>, so a policy optimized with PPO, DPO, or GRPO improves task quality without learning to produce physically impossible trajectories.</p>
+</blockquote>
+<p><strong>Honest status up front.</strong> Pi-GRPO is a <strong>workshop paper</strong> ("Physics as a Hard Reward Floor", MOSS @ COLM 2026) plus a runnable RL stack. The training code (PPO, DPO, and GRPO under a hybrid physics-aware reward) is <strong>real and runs</strong>. The headline result, hard-constraint violation rate driven from about <strong>18% under vanilla DPO to about 0% with physics-augmented DPO</strong>, with KL bounded across the PPO run, is the <strong>paper's reported experimental result</strong> at workshop scale, not a large-scale production benchmark. In short: the method and the RL stack are mine and runnable; the numbers are the paper's reported results, which I would scale and re-report on a larger benchmark before treating them as final.</p>
+<hr />
+<h2 id="1-what-it-is-and-the-gap-it-fills">1. What it is and the gap it fills</h2>
+<p>Reinforcement-learning post-training (the RLHF family: PPO, DPO, GRPO) optimizes a policy against a <strong>learned or preference reward</strong>. The well-known failure mode is <strong>reward hacking</strong>: the policy finds outputs that score well under the reward but are wrong in a way the reward does not capture. For trajectory generation that means physically impossible motion, speeds, accelerations, or turns no real vehicle or vessel could execute, that nonetheless please the reward.</p>
+<p>Pi-GRPO's idea: make the physics a <strong>hard floor</strong>, not a soft afterthought. The reward is a hybrid of the task reward and a physics term that heavily penalizes violations of kinematic constraints, so an output that breaks physics can never be high-reward no matter how well it games the task objective. The result is RL that improves the policy while keeping every sample physically admissible.</p>
+<hr />
+<h2 id="2-how-it-works">2. How it works</h2>
+<pre><code> policy (trajectory generator)
+        │  rollouts / candidate trajectories
+        ▼
+ reward = task_reward + physics_floor
+        │   physics_floor heavily penalizes kinematic-constraint violations
+        │   (velocity / acceleration / curvature / turning-rate bounds)
+        ▼
+ policy update  (PPO clipped objective | DPO preference | GRPO group-relative advantage)
+        │
+        └────────────── improvement loop ──────────────┘</code></pre>
+<p>The same physics-floor reward plugs into three optimizers, so the contribution is the <strong>reward shaping</strong>, not a single algorithm.</p>
+<hr />
+<h2 id="3-the-optimizers-briefly">3. The optimizers, briefly</h2>
+<ul>
+<li><strong>PPO</strong> (Proximal Policy Optimization): a clipped policy-gradient objective with a KL leash to the reference policy, the workhorse of RLHF. Pi-GRPO keeps KL bounded across the run.</li>
+<li><strong>DPO</strong> (Direct Preference Optimization): trains directly on preference pairs without a separate reward model. Vanilla DPO is where the physics-violation problem is most visible; the physics-augmented variant is what drives violations toward zero.</li>
+<li><strong>GRPO</strong> (Group Relative Policy Optimization): estimates advantage from the <strong>relative</strong> scores of a group of samples for the same prompt, dropping the value network. It pairs naturally with the physics floor because the floor reorders the group toward admissible samples.</li>
+</ul>
+<hr />
+<h2 id="4-the-core-idea-from-scratch">4. The core idea, from scratch</h2>
+<p>A reward <code>r = r_task + lambda * r_physics</code>, where <code>r_physics</code> is a large negative penalty whenever a trajectory violates a kinematic bound (and zero when it is admissible), behaves like a <strong>floor</strong>: any policy improvement that increases <code>r_task</code> by hacking physics is cancelled by <code>r_physics</code>, so the optimizer is pushed into the physically feasible region first and then improves task quality within it. This is the RL analogue of the deterministic feasibility gates used elsewhere in the portfolio (the space-time-prism validator in GeoTrace-Agent, the kinematic prior in Pi-DPM): encode the physics as a hard constraint rather than hoping the model learns it.</p>
+<hr />
+<h2 id="5-whats-real-vs-scaffold">5. What's real vs scaffold</h2>
+<table>
+<thead>
+<tr>
+<th>Piece</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>RL training stack (PPO / DPO / GRPO) with the hybrid physics reward</td>
+<td><strong>Real</strong>, runnable</td>
+</tr>
+<tr>
+<td>Physics-floor reward (kinematic-constraint penalty)</td>
+<td><strong>Real</strong></td>
+</tr>
+<tr>
+<td>Reported result: ~18% -&gt; ~0% hard-constraint violations (physics-augmented DPO), KL bounded</td>
+<td><strong>Paper's reported result</strong> (workshop scale), not re-reproduced here</td>
+</tr>
+<tr>
+<td>Large-scale benchmark vs standard RLHF baselines</td>
+<td><strong>Next step</strong>, not done</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="6-what-id-do-next">6. What I'd do next</h2>
+<ol type="1">
+<li>Scale beyond the workshop setting and re-report the violation rate and task quality against standard PPO/DPO/GRPO baselines as a reproducible benchmark.</li>
+<li>Sweep the physics-floor weight <code>lambda</code> to show the task-quality vs feasibility trade-off explicitly.</li>
+<li>Connect the floor to the same kinematic models used in the diffusion line (Pi-DPM) so the physics constraint is shared across the generative and RL stacks.</li>
+</ol>
+<div class="foot">Plain-language explainer for Pi-GRPO, grounded in the real code and honest about scope. <a href="./">Full paper page</a> &middot; <a href="../../index.html">Portfolio</a></div></div></body></html>

@@ -1,0 +1,91 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>TrajPrompt — Explained</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800&family=Noto+Sans:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet"><style>
+:root{--bg:#fbfcfe;--panel:#fff;--ink:#16202c;--mut:#5b6776;--line:#e6eaf0;--acc:#2257d6;--ok:#0e9f6e;--warn:#b45309;--code:#f3f5f9}
+@media(prefers-color-scheme:dark){:root{--bg:#0e1116;--panel:#161b22;--ink:#e7ecf3;--mut:#9aa6b4;--line:#252c37;--acc:#6ea8fe;--ok:#54d6a0;--warn:#ffb454;--code:#11151b}}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:'Noto Sans',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;line-height:1.65;font-size:16px}
+.wrap{max-width:860px;margin:0 auto;padding:0 22px 64px}
+nav.top{font-size:13.5px;color:var(--mut);padding:18px 0;border-bottom:1px solid var(--line)}
+nav.top a{color:var(--acc);text-decoration:none}nav.top a:hover{text-decoration:underline}
+h1,h2,h3,h4{font-family:Montserrat,system-ui,sans-serif;line-height:1.2}
+h1{font-size:30px;margin:26px 0 4px}h2{font-size:21px;margin:30px 0 8px;padding-top:14px;border-top:1px solid var(--line)}
+h3{font-size:16.5px;margin:20px 0 4px}
+a{color:var(--acc)}p{margin:10px 0}
+blockquote{margin:14px 0;padding:.4rem 0 .4rem 1rem;border-left:4px solid var(--acc);color:var(--ink);font-size:17px}
+code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13.5px;background:var(--code);padding:1px 5px;border-radius:5px}
+pre{background:var(--code);border:1px solid var(--line);border-radius:10px;padding:12px 14px;overflow-x:auto}
+pre code{background:none;padding:0}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:14.5px}
+th,td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top}
+th{background:var(--code);font-family:Montserrat;font-size:13px}
+ul,ol{padding-left:22px}li{margin:5px 0}
+strong{font-weight:600}
+.foot{margin-top:30px;padding-top:14px;border-top:1px solid var(--line);color:var(--mut);font-size:13.5px}
+</style></head><body><div class="wrap"><nav class="top"><a href="../../index.html">Arun Sharma</a> / <a href="./">TrajPrompt (paper page)</a> / Explained</nav><h1 id="trajprompt--explained">TrajPrompt — Explained</h1>
+<blockquote>
+<p><strong>One line:</strong> type a plain-English question ("ships drifting suspiciously near pipelines last March") and get matching ship trajectories on a map, by training a <strong>CLIP-style model that aligns AIS trajectories with text</strong>, then confirming candidates with TGARD rendezvous detection and a SAM 2 look at the Sentinel-2 imagery.</p>
+</blockquote>
+<p><strong>Honest status up front.</strong> Real and tested (6/6): the <strong>trajectory-CLIP encoder</strong> + its InfoNCE contrastive loss, and the <strong>TGARD group-rendezvous algorithm</strong> (<code>find_rendezvous</code>) with pairwise haversine. <strong>Stubbed:</strong> the SAM 2 / Sentinel-2 chip puller (<code>Sam2ChipPipeline</code> returns zeros, the Planetary-Computer + SAM 2 call is the "production would…" path). <strong>Scaffold:</strong> the trained traj-CLIP checkpoint and the "AIS-text pairs dataset." In short: "the trajectory-text contrastive encoder and the rendezvous detector are real and tested; the visual-confirmation stage and the trained checkpoint are the next step."</p>
+<hr />
+<h2 id="1-what-it-is-and-the-gap-it-fills">1. What it is and the gap it fills</h2>
+<p>Maritime analysts still query AIS with <strong>SQL filters</strong> ("speed &lt; 3 kn AND region = …"). That can't express fuzzy intent like "loitering suspiciously near infrastructure." <strong>CLIP</strong> solved this for images (search photos by text); TrajPrompt does the same for <strong>ship trajectories</strong>: learn a shared embedding space where a trajectory and its natural-language description sit close together, so you can retrieve trajectories by typing a sentence. Then it adds two checks: TGARD finds the actual rendezvous events, and SAM 2 confirms a vessel is visibly there in Sentinel-2.</p>
+<hr />
+<h2 id="2-architecture-and-data-flow">2. Architecture and data flow</h2>
+<pre><code> text prompt ──► sentence embedding ─┐
+                                     ├─ cosine match in shared space ─► ranked trajectories
+ AIS tracks ──► TrajCLIPEncoder ─────┘
+       │
+       └──► TGARD find_rendezvous ──► suspicious meet-ups
+                     │
+                     └──► Sam2ChipPipeline (Sentinel-2 + SAM 2) ──► visual confirmation (STUB)</code></pre>
+<hr />
+<h2 id="3-module-by-module-walkthrough">3. Module-by-module walkthrough</h2>
+<p><strong><code>src/trajprompt/traj_clip.py</code></strong> — the IP. <code>TrajCLIPEncoder</code>: a small <strong>Transformer</strong> over a fixed-window AIS trajectory (each step = <code>(lon, lat, sog, cog, distance-to-coast, dwell)</code>), with learned positional embeddings, mean-pooled to a 256-d <strong>L2-normalized</strong> embedding. <code>trajclip_loss</code>: the symmetric <strong>InfoNCE</strong> (the exact CLIP objective), trajectory→text and text→trajectory cross-entropy against the diagonal (matching pairs), temperature 0.07. This is what makes "search trajectories by sentence" possible.</p>
+<p><strong><code>src/trajprompt/tgard.py</code></strong> — the <strong>group</strong>-rendezvous variant of TGARD (the trajprompt port; darkvessel has the gap-feasibility variant). <code>haversine_pairwise</code> computes an N×M great-circle distance matrix. <code>find_rendezvous(points, …)</code>: buckets AIS points into 1-minute windows, finds pairs of <em>distinct</em> MMSIs within <code>distance_threshold_m</code> (default 500 m), accumulates contiguous co-location, and emits a <code>RendezvousCandidate</code> when the <strong>dwell</strong> exceeds <code>min_dwell_seconds</code> (default 10 min), with an optional low-speed gate (so convoys at speed aren't flagged). Output: who met whom, where, for how long, and how close.</p>
+<p><strong><code>src/trajprompt/sam2_chip.py</code></strong> — <code>Sam2ChipPipeline</code>, the visual confirmation. <em>Stub</em>: <code>chip_for</code> returns a zero chip + null mask; the docstring lays out the production path (STAC search on Microsoft Planetary Computer → 256×256 crop at the AIS coordinate → SAM 2 with a "ship" prompt → confidence). <code>confirm</code> retries a ±window-days range to find a clear-sky chip.</p>
+<p><strong><code>src/trajprompt/data/{ais.py, sentinel2.py}</code></strong> — AIS loaders and the Sentinel-2 fetch. <strong><code>tests</code></strong> — 6 tests: haversine correctness, rendezvous detection on synthetic dwell, contrastive-loss alignment (matching pairs score higher), traj-CLIP L2-norm, chip-stub shape.</p>
+<hr />
+<h2 id="4-the-core-idea-from-scratch">4. The core idea, from scratch</h2>
+<p><strong>CLIP, ported to trajectories.</strong> CLIP trains two encoders (image, text) so that a true image-caption pair has high cosine similarity and mismatched pairs have low similarity, via InfoNCE over a batch (each item's positive is its own pair; everything else is a negative). TrajPrompt swaps the image encoder for a trajectory Transformer and trains the <em>same</em> loss against sentence embeddings of AIS-track descriptions. After training, a free-text query embeds into the shared space and you retrieve the nearest trajectories, <strong>open-vocabulary</strong> search, no fixed schema.</p>
+<p><strong>Why a Transformer for trajectories?</strong> A trajectory is an ordered sequence with long-range structure (a loiter pattern spans many timesteps). Self-attention captures that better than hand-crafted features or an RNN, and the positional embedding encodes step order.</p>
+<hr />
+<h2 id="5-whats-real-vs-scaffold">5. What's real vs scaffold</h2>
+<table>
+<thead>
+<tr>
+<th>Piece</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>TrajCLIPEncoder</code> + InfoNCE loss</td>
+<td><strong>Real</strong>, tested</td>
+</tr>
+<tr>
+<td>TGARD <code>find_rendezvous</code> + pairwise haversine</td>
+<td><strong>Real</strong>, tested</td>
+</tr>
+<tr>
+<td><code>Sam2ChipPipeline</code> (Sentinel-2 + SAM 2)</td>
+<td><strong>Stub</strong> (returns zeros)</td>
+</tr>
+<tr>
+<td>Trained traj-CLIP checkpoint</td>
+<td><strong>Scaffold</strong></td>
+</tr>
+<tr>
+<td>AIS-text pairs dataset (NeurIPS D&amp;B claim)</td>
+<td><strong>Scaffold</strong></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="6-what-id-do-next">6. What I'd do next</h2>
+<ol type="1">
+<li><strong>Build a small AIS-text pair set and actually train traj-CLIP</strong>, then show one real text→trajectory retrieval. That single retrieval makes the whole thing concrete.</li>
+<li><strong>Wire the real SAM 2 chip puller</strong> (Planetary Computer STAC) so visual confirmation is live.</li>
+<li><strong>Chain it end to end:</strong> prompt → traj-CLIP retrieval → TGARD filter → SAM 2 confirm, one dark-vessel case top to bottom.</li>
+<li><strong>Evaluate retrieval</strong> (recall@k on held-out text queries) so "open-vocabulary search" has a number.</li>
+</ol>
+<hr />
+<div class="foot">Plain-language explainer for TrajPrompt, grounded in the real code and honest about scope. <a href="./">Full paper page</a> &middot; <a href="../../index.html">Portfolio</a></div></div></body></html>

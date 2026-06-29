@@ -1,0 +1,110 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>PhysFlow-Earth — Explained</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800&family=Noto+Sans:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet"><style>
+:root{--bg:#fbfcfe;--panel:#fff;--ink:#16202c;--mut:#5b6776;--line:#e6eaf0;--acc:#2257d6;--ok:#0e9f6e;--warn:#b45309;--code:#f3f5f9}
+@media(prefers-color-scheme:dark){:root{--bg:#0e1116;--panel:#161b22;--ink:#e7ecf3;--mut:#9aa6b4;--line:#252c37;--acc:#6ea8fe;--ok:#54d6a0;--warn:#ffb454;--code:#11151b}}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:'Noto Sans',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;line-height:1.65;font-size:16px}
+.wrap{max-width:860px;margin:0 auto;padding:0 22px 64px}
+nav.top{font-size:13.5px;color:var(--mut);padding:18px 0;border-bottom:1px solid var(--line)}
+nav.top a{color:var(--acc);text-decoration:none}nav.top a:hover{text-decoration:underline}
+h1,h2,h3,h4{font-family:Montserrat,system-ui,sans-serif;line-height:1.2}
+h1{font-size:30px;margin:26px 0 4px}h2{font-size:21px;margin:30px 0 8px;padding-top:14px;border-top:1px solid var(--line)}
+h3{font-size:16.5px;margin:20px 0 4px}
+a{color:var(--acc)}p{margin:10px 0}
+blockquote{margin:14px 0;padding:.4rem 0 .4rem 1rem;border-left:4px solid var(--acc);color:var(--ink);font-size:17px}
+code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13.5px;background:var(--code);padding:1px 5px;border-radius:5px}
+pre{background:var(--code);border:1px solid var(--line);border-radius:10px;padding:12px 14px;overflow-x:auto}
+pre code{background:none;padding:0}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:14.5px}
+th,td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top}
+th{background:var(--code);font-family:Montserrat;font-size:13px}
+ul,ol{padding-left:22px}li{margin:5px 0}
+strong{font-weight:600}
+.foot{margin-top:30px;padding-top:14px;border-top:1px solid var(--line);color:var(--mut);font-size:13.5px}
+</style></head><body><div class="wrap"><nav class="top"><a href="../../index.html">Arun Sharma</a> / <a href="./">PhysFlow-Earth (paper page)</a> / Explained</nav><h1 id="physflow-earth--explained">PhysFlow-Earth — Explained</h1>
+<blockquote>
+<p><strong>One line:</strong> super-resolve satellite imagery and climate fields with a generative model (rectified flow + a Diffusion Transformer), but add a <strong>physics penalty</strong> so the sharp output it invents still obeys the conservation laws of the data, precipitation mass, divergence-free wind, Sentinel-2 band ratios, instead of hallucinating physically-impossible textures.</p>
+</blockquote>
+<p><strong>Honest status up front.</strong> This is the <strong>CV-vocabulary repackaging of Arun's own published work</strong> (Pi-DPM, the Kriging-informed conditional diffusion paper at SIGSPATIAL 2024, GCDM at SIGSPATIAL 2025, and the PC-RF/AIAS paper). The <strong>physics residual operators, the rectified-flow training step, and the DiT backbone are real and tested</strong> (8/8 physics + flow tests pass, the DiT forward runs). The <strong>trained checkpoints and the benchmark numbers</strong> (PSNR 28.6 beating EDiffSR) are <strong>scaffold/targets</strong> (two "checkpoint scaffold" badges). Because the method <em>is</em> Arun's published diffusion line, this is the project he can defend most deeply, the math is the same idea as the PC-RF paper, just written in "rectified flow + DiT" instead of "conditional diffusion."</p>
+<hr />
+<h2 id="1-what-it-is-and-the-gap-it-fills">1. What it is and the gap it fills</h2>
+<p>Diffusion/flow super-resolution makes images <em>look</em> sharp by inventing plausible high-frequency texture. For natural photos that's fine. For <strong>scientific</strong> fields it's dangerous: an invented precipitation texture can violate <strong>mass conservation</strong> (the fine field's average no longer equals the coarse input), an upsampled wind field can have non-physical <strong>divergence</strong>, and a sharpened Sentinel-2 image can break the <strong>band ratios</strong> (NDVI, NDWI) that downstream vegetation/water indices depend on. A "beautiful" but physically-wrong field is worse than a blurry-but-correct one.</p>
+<p><strong>PhysFlow-Earth's idea:</strong> keep the generative power (rectified flow + DiT) but add a <strong>differentiable physics-residual loss</strong> that punishes those violations during training, evaluated on the model's <em>predicted clean sample</em> at every step. The model learns to be sharp <em>and</em> conservation-respecting, without a separate projection or Lagrangian solver. It's the exact thesis of the PC-RF/AIAS paper, generalized to three modalities.</p>
+<hr />
+<h2 id="2-architecture-and-data-flow">2. Architecture and data flow</h2>
+<pre><code> coarse field x_lr  ──► LR tokenizer ─┐
+                                      ▼
+ noisy x_t, time t  ──► patch embed ─► DiT-XL blocks  ──► velocity v_theta(x_t,t,c)
+                                      ▲   (cross-attend to a 64-entry
+ physics codebook ───────────────────┘    physics-constraint codebook)
+                                      │
+                    hat_x_1 = x_t + (1-t)·v_theta   (one-step clean estimate)
+                                      │
+                    PhysicsResidual(hat_x_1, x_lr) ─► band-ratio / divergence / mass residuals
+                                      │
+   loss = ||v_theta - (x_1 - x_0)||²  +  λ·||R(hat_x_1)||²</code></pre>
+<p>The physics term is evaluated on <code>hat_x_1</code> (the clean image the model <em>would</em> produce now), and its gradient flows back through the velocity head, so the model is pushed toward conservation-respecting predictions directly.</p>
+<hr />
+<h2 id="3-module-by-module-walkthrough">3. Module-by-module walkthrough</h2>
+<p><strong><code>src/physflow/flow/rectified.py</code></strong> — <code>RectifiedFlow</code>. The training step: sample noise <code>x_0</code>, a random time <code>t</code>, form the linear interpolant <code>x_t = (1−t)x_0 + t·x_1</code>, predict velocity <code>v_pred</code>, and compute the <strong>velocity loss</strong> <code>‖v_pred − (x_1−x_0)‖²</code> (rectified flow matches the straight-line velocity from noise to data). Then the <strong>one-step clean estimate</strong> <code>hat_x_1 = x_t + (1−t)v_pred</code>, the physics residual on it, and the hybrid total. Returns a <code>FlowStepOutput</code> with both losses.</p>
+<p><strong><code>src/physflow/physics/operators.py</code></strong> — the differentiable building blocks: <code>average_pool</code> (project HR→LR grid for mass/band residuals), <code>central_diff_x/y</code> (shape-preserving central-difference derivatives via replicate-padding), <code>horizontal_divergence(u,v) = ∂u/∂x + ∂v/∂y</code>, <code>upsample_nearest</code>. All pure PyTorch so gradients chain through them.</p>
+<p><strong><code>src/physflow/physics/residual.py</code></strong> — three modality-specific residual heads sharing one interface:</p>
+<ul>
+<li><code>BandRatioResidual</code> (Sentinel-2): the average-pooled NDVI/NDWI of the super-resolved image must match the LR NDVI/NDWI. <code>NDVI = (NIR−RED)/(NIR+RED)</code>, <code>NDWI = (GREEN−SWIR)/(GREEN+SWIR)</code>. So sharpening can't break the vegetation/water indices.</li>
+<li><code>DivergenceResidual</code> (ERA5 wind): penalizes <code>∂u/∂x + ∂v/∂y</code> (synoptic wind is near-incompressible; non-zero divergence = invented sources/sinks of air).</li>
+<li><code>MassConservationResidual</code> (CHIRPS precip): <code>avg_pool(SR) − LR</code> must be ~0, so the fine field preserves the coarse total (no invented/destroyed rain).</li>
+<li><code>PhysicsResidual</code> composes them into a weighted L2 sum, with <code>per_residual</code> for logging.</li>
+</ul>
+<p><strong><code>src/physflow/models/dit.py</code></strong> — <code>DiTVelocity</code>, a Diffusion Transformer (Peebles &amp; Xie 2023) with two extensions: (1) the LR field is tokenized and concatenated to the patch sequence (conditioning), and (2) each block <strong>cross-attends to a learned 64-entry "physics codebook."</strong> <code>DiTBlock</code> uses adaLN-Zero modulation (time-conditioned shift/scale/gate), self-attention, the codebook cross-attention, and an MLP; the head un-patchifies via <code>pixel_shuffle</code> back to image shape. Sinusoidal time embedding feeds the adaLN.</p>
+<p><strong><code>tests/test_physics_residuals.py</code></strong> — 6 correctness tests that pin the operators: avg-pool inverts nearest-upsample (so mass residual is exactly 0 on a perfect upsample); divergence is 0 on a constant field and recovers a known linear gradient; mass and band-ratio residuals are 0 when HR is a perfect upsample of LR. These prove the physics operators are <em>exactly</em> what they claim, so the loss means what it says.</p>
+<p><strong>Other dirs:</strong> <code>flow/sampling.py</code> (Euler/few-step ODE inference), <code>flow/adjoint.py</code> (adjoint-mode gradient variant), <code>models/{conditioning,pipeline}.py</code> (LR tokenizer, physics codebook, <code>from_pretrained</code> Diffusers-style pipeline), <code>data/{worldstrat,sen2venus,era5_chirps}.py</code>, <code>eval/{worldstrat_bench,physics_bench}.py</code>.</p>
+<hr />
+<h2 id="4-the-core-math-from-scratch">4. The core math, from scratch</h2>
+<p><strong>Rectified flow in one breath.</strong> Instead of diffusion's many noisy steps, learn a velocity field <code>v_θ(x_t,t)</code> that moves a sample along the <em>straight line</em> from noise <code>x_0</code> to data <code>x_1</code>: <code>x_t = (1−t)x_0 + t·x_1</code>, and the target velocity is the constant <code>x_1 − x_0</code>. Train by regressing <code>v_θ</code> onto that. At inference you integrate the ODE <code>dx/dt = v_θ</code> in a handful of Euler steps (far fewer than diffusion's hundreds). It's the same generative idea as the PC-RF paper.</p>
+<p><strong>The physics trick.</strong> At any time <code>t</code>, the model's implied clean prediction is <code>hat_x_1 = x_t + (1−t)v_θ</code> (extrapolate the straight line to t=1). Evaluate the physics residual <code>R</code> on <em>that</em>, and add <code>λ‖R(hat_x_1)‖²</code> to the loss. Because <code>hat_x_1</code> is differentiable in <code>v_θ</code>, the model is trained to make predictions whose physics residuals are small, no test-time projection needed (though you can add one). This is exactly the PC-RF "soft penalty on the one-step clean-field estimate" mechanism, here for three EO modalities.</p>
+<p><strong>Why these three residuals?</strong> Each is a real conservation law of its data: precipitation can't be created/destroyed at the domain scale (mass), large-scale wind is near-incompressible (divergence-free), and Sentinel-2 indices must survive sharpening (band ratios). They're the same family as the AIAS paper's divergence/non-negativity/mass penalties.</p>
+<hr />
+<h2 id="5-whats-real-vs-scaffold">5. What's real vs scaffold</h2>
+<table>
+<thead>
+<tr>
+<th>Piece</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Physics operators + residual heads</td>
+<td><strong>Real</strong>, 6 exactness tests pass</td>
+</tr>
+<tr>
+<td><code>RectifiedFlow</code> hybrid training step</td>
+<td><strong>Real</strong>, runs with backward</td>
+</tr>
+<tr>
+<td><code>DiTVelocity</code> (DiT + codebook cross-attn)</td>
+<td><strong>Real</strong> module, forward verified</td>
+</tr>
+<tr>
+<td>Trained Sentinel-2 / ERA5 checkpoints</td>
+<td><strong>Scaffold</strong> (badges)</td>
+</tr>
+<tr>
+<td>PSNR 28.6 beating EDiffSR on WorldStrat</td>
+<td><strong>Target</strong>, not reproduced</td>
+</tr>
+<tr>
+<td>4-step consistency distillation, 200× speedup</td>
+<td><strong>Aspirational</strong> (README claim)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="6-what-id-do-next">6. What I'd do next</h2>
+<ol type="1">
+<li><strong>Train one modality end to end</strong> (Sentinel-2 ×4 on WorldStrat) and report PSNR + the <em>physics-violation</em> metric with vs without the residual term, the latter is the whole selling point and your own metric.</li>
+<li><strong>Show the failure it prevents:</strong> a side-by-side where the no-physics model breaks NDVI and the physics model doesn't. That's the paper figure.</li>
+<li><strong>Lean on the PC-RF connection:</strong> this is your published method; cite Pi-DPM / Kriging-diffusion / PC-RF and frame PhysFlow as the rectified-flow + DiT generalization, that's a strength, not a gap.</li>
+<li><strong>Cut DiT-XL to DiT-B for a runnable demo</strong> (XL is large); a small model that demonstrates the residual mechanism is more convincing than an untrained XL.</li>
+</ol>
+<hr />
+<div class="foot">Plain-language explainer for PhysFlow-Earth, grounded in the real code and honest about scope. <a href="./">Full paper page</a> &middot; <a href="../../index.html">Portfolio</a></div></div></body></html>

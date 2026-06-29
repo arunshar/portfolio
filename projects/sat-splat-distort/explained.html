@@ -1,0 +1,133 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Sat-Splat-Distort — Explained</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800&family=Noto+Sans:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet"><style>
+:root{--bg:#fbfcfe;--panel:#fff;--ink:#16202c;--mut:#5b6776;--line:#e6eaf0;--acc:#2257d6;--ok:#0e9f6e;--warn:#b45309;--code:#f3f5f9}
+@media(prefers-color-scheme:dark){:root{--bg:#0e1116;--panel:#161b22;--ink:#e7ecf3;--mut:#9aa6b4;--line:#252c37;--acc:#6ea8fe;--ok:#54d6a0;--warn:#ffb454;--code:#11151b}}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:'Noto Sans',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;line-height:1.65;font-size:16px}
+.wrap{max-width:860px;margin:0 auto;padding:0 22px 64px}
+nav.top{font-size:13.5px;color:var(--mut);padding:18px 0;border-bottom:1px solid var(--line)}
+nav.top a{color:var(--acc);text-decoration:none}nav.top a:hover{text-decoration:underline}
+h1,h2,h3,h4{font-family:Montserrat,system-ui,sans-serif;line-height:1.2}
+h1{font-size:30px;margin:26px 0 4px}h2{font-size:21px;margin:30px 0 8px;padding-top:14px;border-top:1px solid var(--line)}
+h3{font-size:16.5px;margin:20px 0 4px}
+a{color:var(--acc)}p{margin:10px 0}
+blockquote{margin:14px 0;padding:.4rem 0 .4rem 1rem;border-left:4px solid var(--acc);color:var(--ink);font-size:17px}
+code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13.5px;background:var(--code);padding:1px 5px;border-radius:5px}
+pre{background:var(--code);border:1px solid var(--line);border-radius:10px;padding:12px 14px;overflow-x:auto}
+pre code{background:none;padding:0}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:14.5px}
+th,td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top}
+th{background:var(--code);font-family:Montserrat;font-size:13px}
+ul,ol{padding-left:22px}li{margin:5px 0}
+strong{font-weight:600}
+.foot{margin-top:30px;padding-top:14px;border-top:1px solid var(--line);color:var(--mut);font-size:13.5px}
+</style></head><body><div class="wrap"><nav class="top"><a href="../../index.html">Arun Sharma</a> / <a href="./">Sat-Splat-Distort (paper page)</a> / Explained</nav><h1 id="sat-splat-distort--explained">Sat-Splat-Distort — Explained</h1>
+<blockquote>
+<p><strong>One line:</strong> make 3D Gaussian Splatting work for <em>non-pinhole</em> cameras (satellite, pushbroom, fisheye, 360) by replacing the one wrong matrix in the standard rasterizer with an exact, per-camera, closed-form Jacobian, plus a small learned grid that mops up residual lens noise.</p>
+</blockquote>
+<p><strong>Honest status up front.</strong> The genuine, defensible contribution that is <em>real and tested</em> is the <strong>four closed-form camera Jacobians</strong>, each numerically validated against <code>torch.autograd</code> (7/7 tests pass), and the <strong>learned distortion-prior grid</strong> module (runs on CPU). The full GPU 3DGS fit relies on a forked CUDA rasterizer that is <em>loaded lazily and stubbed for CPU smoke</em>, and the benchmark numbers in the README (PSNR 24.2 etc.) are labelled <strong>"leaderboard targets,"</strong> not reproduced results. Repo carries a <code>model-checkpoint-scaffold</code> badge. In short: "the camera math is done and validated; the trained scene checkpoints and the benchmark numbers are the next step."</p>
+<hr />
+<h2 id="1-what-it-is-and-the-gap-it-fills">1. What it is and the gap it fills</h2>
+<p><strong>3D Gaussian Splatting (3DGS)</strong> represents a scene as millions of tiny 3D Gaussian blobs (each with a position, a 3D covariance = shape/orientation, an opacity, and a view-dependent color). To render, you <em>project</em> every 3D Gaussian to the 2D image and "splat" it (draw it as a fuzzy 2D ellipse), then alpha-blend front-to-back. It is fast and photorealistic, and it won a best-paper at SIGGRAPH 2023.</p>
+<p>The catch: 3DGS was derived for the <strong>perspective pinhole camera</strong>, where projection is <code>(x, y, z) -&gt; (fx·x/z, fy·y/z)</code>. Projecting a 3D <em>covariance</em> (not just a point) to 2D uses a linear approximation called the <strong>EWA (Elliptical Weighted Average) splat</strong>, which needs the <strong>Jacobian</strong> of the projection (the 2×3 matrix of partial derivatives). For a pinhole camera that Jacobian is a simple affine form baked into the CUDA rasterizer.</p>
+<p><strong>Real geospatial / immersive cameras are not pinhole:</strong></p>
+<ul>
+<li><strong>Satellite</strong> imagery ships as an <strong>RPC</strong> (Rational Polynomial Coefficient) model: pixel = ratio of two cubic polynomials in (lon, lat, height).</li>
+<li><strong>Pushbroom</strong> scanners (Sentinel-2, Landsat, SPOT) build the image one row at a time as the satellite flies, so the along-track axis is a <em>time</em> index, not a projective one.</li>
+<li><strong>Fisheye</strong> lenses use <code>r = f·θ</code> (angle), not <code>r = f·tan θ</code>.</li>
+<li><strong>360 panoramas</strong> map directions to longitude/latitude (equirectangular).</li>
+</ul>
+<p>For all of these, the pinhole EWA Jacobian is <strong>wrong</strong>, so vanilla 3DGS smears Gaussians incorrectly, worst at the image periphery. Existing fixes either <em>undistort the image first</em> (throws away peripheral detail) or hand-roll a per-camera approximation. <strong>Sat-Splat-Distort's idea:</strong> keep one unified rasterizer but swap in the <strong>exact analytic Jacobian for whichever camera you have</strong>, dispatched by a flag, and add a tiny learned correction for whatever the analytic model misses.</p>
+<hr />
+<h2 id="2-architecture-and-data-flow">2. Architecture and data flow</h2>
+<pre><code>                          ┌─────────────────────────────────────┐
+   3D Gaussian field      │  cameras/{rpc,pushbroom,equidist,    │
+   (means, scales,        │           equirect}.py               │
+    quats, opacity, SH)   │   project(X) -&gt; (u,v)                │
+        │                 │   jacobian(X) -&gt; 2x3  ◄── the IP     │
+        ▼                 └─────────────────────────────────────┘
+  models/splat_pipeline.py            │
+  SatSplatPipeline.render():          │ uv, J
+   1. uv = camera.project(means)      ▼
+   2. J  = camera.jacobian(means) ─────────────►  CUDA rasterizer fork
+   3. dΣ = distortion_grid(uv)  ──────────────►  computeCov2D(J, dΣ): Σ2D = J W Σ3D Wᵀ Jᵀ + dΣ
+   4. rasterize -&gt; image                          alpha-blend -&gt; pixels</code></pre>
+<p>The only thing different from stock 3DGS is steps 2–3: instead of the affine pinhole Jacobian, we pass the <strong>camera-specific analytic <code>J</code></strong>, plus a learned 2×2 covariance bump <code>dΣ</code>.</p>
+<hr />
+<h2 id="3-module-by-module-walkthrough">3. Module-by-module walkthrough</h2>
+<p><strong><code>src/sat_splat/cameras/base.py</code></strong> — the interface. <code>CameraModel</code> is an abstract class with two methods every camera must implement: <code>project(X)</code> (3D point → 2D pixel) and <code>jacobian(X)</code> (the analytic 2×3 derivative). It also ships <code>autograd_jacobian(X)</code>, which computes the <em>same</em> Jacobian by automatic differentiation (looping over the 2 output components and calling <code>torch.autograd.grad</code>). That reference is what the tests compare against; it is the safety net that proves the hand-derived calculus is correct.</p>
+<p><strong><code>src/sat_splat/cameras/rpc.py</code></strong> (229 LOC, the most involved). Implements the satellite RPC model.</p>
+<ul>
+<li><code>RPCMeta</code> dataclass holds the 90 numbers an RPC file carries: 4 offsets + 4 scales for (line, sample, lat, lon, height) and four 20-coefficient cubic polynomials (line numerator/denominator, sample numerator/denominator).</li>
+<li><code>_monomials(L,P,H)</code> builds the 20-term cubic basis <code>[1, L, P, H, LP, LH, PH, L², …, H³]</code> in the exact NGA standard order (<code>RPC_MONO_ORDER</code>).</li>
+<li><code>_monomial_grads</code> returns the analytic derivatives of all 20 monomials w.r.t. L, P, H (hand-written, e.g. <code>d/dL of L²P = 2LP</code>).</li>
+<li><code>project</code> normalizes world (lon, lat, h) to internal (L, P, H), evaluates <code>line = (Σ mono·line_num)/(Σ mono·line_den)</code>, same for sample, then denormalizes to pixels.</li>
+<li><code>jacobian</code> applies the <strong>quotient rule</strong> <code>(N'D − ND')/D²</code> to each polynomial ratio, then <strong>chains</strong> through the normalization (divide by lon/lat/height scales) and the pixel denormalization (multiply by sample/line scales).</li>
+</ul>
+<p><strong><code>src/sat_splat/cameras/pushbroom.py</code></strong> — linearized single-line scanner (Gupta &amp; Hartley 1997). <code>u = fu·(X·a)/(X·c)</code> (cross-track, pinhole within a row), <code>v = fv·(X·b)</code> (along-track, <em>linear</em> in scan time). The Jacobian is <code>du/dX = fu·(a/(X·c) − (X·a)·c/(X·c)²)</code> and <code>dv/dX = fv·b</code> (constant). The "v is linear, not projective" is exactly why stock 3DGS is wrong here.</p>
+<p><strong><code>src/sat_splat/cameras/equidist.py</code></strong> — equidistant fisheye, <code>r = f·θ</code>. Projects via <code>θ = acos(z/‖X‖)</code>, radial scale <code>s = f·θ/ρ</code> where <code>ρ = √(x²+y²)</code>. The Jacobian uses the identities <code>dθ/dx = xz/(r²ρ)</code>, <code>dθ/dy = yz/(r²ρ)</code>, <code>dθ/dz = −ρ/r²</code>, then a product rule on <code>s·x</code> and <code>s·y</code>. The doc comment spells out the <code>1/ρ³</code> residual term, the trickiest part.</p>
+<p><strong><code>src/sat_splat/cameras/equirect.py</code></strong> — equirectangular 360. <code>φ = atan2(x,z)</code> (longitude → u), <code>θ = asin(y/r)</code> (latitude → v). Closed-form Jacobian: <code>dφ/dx = z/ρ²</code>, <code>dφ/dz = −x/ρ²</code> (with <code>ρ²=x²+z²</code>), <code>dθ/dx = −xy/(r²ρ)</code>, <code>dθ/dy = ρ/r²</code>, <code>dθ/dz = −zy/(r²ρ)</code>, scaled by <code>W/2π</code> and <code>−H/π</code>.</p>
+<p><strong><code>src/sat_splat/models/distortion_grid.py</code></strong> — <code>DistortionPriorGrid</code>, a learnable <code>64×64×16</code> grid of latent codes laid over the image. For a Gaussian landing at pixel (u,v): bilinearly sample a 16-d token (<code>F.grid_sample</code>), push it through a 3-layer MLP, output a <strong>symmetric positive-semidefinite 2×2 perturbation</strong> <code>[[a,b],[b,c]]</code> (softplus on the diagonal to keep it PSD, off-diagonal free). It is initialized near zero (last layer zeroed, <code>eps_init=1e-3</code>) so the analytic Jacobian dominates early training and the grid only <em>corrects residuals</em> (lens artifacts, RPC fit noise, atmospheric refraction). <code>regularization()</code> is an L2 on the tokens encouraging a smooth, low-frequency distortion field.</p>
+<p><strong><code>src/sat_splat/models/splat_pipeline.py</code></strong> — <code>SatSplatPipeline(nn.Module)</code>. Holds the per-scene Gaussian parameters (<code>means, scales, quats, opacities, colors</code> as SH coefficients) + the distortion grid + a camera. <code>render()</code> runs project → jacobian → distortion → CUDA rasterize. <code>_lazy_rasterizer()</code> imports the forked CUDA kernel only on first render (so the package imports fine CPU-only). <code>from_pretrained</code> / <code>save_pretrained</code> give a HuggingFace-style load/save (<code>scene.pt</code> + <code>distortion_grid.pt</code>).</p>
+<p><strong><code>tests/test_cameras.py</code></strong> — the validation that <em>is</em> the contribution. For each camera it samples random 3D points in a sensible region, computes the analytic Jacobian and the autograd Jacobian, and asserts they match elementwise (tolerances 1e-4 to 5e-2). RPC is tested with a toy well-conditioned RPC and with a full nontrivial cubic to exercise every monomial. <strong>If any of these fail, the rasterizer would render garbage</strong> — so passing them is the proof the math is right.</p>
+<p><strong>Other dirs:</strong> <code>data/{dfc2019,matterport360}.py</code> (dataset loaders), <code>eval/dfc2019_bench.py</code> (benchmark harness), <code>training/train.py</code> (Hydra-configured fit loop), <code>space/app.py</code> (Gradio demo), <code>cuda_rasterizer/</code> (the INRIA fork).</p>
+<hr />
+<h2 id="4-the-core-math-from-scratch">4. The core math, from scratch</h2>
+<p><strong>Why a Jacobian at all?</strong> A 3D Gaussian has a covariance <code>Σ3D</code> (a 3×3 matrix describing its ellipsoid shape). To draw it on screen you need its 2D shadow <code>Σ2D</code>. Projection <code>π: R³→R²</code> is nonlinear, so you <em>linearize</em> it at the Gaussian's center with the Jacobian <code>J = dπ/dX</code> (2×3). Then the standard EWA result is</p>
+<pre><code>Σ2D = J · W · Σ3D · Wᵀ · Jᵀ</code></pre>
+<p>where <code>W</code> is the world→camera rotation. <strong>Everything hinges on <code>J</code> being correct for your camera.</strong> For a pinhole, <code>J</code> is the familiar <code>[[f/z, 0, −fx/z²],[0, f/z, −fy/z²]]</code>. The whole project is: derive and validate the <em>right</em> <code>J</code> for four other cameras, and plug it into the same rasterizer.</p>
+<p><strong>Worked example — the pushbroom Jacobian (the cleanest one to recite):</strong> Projection <code>u = fu·(X·a)/(X·c)</code>, <code>v = fv·(X·b)</code>. Differentiate <code>u</code> with the quotient rule treating <code>a, c</code> as constant vectors: <code>du/dX = fu·[ a·(X·c) − (X·a)·c ] / (X·c)² = fu·( a/(X·c) − (X·a)c/(X·c)² )</code>. And <code>v = fv·(X·b)</code> is linear, so <code>dv/dX = fv·b</code> (a constant). That constant along-track row is the signature of a pushbroom and the reason the projective pinhole Jacobian is structurally wrong.</p>
+<p><strong>The distortion grid</strong> then adds a learned <code>dΣ</code> so <code>Σ2D = J W Σ3D Wᵀ Jᵀ + dΣ(u,v)</code>, capturing what no closed form can (manufacturing tolerances, refraction). It starts at ~0 so it never fights the analytic term early on.</p>
+<hr />
+<h2 id="5-whats-real-vs-scaffold">5. What's real vs scaffold</h2>
+<table>
+<thead>
+<tr>
+<th>Piece</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>4 camera <code>project</code> + analytic <code>jacobian</code></td>
+<td><strong>Real</strong>, pure PyTorch, differentiable</td>
+</tr>
+<tr>
+<td>Autograd validation (7 tests)</td>
+<td><strong>Real</strong>, passing</td>
+</tr>
+<tr>
+<td><code>DistortionPriorGrid</code> module</td>
+<td><strong>Real</strong>, CPU-runnable forward</td>
+</tr>
+<tr>
+<td><code>SatSplatPipeline</code> plumbing + HF save/load</td>
+<td><strong>Real</strong> glue</td>
+</tr>
+<tr>
+<td>CUDA rasterizer fork (<code>distortion_aware_rasterize</code>)</td>
+<td><strong>Forked, lazy-loaded, stubbed for CPU smoke</strong> — not the thing you've personally rebuilt</td>
+</tr>
+<tr>
+<td>Trained scene checkpoints, PSNR 24.2 on DFC2019</td>
+<td><strong>Target, not reproduced</strong> (<code>model-checkpoint-scaffold</code>)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="6-tests-datasets-benchmarks">6. Tests, datasets, benchmarks</h2>
+<ul>
+<li><strong>Tests:</strong> <code>test_cameras.py</code> (7 Jacobian-vs-autograd) + <code>test_smoke.py</code> (13 import/forward/UI checks). 20 total, CPU, &lt;15 s.</li>
+<li><strong>Datasets (targeted):</strong> IEEE GRSS <strong>DFC2019</strong> Track-3 (satellite multi-view, the standard satellite-NVS benchmark), <strong>Matterport3D</strong> 360, <strong>KITTI-360</strong> fisheye.</li>
+<li><strong>Baselines cited (from their papers, not re-run):</strong> Sat-NeRF, EO-NeRF, plain 3DGS. The "ours 24.2 PSNR" row is an aspirational target.</li>
+</ul>
+<hr />
+<h2 id="7-what-id-do-next-to-turn-the-scaffold-into-a-result">7. What I'd do next (to turn the scaffold into a result)</h2>
+<ol type="1">
+<li><strong>Build the CUDA fork and fit one real scene.</strong> A single DFC2019 AOI rendered with the analytic RPC Jacobian, with vs without the distortion grid, gives one honest qualitative + PSNR number. This is the single highest-value step.</li>
+<li><strong>Ablation that sells the idea:</strong> render the <em>same</em> scene with the pinhole Jacobian vs the analytic Jacobian and show the periphery error map. That figure is the paper.</li>
+<li><strong>gsplat instead of the INRIA fork.</strong> The <code>gsplat</code> library exposes a Python <code>computeCov2D</code> hook, so you could inject <code>J</code> and <code>dΣ</code> without maintaining a CUDA fork at all — much easier to run and defend.</li>
+<li><strong>Quantify the distortion grid's marginal value</strong> (turn it off, measure the PSNR delta) so you can say exactly what the learned part buys over the closed form.</li>
+<li><strong>One synthetic exactness test:</strong> a scene where ground-truth depth is known, to show the analytic Jacobian recovers geometry the pinhole one cannot.</li>
+</ol>
+<hr />
+<div class="foot">Plain-language explainer for Sat-Splat-Distort, grounded in the real code and honest about scope. <a href="./">Full paper page</a> &middot; <a href="../../index.html">Portfolio</a></div></div></body></html>

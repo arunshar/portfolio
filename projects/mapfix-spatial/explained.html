@@ -1,0 +1,99 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>MapFix-Spatial — Explained</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800&family=Noto+Sans:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet"><style>
+:root{--bg:#fbfcfe;--panel:#fff;--ink:#16202c;--mut:#5b6776;--line:#e6eaf0;--acc:#2257d6;--ok:#0e9f6e;--warn:#b45309;--code:#f3f5f9}
+@media(prefers-color-scheme:dark){:root{--bg:#0e1116;--panel:#161b22;--ink:#e7ecf3;--mut:#9aa6b4;--line:#252c37;--acc:#6ea8fe;--ok:#54d6a0;--warn:#ffb454;--code:#11151b}}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:'Noto Sans',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;line-height:1.65;font-size:16px}
+.wrap{max-width:860px;margin:0 auto;padding:0 22px 64px}
+nav.top{font-size:13.5px;color:var(--mut);padding:18px 0;border-bottom:1px solid var(--line)}
+nav.top a{color:var(--acc);text-decoration:none}nav.top a:hover{text-decoration:underline}
+h1,h2,h3,h4{font-family:Montserrat,system-ui,sans-serif;line-height:1.2}
+h1{font-size:30px;margin:26px 0 4px}h2{font-size:21px;margin:30px 0 8px;padding-top:14px;border-top:1px solid var(--line)}
+h3{font-size:16.5px;margin:20px 0 4px}
+a{color:var(--acc)}p{margin:10px 0}
+blockquote{margin:14px 0;padding:.4rem 0 .4rem 1rem;border-left:4px solid var(--acc);color:var(--ink);font-size:17px}
+code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13.5px;background:var(--code);padding:1px 5px;border-radius:5px}
+pre{background:var(--code);border:1px solid var(--line);border-radius:10px;padding:12px 14px;overflow-x:auto}
+pre code{background:none;padding:0}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:14.5px}
+th,td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top}
+th{background:var(--code);font-family:Montserrat;font-size:13px}
+ul,ol{padding-left:22px}li{margin:5px 0}
+strong{font-weight:600}
+.foot{margin-top:30px;padding-top:14px;border-top:1px solid var(--line);color:var(--mut);font-size:13.5px}
+</style></head><body><div class="wrap"><nav class="top"><a href="../../index.html">Arun Sharma</a> / <a href="./">MapFix-Spatial (paper page)</a> / Explained</nav><h1 id="mapfix-spatial--explained">MapFix-Spatial — Explained</h1>
+<blockquote>
+<p><strong>One line:</strong> the smallest, most demo-able project, an interactive web app that takes warped/distorted geographic coordinates, <em>estimates the distortion field</em>, and iteratively "un-warps" them back onto a clean map projection, with an optional LLM/image layer that narrates and renders the fix.</p>
+</blockquote>
+<p><strong>Honest status up front.</strong> This is a <strong>single-file interactive MVP</strong> (<code>server.py</code>, 457 LOC) + a browser front-end, not a trained model. The distortion-and-correction <strong>math is real and deterministic</strong> (it runs); the distortion itself is a <strong>synthetic, parametric model</strong> (a "Mercator repair" profile with curve/shear knobs), so it demonstrates the <em>method</em> on controllable distortion rather than on real misregistered maps. The OpenAI calls (<code>/api/correct</code> text analysis, <code>/api/render-map</code> image) are an <strong>optional</strong> flavor layer; without a key it falls back to a deterministic summary. In short: "a working interactive demo of distortion estimation + fixed-point correction on a parametric distortion model; the engine is real, the distortion is synthetic, and the LLM layer is optional polish."</p>
+<hr />
+<h2 id="1-what-it-is-and-the-gap-it-fills">1. What it is and the gap it fills</h2>
+<p>Geospatial coordinates arrive distorted all the time: bad georeferencing, projection mismatches, sensor warp. MapFix is the <strong>interactive teaching/demo</strong> version of "detect and undo that distortion." You give it points, it models the distortion as a smooth field, inverts it by fixed-point iteration, and shows you the residual error and how much area it recovered, live in the browser. It's the lightweight, clickable face of the same <strong>distortion-aware</strong> theme that runs through sat-splat (camera Jacobians) and darkvessel (sensor co-registration).</p>
+<hr />
+<h2 id="2-architecture-and-data-flow">2. Architecture and data flow</h2>
+<pre><code> input points ──► normalize to [0,1] (bounds_for / normalize_point)
+        │
+        ├─► apply_distortion: synthetic warp via distortion_vector(curve, shear, noise, seed)
+        ▼
+ correct_point: fixed-point iteration to invert the distortion
+        │
+        ├─► gradient_at: finite-difference the distortion field (Jacobian probe)
+        ▼
+ metrics_for / coordinate_rows: residual px, % area recovered, per-point table
+        │
+        └─► /api/correct (OpenAI text analysis)  +  /api/render-map (image)  [optional]</code></pre>
+<hr />
+<h2 id="3-walkthrough-its-one-file-serverpy">3. Walkthrough (it's one file: <code>server.py</code>)</h2>
+<ul>
+<li><strong><code>PROJECTION_TUNING</code></strong> — named distortion profiles, e.g. <code>"mercator": {curve: 0.74, shear: 0.42}</code>. These parameterize the synthetic warp.</li>
+<li><strong><code>bounds_for</code> / <code>normalize_point</code> / <code>denormalize_point</code></strong> — map raw lon/lat into a unit square and back, so the distortion math is scale-free.</li>
+<li><strong><code>distortion_vector(point, noise, projection, seed)</code></strong> — the forward distortion model: a smooth field combining a <strong>shear</strong> term (linear in the off-axis coordinate) and a <strong>curve</strong> term (a sinusoidal wave), scaled by the projection's curve/shear and a noise level. This is "how the map got warped."</li>
+<li><strong><code>apply_distortion</code></strong> — adds the distortion vector to a clean point (produces the warped input).</li>
+<li><strong><code>correct_point</code></strong> — the inverse: a <strong>fixed-point iteration</strong> that repeatedly subtracts the estimated distortion at the current estimate to recover the original clean point (<code>estimate ← raw − distortion(estimate)</code>), the standard way to invert a contraction map.</li>
+<li><strong><code>gradient_at</code></strong> — <strong>finite-differences</strong> the distortion field in x and y (a numerical 2×2 Jacobian probe), used for diagnostics / convergence.</li>
+<li><strong><code>metrics_for</code></strong> — residual statistics: mean residual in pixels, % area recovered.</li>
+<li><strong><code>coordinate_rows</code></strong> — a per-point table (clean vs raw vs corrected, residual).</li>
+<li><strong><code>build_correction</code></strong> — orchestrates the whole pipeline for a request.</li>
+<li><strong><code>/api/correct</code> and <code>/api/render-map</code></strong> — the optional OpenAI layer: a concise geospatial diagnosis and a rendered clean-projection preview. <code>default_ai_summary</code> is the no-key deterministic fallback (so it works offline).</li>
+</ul>
+<hr />
+<h2 id="4-the-core-idea-from-scratch">4. The core idea, from scratch</h2>
+<p><strong>Inverting a distortion by fixed-point iteration.</strong> If the warp is <code>raw = clean + D(clean)</code> for a small smooth field <code>D</code>, you can't solve for <code>clean</code> directly, but if <code>D</code> is a contraction you can iterate <code>clean ← raw − D(clean_estimate)</code> until it converges. That's exactly <code>correct_point</code>. The <code>gradient_at</code> finite-difference gives the local Jacobian of <code>D</code>, which both diagnoses convergence and connects conceptually to the analytic Jacobians in sat-splat (there, derived in closed form; here, probed numerically).</p>
+<p>The honest limitation: the distortion is a <em>known parametric model</em> the app both applies and inverts, so it's a controlled demonstration, not a learned correction of real-world warp. That's the right scope for an interactive MVP.</p>
+<hr />
+<h2 id="5-whats-real-vs-scaffold">5. What's real vs scaffold</h2>
+<table>
+<thead>
+<tr>
+<th>Piece</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Distortion model + fixed-point correction + metrics</td>
+<td><strong>Real</strong>, deterministic, runs</td>
+</tr>
+<tr>
+<td>Interactive browser demo (GitHub Pages)</td>
+<td><strong>Real</strong>, live</td>
+</tr>
+<tr>
+<td>OpenAI text + image layer</td>
+<td><strong>Real but optional</strong> (falls back without a key)</td>
+</tr>
+<tr>
+<td>Correction of <em>real</em> misregistered maps</td>
+<td><strong>Not yet</strong> (distortion is synthetic/parametric)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="6-what-id-do-next">6. What I'd do next</h2>
+<ol type="1">
+<li><strong>Feed real misregistered control points</strong> (e.g. GCPs with known offsets) instead of the synthetic warp, so the correction is evaluated on real distortion.</li>
+<li><strong>Fit the distortion field</strong> (thin-plate spline or a small learned field) from observed point pairs rather than assuming the parametric model.</li>
+<li><strong>Report a real accuracy number</strong> (RMSE before/after on held-out control points).</li>
+<li><strong>Connect it to the portfolio:</strong> use the same fix to align two real images (the darkvessel SAR/optical co-registration use case), making the distortion-aware theme one continuous story.</li>
+</ol>
+<hr />
+<div class="foot">Plain-language explainer for MapFix-Spatial, grounded in the real code and honest about scope. <a href="./">Full paper page</a> &middot; <a href="../../index.html">Portfolio</a></div></div></body></html>

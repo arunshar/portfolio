@@ -1,0 +1,117 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>GeoSAM-3D — Explained</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800&family=Noto+Sans:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet"><style>
+:root{--bg:#fbfcfe;--panel:#fff;--ink:#16202c;--mut:#5b6776;--line:#e6eaf0;--acc:#2257d6;--ok:#0e9f6e;--warn:#b45309;--code:#f3f5f9}
+@media(prefers-color-scheme:dark){:root{--bg:#0e1116;--panel:#161b22;--ink:#e7ecf3;--mut:#9aa6b4;--line:#252c37;--acc:#6ea8fe;--ok:#54d6a0;--warn:#ffb454;--code:#11151b}}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:'Noto Sans',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;line-height:1.65;font-size:16px}
+.wrap{max-width:860px;margin:0 auto;padding:0 22px 64px}
+nav.top{font-size:13.5px;color:var(--mut);padding:18px 0;border-bottom:1px solid var(--line)}
+nav.top a{color:var(--acc);text-decoration:none}nav.top a:hover{text-decoration:underline}
+h1,h2,h3,h4{font-family:Montserrat,system-ui,sans-serif;line-height:1.2}
+h1{font-size:30px;margin:26px 0 4px}h2{font-size:21px;margin:30px 0 8px;padding-top:14px;border-top:1px solid var(--line)}
+h3{font-size:16.5px;margin:20px 0 4px}
+a{color:var(--acc)}p{margin:10px 0}
+blockquote{margin:14px 0;padding:.4rem 0 .4rem 1rem;border-left:4px solid var(--acc);color:var(--ink);font-size:17px}
+code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13.5px;background:var(--code);padding:1px 5px;border-radius:5px}
+pre{background:var(--code);border:1px solid var(--line);border-radius:10px;padding:12px 14px;overflow-x:auto}
+pre code{background:none;padding:0}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:14.5px}
+th,td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top}
+th{background:var(--code);font-family:Montserrat;font-size:13px}
+ul,ol{padding-left:22px}li{margin:5px 0}
+strong{font-weight:600}
+.foot{margin-top:30px;padding-top:14px;border-top:1px solid var(--line);color:var(--mut);font-size:13.5px}
+</style></head><body><div class="wrap"><nav class="top"><a href="../../index.html">Arun Sharma</a> / <a href="./">GeoSAM-3D (paper page)</a> / Explained</nav><h1 id="geosam-3d--explained">GeoSAM-3D — Explained</h1>
+<blockquote>
+<p><strong>One line:</strong> click an object in one frame of a phone video and get its full <strong>3D</strong> mask, by reconstructing the scene as 3D Gaussians, lifting SAM 2's 2D video masks onto those Gaussians, and spreading the label along the <em>surface</em> (geodesic distance) instead of through the air (Euclidean), so it doesn't leak across occlusions and concave corners.</p>
+</blockquote>
+<p><strong>Honest status up front.</strong> The real, tested contribution is the <strong>heat-method geodesic kernel</strong> (<code>propagate/heat_geodesic.py</code>), validated by 4 property tests, plus the <strong>per-Gaussian contrastive feature head</strong> module. The two heavy front-end pieces, <strong>MonoGS</strong> reconstruction and <strong>SAM 2 mask projection</strong>, are <em>stubs</em> in this repo (the runner returns empty tensors; mask projection returns random ids). The README's "reproduces leaderboard numbers on ScanNet/Replica" is a <strong>target</strong> (<code>model-checkpoint-scaffold</code> badge), not a reproduced result. In short: "the geodesic propagation kernel is the novel, working, tested piece; the reconstruction and mask front-ends are off-the-shelf models I wire in, currently stubbed."</p>
+<hr />
+<h2 id="1-what-it-is-and-the-gap-it-fills">1. What it is and the gap it fills</h2>
+<p><strong>SAM 2</strong> (Segment Anything 2) segments and <em>tracks</em> an object across a video in 2D: click it once, get a mask in every frame. <strong>The gap:</strong> those are 2D masks. To get a <strong>3D</strong> mask you must lift them onto a 3D representation of the scene. Existing 3D-segmentation tools (OpenMask3D, Gaussian Grouping) need multi-view RGB-D or a pre-built mesh. If you instead lift SAM 2 masks to a 3D point/Gaussian cloud with <strong>Euclidean k-nearest-neighbors</strong>, the label <em>jumps across gaps</em>: a hand near a mug, two walls meeting at a corner, anything where points are close in 3D space but far along the surface. The mask <strong>fragments</strong>.</p>
+<p><strong>GeoSAM-3D's idea:</strong> propagate the label along <strong>geodesic</strong> distance (distance <em>along the surface manifold</em>) instead of straight-line Euclidean distance. Two points on opposite sides of an occlusion are geodesically far even if spatially close, so the label stops at the real boundary.</p>
+<p>The geodesic machinery is explicitly inherited from Arun's thesis work (<strong>TGARD</strong>'s manifold-distance kernel for trajectory-gap detection), which is a useful cross-project through-line.</p>
+<hr />
+<h2 id="2-architecture-and-data-flow">2. Architecture and data flow</h2>
+<pre><code> phone video ──► [MonoGS + Depth Anything V2]  ──►  3D Gaussian field (means = centroids)
+                  (recon/monogs_runner.py, STUB)        │
+ phone video ──► [SAM 2 video masks] ──► project+vote ──► per-Gaussian pseudo-labels
+                  (STUB in train.py)                     │
+                                                         ▼
+            GaussianFeatureHead (transformer) ─ contrastive loss ─► 32-d per-Gaussian features
+                                                         │
+   user clicks a point ─► seed Gaussians ─► HeatGeodesicKernel.propagate_label ─► 3D mask
+                                            (propagate/heat_geodesic.py, REAL)</code></pre>
+<p>Frozen models: Depth Anything V2 (depth prior for MonoGS) and SAM 2. <strong>Learned:</strong> only the feature head and (optionally) the kernel's diffusion time. That "freeze the big models, train a tiny head" pattern is the practical, cheap design.</p>
+<hr />
+<h2 id="3-module-by-module-walkthrough">3. Module-by-module walkthrough</h2>
+<p><strong><code>src/geosam3d/propagate/heat_geodesic.py</code></strong> — the IP. Three pieces:</p>
+<ul>
+<li><code>knn_graph(points, k)</code>: builds a k-nearest-neighbor graph over the Gaussian centroids (<code>torch.cdist</code> for all-pairs distance, <code>topk</code> for the k nearest), with <strong>Gaussian edge weights</strong> <code>exp(−d²/2σ²)</code> where σ is the median neighbor distance. So nearby Gaussians are strongly connected, far ones weakly.</li>
+<li><code>graph_laplacian(N, edges, weights)</code>: assembles the symmetric graph Laplacian <code>L = D − W</code> (W = weighted adjacency, D = degree diagonal). The Laplacian is the discrete "how much does a function differ from its neighbors" operator, i.e. the diffusion operator.</li>
+<li><code>HeatGeodesicKernel(nn.Module)</code>: <code>precompute</code> builds <code>A = I + tL</code> and its Cholesky factor once per scene; <code>geodesic(centroids, seed_mask)</code> solves <code>(I + tL)u = u₀</code> (heat diffusion from the seed for short time t) and converts heat to distance with the <strong>Varadhan formula</strong> <code>d ≈ √(−4t·log u)</code>; <code>propagate_label</code> turns distance into a per-Gaussian probability via a Gaussian falloff <code>exp(−d²/2σ²)</code>.</li>
+</ul>
+<p><strong><code>src/geosam3d/features/gaussian_head.py</code></strong> — <code>GaussianFeatureHead</code>: a small <strong>Transformer encoder</strong> over each Gaussian's 12-d attribute vector (position, mean color, opacity, scale) → a 32-d L2-normalized embedding. Trained with <code>contrastive_loss</code>, an <strong>InfoNCE</strong> objective: Gaussians inside the <em>same</em> SAM 2 mask are pulled together in cosine space, different masks pushed apart. This gives the seed-selection a learned notion of "same object" beyond raw geometry.</p>
+<p><strong><code>src/geosam3d/recon/monogs_runner.py</code></strong> — thin wrapper around <strong>MonoGS</strong> (monocular Gaussian-splatting SLAM, spla-tam). <code>reconstruct</code> would run MonoGS with a Depth Anything V2 depth prior and return the Gaussian field. <strong>Currently a stub</strong>: <code>_load_scene</code> returns empty tensors with a "parse the .ply in production" comment. So in this repo the reconstruction is a placeholder for the real MonoGS install.</p>
+<p><strong><code>src/geosam3d/training/train.py</code></strong> — the end-to-end loop (Hydra-configured): reconstruct → SAM 2 masks → lift to per-Gaussian pseudo-labels → train the feature head with contrastive loss. <code>_project_sam2_masks</code> is a <strong>stub</strong> returning random ids (the real version projects masks through the camera and majority-votes per Gaussian). So the training loop is wired but runs on placeholder labels.</p>
+<p><strong><code>tests/test_heat_geodesic.py</code></strong> — 4 property tests that pin down correctness without ground-truth meshes: (1) distance from a seed to itself is 0; (2) distances are non-negative; (3) on a sampled <strong>circle</strong>, geodesic distance increases monotonically with arc-length (the near half is closer than the far half), the key behavior; (4) propagated label probabilities are in [0,1] and the seed's own probability &gt; 0.5.</p>
+<hr />
+<h2 id="4-the-core-math-from-scratch">4. The core math, from scratch</h2>
+<p><strong>The heat method (Crane, Weischedel, Wardetzky, ACM TOG 2013), simplified.</strong> There is a classical fact (Varadhan): if you drop a unit of heat at a point and let it diffuse for a tiny time t, the amount of heat that reaches another point <code>x</code> decays like <code>exp(−d²(x,seed)/4t)</code>, where <code>d</code> is the <strong>geodesic</strong> distance. Invert it: <code>d(x) ≈ √(−4t · log u_t(x))</code>. So you can read geodesic distance off a heat diffusion.</p>
+<p>GeoSAM-3D does exactly this on the Gaussian graph:</p>
+<ol type="1">
+<li><code>u₀</code> = 1 on the clicked (seed) Gaussians, 0 elsewhere.</li>
+<li>Diffuse one implicit step: solve <code>(I + tL)u = u₀</code> (backward-Euler heat step; <code>t</code> controls smoothing).</li>
+<li>Normalize and apply <code>d = √(−4t·log u)</code>.</li>
+</ol>
+<p><strong>Why not the full Crane et al. algorithm?</strong> The original method has a second stage (normalize the heat <em>gradient</em>, then solve a Poisson equation for distance). The code's docstring explains it <strong>degenerates at seed nodes on a non-mesh kNN graph</strong> because outgoing edges symmetrically cancel the gradient. The Varadhan one-step form avoids that, is monotone-in-u for any t, and is all you need to <em>order</em> points for label propagation. That is a genuine, defensible engineering decision, not a shortcut.</p>
+<p><strong>Why geodesic beats Euclidean (the whole point):</strong> Euclidean kNN connects any two spatially-close Gaussians, so a label leaks across an occlusion (hand in front of mug) or a concave fold (inside corner of a room). Geodesic distance travels <em>along the connected surface graph</em>, so it goes "the long way around" and stops at the true object boundary. The circle test is the toy proof: points across the circle are Euclidean-close but geodesically far.</p>
+<hr />
+<h2 id="5-whats-real-vs-scaffold">5. What's real vs scaffold</h2>
+<table>
+<thead>
+<tr>
+<th>Piece</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>HeatGeodesicKernel</code> (knn graph, Laplacian, Varadhan distance, label propagation)</td>
+<td><strong>Real</strong>, differentiable, 4 tests pass</td>
+</tr>
+<tr>
+<td><code>GaussianFeatureHead</code> + InfoNCE contrastive loss</td>
+<td><strong>Real</strong> module (forward + loss runnable)</td>
+</tr>
+<tr>
+<td>MonoGS reconstruction (<code>monogs_runner</code>)</td>
+<td><strong>Stub</strong> (returns empty tensors; needs MonoGS installed)</td>
+</tr>
+<tr>
+<td>SAM 2 mask → Gaussian pseudo-labels (<code>_project_sam2_masks</code>)</td>
+<td><strong>Stub</strong> (random ids)</td>
+</tr>
+<tr>
+<td>ScanNet/Replica/ScanNet++ leaderboard numbers</td>
+<td><strong>Target</strong>, not reproduced</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="6-tests-datasets-benchmarks">6. Tests, datasets, benchmarks</h2>
+<ul>
+<li><strong>Tests:</strong> 4 heat-geodesic property tests + 11 Space smoke tests (15 total, CPU).</li>
+<li><strong>Datasets (targeted):</strong> ScanNet, Replica, ScanNet++ <strong>monocular</strong> splits (indoor RGB-D-style scenes, here used in mono mode).</li>
+<li>The novelty being tested is the <em>propagation</em>, not a trained segmentation score.</li>
+</ul>
+<hr />
+<h2 id="7-what-id-do-next">7. What I'd do next</h2>
+<ol type="1">
+<li><strong>Install MonoGS + Depth Anything V2 and reconstruct one real clip.</strong> One end-to-end scene (phone video → 3D mask) is the demo that makes this concrete. Highest-value step.</li>
+<li><strong>Implement the real SAM 2 mask projection + majority vote</strong> (replace the random-id stub), so the feature head trains on true pseudo-labels.</li>
+<li><strong>Ablation figure:</strong> the <em>same</em> click propagated with Euclidean kNN vs the geodesic kernel, on a scene with an occlusion, showing Euclidean leaks and geodesic doesn't. That single figure is the paper's money shot.</li>
+<li><strong>Sparse Laplacian solve.</strong> The current dense <code>(I+tL)</code> Cholesky is O(N²) memory; switch to a sparse CG/cholmod solve so it scales to 100k+ Gaussians.</li>
+<li><strong>Tie the kernel's diffusion time <code>t</code> to the scene scale</strong> (it currently is a fixed hyperparameter) so it transfers across rooms.</li>
+</ol>
+<hr />
+<div class="foot">Plain-language explainer for GeoSAM-3D, grounded in the real code and honest about scope. <a href="./">Full paper page</a> &middot; <a href="../../index.html">Portfolio</a></div></div></body></html>

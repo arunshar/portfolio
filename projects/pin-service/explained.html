@@ -1,0 +1,72 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Pin-Service — Explained</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800&family=Noto+Sans:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet"><style>
+:root{--bg:#fbfcfe;--panel:#fff;--ink:#16202c;--mut:#5b6776;--line:#e6eaf0;--acc:#2257d6;--ok:#0e9f6e;--warn:#b45309;--code:#f3f5f9}
+@media(prefers-color-scheme:dark){:root{--bg:#0e1116;--panel:#161b22;--ink:#e7ecf3;--mut:#9aa6b4;--line:#252c37;--acc:#6ea8fe;--ok:#54d6a0;--warn:#ffb454;--code:#11151b}}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:'Noto Sans',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;line-height:1.65;font-size:16px}
+.wrap{max-width:860px;margin:0 auto;padding:0 22px 64px}
+nav.top{font-size:13.5px;color:var(--mut);padding:18px 0;border-bottom:1px solid var(--line)}
+nav.top a{color:var(--acc);text-decoration:none}nav.top a:hover{text-decoration:underline}
+h1,h2,h3,h4{font-family:Montserrat,system-ui,sans-serif;line-height:1.2}
+h1{font-size:30px;margin:26px 0 4px}h2{font-size:21px;margin:30px 0 8px;padding-top:14px;border-top:1px solid var(--line)}
+h3{font-size:16.5px;margin:20px 0 4px}
+a{color:var(--acc)}p{margin:10px 0}
+blockquote{margin:14px 0;padding:.4rem 0 .4rem 1rem;border-left:4px solid var(--acc);color:var(--ink);font-size:17px}
+code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13.5px;background:var(--code);padding:1px 5px;border-radius:5px}
+pre{background:var(--code);border:1px solid var(--line);border-radius:10px;padding:12px 14px;overflow-x:auto}
+pre code{background:none;padding:0}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:14.5px}
+th,td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top}
+th{background:var(--code);font-family:Montserrat;font-size:13px}
+ul,ol{padding-left:22px}li{margin:5px 0}
+strong{font-weight:600}
+.foot{margin-top:30px;padding-top:14px;border-top:1px solid var(--line);color:var(--mut);font-size:13.5px}
+</style></head><body><div class="wrap"><nav class="top"><a href="../../index.html">Arun Sharma</a> / <a href="./">Pin-Service (paper page)</a> / Explained</nav><h1 id="pin-service-pudo-pin-selection--explained">Pin-Service (PUDO pin selection) — Explained</h1>
+<blockquote>
+<p><strong>One line:</strong> the production <em>serving path</em> for choosing where a vehicle should actually stop, candidate generation → hard-constraint filtering → ML scoring → congestion-aware re-ranking → load shedding, behind a gRPC API with full observability.</p>
+</blockquote>
+<p><strong>Honest status.</strong> This is a clean, <strong>tested reference implementation</strong> (17 files, ~1,100 LOC; unit tests for each stage + a Locust load test) of the canonical serving path. The ML scorer is a gradient-boosted regressor trained on a <em>synthetic</em> satisfaction label; the HD-map and supply signals are fixtures/stubs. So the <em>engineering pattern</em> is real and runnable; the model and data are illustrative.</p>
+<hr />
+<h2 id="1-the-problem-and-why-its-not-trivial">1. The problem and why it's not trivial</h2>
+<p>You can't just pick "the lat/lon nearest the rider/door." The stop has to be (a) on a <strong>drivable lane</strong>, (b) <strong>legal to stop at</strong> (no bus stops, hydrants, no-stop zones), (c) <strong>walkable</strong> from the actual destination, and (d) <strong>globally coordinated</strong> so demand spikes (a stadium exit, an apartment complex) don't all get assigned the same curb. That last point is what turns a lookup into a <em>systems</em> problem.</p>
+<hr />
+<h2 id="2-architecture-and-data-flow">2. Architecture and data flow</h2>
+<pre><code> request (rider/destination) ──► gRPC server (pin_service/server.py)
+        │
+        ▼
+ 1. generate_candidates       → nearby candidate pins (candidate_gen.py)
+        ▼
+ 2. filter_feasible           → drop illegal/unreachable pins (constraints.py)  [HARD GATE]
+        ▼
+ 3. score_candidates          → gradient-boosted &quot;satisfaction&quot; score (scorer.py)
+        ▼
+ 4. congestion re-rank        → subtract a penalty from over-assigned cells (congestion.py)
+        ▼
+ 5. load shed                 → if global rate too high, fail fast (congestion.py)
+        ▼
+ best pin  +  OpenTelemetry spans (telemetry.py)</code></pre>
+<p>The ordering is the whole point: <strong>hard constraints before ML, ML before global coordination, coordination before load shedding.</strong></p>
+<hr />
+<h2 id="3-module-by-module-walkthrough">3. Module-by-module walkthrough</h2>
+<p><strong><code>pin_service/candidate_gen.py</code></strong> — <code>generate_candidates(...)</code> returns nearby <code>PinCandidate</code>s (lat/lon + lane + metadata) around the requested location. The cheap, high-recall first stage: cast a wide net, let later stages prune.</p>
+<p><strong><code>pin_service/constraints.py</code></strong> — the <strong>hard gate</strong>. <code>HDMapView</code> snapshots HD-map polygons (<code>drivable_area</code>, <code>no_stop_zones</code>); <code>is_feasible(candidate, hd_map)</code> returns a strict boolean (on a drivable lane AND not in a no-stop zone), and <code>filter_feasible</code> keeps only the survivors. The doc comment states the invariant explicitly: <strong>ML scoring NEVER overrides a hard-constraint failure.</strong> Legality and reachability are not negotiable by a learned score.</p>
+<p><strong><code>pin_service/scorer.py</code></strong> — <code>score_candidates(...)</code> runs each surviving candidate through a <strong>gradient-boosted regressor</strong> (joblib, loaded once at import as a lazy singleton so gRPC worker threads share it). Features include historical success per H3 cell and local supply. The label is a synthetic "rider satisfaction" in training. There are <strong>parity tests</strong> so a Python-vs-C++ reimplementation would match, the kind of thing production serving needs.</p>
+<p><strong><code>pin_service/congestion.py</code></strong> — <code>CongestionTracker</code> does two jobs. <strong>Re-ranking:</strong> when a cell's assignments-in-window exceed <code>threshold</code>, subtract a <code>penalty</code> from its candidates' scores so the re-ranker prefers a cooler nearby cell (spreads load across curbs). <strong>Load shedding:</strong> if the global assignment rate exceeds <code>load_shed_ratio × threshold</code>, the service <strong>fails requests fast</strong> rather than melting down, the demand-protection valve.</p>
+<p><strong><code>pin_service/server.py</code></strong> — the gRPC service wiring the five stages, plus <code>telemetry.py</code> (OpenTelemetry spans) and <code>metrics.py</code> for observability. <strong><code>client/</code></strong> has a sample client; <strong><code>load_tests/locustfile.py</code></strong> drives synthetic load.</p>
+<p><strong>Tests:</strong> <code>test_candidate_gen</code>, <code>test_constraints</code>, <code>test_scorer</code>, <code>test_congestion</code> — one per stage, asserting the contract of each (constraints are strict, congestion penalizes hot cells, scorer parity).</p>
+<hr />
+<h2 id="4-the-three-ideas-worth-reciting">4. The three ideas worth reciting</h2>
+<ol type="1">
+<li><strong>Constraints before ML (and ML can't override them).</strong> Safety/legality are hard booleans evaluated <em>before</em> scoring; a high model score never rescues an illegal pin. This is the single most important production-ML principle: keep the learned component inside a hard-constraint envelope.</li>
+<li><strong>Global coordination via congestion penalties.</strong> Local greedy scoring would pile everyone onto the best curb. A per-cell congestion penalty turns independent requests into a load-balanced fleet decision without a central optimizer.</li>
+<li><strong>Graceful degradation via load shedding.</strong> Under a demand spike, failing some requests fast keeps latency bounded for the rest, far better than uniformly slow or a cascading collapse.</li>
+</ol>
+<hr />
+<h2 id="5-what-id-do-next">5. What I'd do next</h2>
+<ol type="1">
+<li><strong>Train the scorer on a realistic label</strong> (e.g. actual walk distance + dwell + reassignment rate) instead of the synthetic satisfaction stub.</li>
+<li><strong>Replace the HD-map fixture with real map polygons</strong> (OSM lanes + curb data) so feasibility is genuine.</li>
+<li><strong>A/B the congestion penalty</strong> to show it actually lowers max-curb load vs greedy.</li>
+<li><strong>Tie it to LastMile-SafeSeg:</strong> feed the per-pin <em>safety score</em> (curb height, stairs, blocked approach) in as a feasibility/score input, that connects the perception side to the serving side into one stop-selection story.</li>
+</ol>
+<hr />
+<div class="foot">Plain-language explainer for Pin-Service, grounded in the real code and honest about scope. <a href="./">Full paper page</a> &middot; <a href="../../index.html">Portfolio</a></div></div></body></html>

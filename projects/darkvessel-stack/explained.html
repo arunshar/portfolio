@@ -1,0 +1,107 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>DarkVesselNet — Explained</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800&family=Noto+Sans:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet"><style>
+:root{--bg:#fbfcfe;--panel:#fff;--ink:#16202c;--mut:#5b6776;--line:#e6eaf0;--acc:#2257d6;--ok:#0e9f6e;--warn:#b45309;--code:#f3f5f9}
+@media(prefers-color-scheme:dark){:root{--bg:#0e1116;--panel:#161b22;--ink:#e7ecf3;--mut:#9aa6b4;--line:#252c37;--acc:#6ea8fe;--ok:#54d6a0;--warn:#ffb454;--code:#11151b}}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:'Noto Sans',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;line-height:1.65;font-size:16px}
+.wrap{max-width:860px;margin:0 auto;padding:0 22px 64px}
+nav.top{font-size:13.5px;color:var(--mut);padding:18px 0;border-bottom:1px solid var(--line)}
+nav.top a{color:var(--acc);text-decoration:none}nav.top a:hover{text-decoration:underline}
+h1,h2,h3,h4{font-family:Montserrat,system-ui,sans-serif;line-height:1.2}
+h1{font-size:30px;margin:26px 0 4px}h2{font-size:21px;margin:30px 0 8px;padding-top:14px;border-top:1px solid var(--line)}
+h3{font-size:16.5px;margin:20px 0 4px}
+a{color:var(--acc)}p{margin:10px 0}
+blockquote{margin:14px 0;padding:.4rem 0 .4rem 1rem;border-left:4px solid var(--acc);color:var(--ink);font-size:17px}
+code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13.5px;background:var(--code);padding:1px 5px;border-radius:5px}
+pre{background:var(--code);border:1px solid var(--line);border-radius:10px;padding:12px 14px;overflow-x:auto}
+pre code{background:none;padding:0}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:14.5px}
+th,td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top}
+th{background:var(--code);font-family:Montserrat;font-size:13px}
+ul,ol{padding-left:22px}li{margin:5px 0}
+strong{font-weight:600}
+.foot{margin-top:30px;padding-top:14px;border-top:1px solid var(--line);color:var(--mut);font-size:13.5px}
+</style></head><body><div class="wrap"><nav class="top"><a href="../../index.html">Arun Sharma</a> / <a href="./">DarkVesselNet (paper page)</a> / Explained</nav><h1 id="darkvesselnet-darkvessel-stack--explained">DarkVesselNet (darkvessel-stack) — Explained</h1>
+<blockquote>
+<p><strong>One line:</strong> a single repo that detects "dark vessels" (ships that have switched off their AIS transponder to hide) by fusing what the sky sees (Sentinel-1 radar + Sentinel-2 optical) with what the sea broadcasts (AIS tracks), run through modern geospatial foundation models, with the anomaly reasoning coming straight from Arun's thesis (TGARD + Pi-DPM).</p>
+</blockquote>
+<p><strong>Honest status up front.</strong> This is the <strong>breadth showcase</strong>, "here's the whole modern remote-sensing CV stack a senior scientist is expected to wield." What's <strong>real and tested</strong> (14/14 math tests) is a clean toolkit of EO <strong>primitives</strong> (Lee speckle filter, cloud masking + spectral band ratios, haversine + the TGARD rendezvous algorithm), a <strong>foundation-model adapter</strong> (<code>GeoBackbone</code> over six real models, with a CPU stub mode), a <strong>distortion-aware co-registration</strong> warp (reusing the sat-splat Jacobian idea), and the <strong>Pi-DPM anomaly head</strong> module. The README's headline "<strong>7 canonical EO tasks under one config tree</strong>" and the <strong>xView3-SAR leaderboard</strong> are the <strong>aspirational framing</strong> (<code>model-checkpoint-scaffold</code> badge), not seven trained task pipelines. In short: "it's a tested toolkit of EO primitives, foundation-model adapters, and my published anomaly heads; the seven-task config tree and the benchmark are the roadmap, not done."</p>
+<hr />
+<h2 id="1-what-it-is-and-the-gap-it-fills">1. What it is and the gap it fills</h2>
+<p>A ship "goes dark" by silencing, spoofing, or jamming its <strong>AIS</strong> transponder (the GPS beacon vessels are legally required to broadcast). Catching it means <em>fusing</em>: AIS says where ships <em>claim</em> to be, radar (Sentinel-1 SAR) and optical (Sentinel-2) say where ships <em>actually</em> are. Most RS demos are narrow (classification on EuroSAT, segmentation on SpaceNet). DarkVesselNet's pitch is a <strong>single project that touches every sensor type and every canonical task</strong>, ending in a real decision: "is this radar blob a vessel that disappeared off AIS?" The anomaly half is Arun's published thesis work made operational.</p>
+<hr />
+<h2 id="2-architecture-and-data-flow">2. Architecture and data flow</h2>
+<pre><code> Sentinel-1 SAR ─► lee_filter (speckle) ─┐
+ Sentinel-2     ─► cloud mask + band ratios ─┤
+                                            ├─► distortion-aware co-registration (onto one grid)
+                                            ▼
+                              GeoBackbone (Prithvi-2 / Clay / SatMAE++ / …) ─► tokens
+                                            │
+   AIS track ─► TGARD rendezvous (gap feasibility) ─┐
+                                            ▼        ▼
+                              PiDPMAnomalyHead(scene tokens, AIS gap) ─► dark-vessel score + reconstructed track</code></pre>
+<p>The "7 tasks" (detection, segmentation, classification, change detection, super-resolution, forecasting, anomaly) are meant to hang off the shared backbone tokens via per-task heads in a Hydra config tree; the anomaly task is the one with real, published math.</p>
+<hr />
+<h2 id="3-module-by-module-walkthrough">3. Module-by-module walkthrough</h2>
+<p><strong><code>src/darkvessel/backbones/geo_backbone.py</code></strong> — <code>GeoBackbone</code>, a uniform adapter over <strong>six real geospatial foundation models</strong> (Prithvi-2 NASA/IBM 600M, Clay v1, SatMAE++, DOFA, SatlasNet, RemoteCLIP), each described by a <code>_BACKBONE_CARDS</code> entry (HF id, patch size, embed dim, bands, license). <code>forward(x) -&gt; (B, N, embed_dim)</code> tokens, so downstream heads don't care which backbone is loaded. A <code>stub=True</code> mode swaps in a zero-init conv projection so the pipeline runs CPU-only without downloading hundreds of MB. This is the "swap your backbone with one flag" abstraction a real EO platform needs.</p>
+<p><strong><code>src/darkvessel/sar/speckle.py</code></strong> — <code>lee_filter</code>, the canonical <strong>Lee (1980) speckle filter</strong> for Sentinel-1, in pure differentiable PyTorch. SAR images are grainy ("speckle") from coherent imaging; the Lee filter weight <code>w = max(0, 1 − C_u²/C_i²)</code> blends toward the local mean in flat regions and keeps edges in textured ones (<code>C_u</code> = noise CV from the number of looks, <code>C_i</code> = local CV). Output <code>y = mean + w·(x − mean)</code>. Handles tiny tiles gracefully (a real bug fixed: <code>F.pad(reflect)</code> crashed when the window exceeded the image).</p>
+<p><strong><code>src/darkvessel/optical/cloud_mask.py</code></strong> — <code>s2cloudless_mask</code> (cloud detection on Sentinel-2) and <code>band_ratios</code> returning NDVI/NDWI/MNDWI/NDBI/SAVI (the standard spectral indices). Real, tested for shape and value range.</p>
+<p><strong><code>src/darkvessel/ais/tgard.py</code></strong> — <strong>TGARD</strong>, vendored from Arun's published paper (ACM TIST 2024). <code>haversine</code> (great-circle distance). <code>tgard_rendezvous(track, tau, max_sog)</code>: scans an AIS track for <strong>gaps</strong> (consecutive points with <code>dt &gt; tau</code>), computes the reachable distance under a max speed-over-ground (<code>reach = max_sog·dt</code>), and scores a <strong>rendezvous</strong> by how <em>infeasible</em> the gap is: <code>score = max(0, 1 − d/reach)</code>. A high score means the vessel covered far less ground than it could have, consistent with stopping to meet something (a transfer at sea). This is the geometric core of the dark-vessel reasoning.</p>
+<p><strong><code>src/darkvessel/heads/anomaly.py</code></strong> — <code>PiDPMAnomalyHead</code>, the inference head from Arun's Pi-DPM paper (SIGSPATIAL GeoAnomalies 2025). Projects scene tokens and the AIS gap segment, fuses them, and outputs (a) a <strong>spoofing/denial likelihood score</strong> and (b) a <strong>reconstructed trajectory</strong> across the gap. The reconstruction's kinematic residual against the simplified Kinematic Bicycle Model is what flags spoofing. Real <code>nn.Module</code>, forward + backward tested.</p>
+<p><strong><code>src/darkvessel/fusion/coregistration.py</code></strong> — <code>distortion_aware_coregister</code>: warps SAR onto the optical grid using <strong>per-pixel sensor models</strong> (the RPC/pushbroom Jacobian idea from sat-splat-distort) rather than a naive UTM resample. Builds the target pixel grid, projects through the source sensor model, and <code>grid_sample</code>s. The docstring calls out the <strong>dissertation through-line</strong>: Distortion-Aware Spatial Data Science → Sat-Splat-Distort → DarkVesselNet. A <code>_affine_identity_model</code> is the test-path stub.</p>
+<p><strong><code>tests/test_math.py</code></strong> — 14 tests covering every primitive: Lee filter is identity on a constant image, reduces variance on speckle, rejects even windows, handles 1×1 tiles; cloud mask shape/dtype; band ratios in [−1,1]; haversine zero on same point and ≈111,195 m for one degree of latitude; TGARD skips short gaps and emits a rendezvous on an infeasible gap; co-registration identity matches grid_sample; backbone stub forward shape + all six listed; the Pi-DPM head forward shapes + backward. This is the proof the math core is correct.</p>
+<hr />
+<h2 id="4-the-core-ideas-from-scratch">4. The core ideas, from scratch</h2>
+<p><strong>Why fuse SAR + optical + AIS?</strong> Each sensor has a blind spot. Optical is blocked by clouds and night; SAR sees through both but is grainy and hard to interpret; AIS is precise but <em>trivially spoofable</em> (that's the whole problem). Fuse all three and a vessel can't hide in every modality at once: if AIS says "nothing here" but SAR shows a ship-shaped bright return, that contradiction is the detection.</p>
+<p><strong>The rendezvous logic (TGARD).</strong> A legitimate AIS gap (lost signal in a dead zone) still has the vessel moving at its usual speed, so it covers roughly <code>speed·dt</code> of distance. A <em>suspicious</em> gap is one where the endpoints are far closer than the vessel could have traveled, meaning it slowed or stopped, often to meet another vessel. The feasibility score <code>1 − d/reach</code> formalizes "how much of the reachable envelope went unused."</p>
+<p><strong>Distortion-aware fusion.</strong> SAR and optical sensors image the same ground through <em>different geometry</em>. Resampling one onto the other in a flat map projection (UTM) misaligns terrain. Using the real RPC/pushbroom Jacobians (from sat-splat) co-registers them correctly, the same distortion-aware geometry skill, reused.</p>
+<hr />
+<h2 id="5-whats-real-vs-scaffold">5. What's real vs scaffold</h2>
+<table>
+<thead>
+<tr>
+<th>Piece</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Lee speckle filter, cloud mask, band ratios</td>
+<td><strong>Real</strong>, tested</td>
+</tr>
+<tr>
+<td>Haversine + TGARD rendezvous</td>
+<td><strong>Real</strong> (published algo), tested</td>
+</tr>
+<tr>
+<td><code>GeoBackbone</code> adapter (6 models) + stub mode</td>
+<td><strong>Real</strong> adapter; weights download on demand</td>
+</tr>
+<tr>
+<td><code>PiDPMAnomalyHead</code></td>
+<td><strong>Real</strong> module (forward/backward); full diffusion sampler lives upstream</td>
+</tr>
+<tr>
+<td>Distortion-aware co-registration</td>
+<td><strong>Real</strong> warp; RPC fit is the identity stub in tests</td>
+</tr>
+<tr>
+<td>"7 canonical tasks under one config tree"</td>
+<td><strong>Aspirational</strong> framing</td>
+</tr>
+<tr>
+<td>xView3-SAR leaderboard numbers</td>
+<td><strong>Target</strong>, not reproduced</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="6-what-id-do-next">6. What I'd do next</h2>
+<ol type="1">
+<li><strong>Make one task real end to end:</strong> vessel <strong>detection on xView3-SAR</strong> with a DETR head on Prithvi-2 tokens, on the public xView3 sample. One trained task beats seven scaffolded ones.</li>
+<li><strong>Demonstrate the fusion win:</strong> a case where AIS says "empty" but SAR+the detector finds a vessel, the actual dark-vessel scenario, end to end.</li>
+<li><strong>Wire TGARD → the detector:</strong> use a flagged AIS rendezvous to <em>prioritize</em> a SAR tile for detection, closing the AIS-to-imagery loop.</li>
+<li><strong>Quantify the speckle/cloud preprocessing</strong> (detection AP with vs without Lee filtering) so the primitives have measured value.</li>
+<li><strong>Trim the backbone list to the 1–2 you actually run</strong> so the "six backbones" claim is backed by usage, not just cards.</li>
+</ol>
+<hr />
+<div class="foot">Plain-language explainer for DarkVesselNet, grounded in the real code and honest about scope. <a href="./">Full paper page</a> &middot; <a href="../../index.html">Portfolio</a></div></div></body></html>

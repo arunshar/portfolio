@@ -4,11 +4,11 @@
    + table class hooks. body.project-page beats gen css's bare `body` rules. */
 
 :root{
-  --ink:#000; --muted:#5a5a5a; --faint:#777;
-  --link:#1772d0; --link-hover:#f09228;
-  --code-bg:#f5f5f5; --rule-c:#e2e2e2; --pill:#fafafa; --pill-border:#cfcfcf;
-  --rule:linear-gradient(to right, rgba(0,0,0,0), rgba(0,0,0,0.75), rgba(0,0,0,0));
-  --maxw:840px;
+  --ink:#16202c; --muted:#5b6776; --faint:#7a8694;
+  --link:#2257d6; --link-hover:#0e9f6e; --ok:#0e9f6e; --warn:#b45309;
+  --code-bg:#f3f5f9; --rule-c:#e6eaf0; --pill:#eef2f9; --pill-border:#d4dce8;
+  --rule:linear-gradient(to right, rgba(0,0,0,0), rgba(34,87,214,0.35), rgba(0,0,0,0));
+  --maxw:880px;
   color-scheme:light;
 }
 
@@ -16,13 +16,19 @@ html{ -webkit-text-size-adjust:100%; color-scheme:light; scroll-behavior:smooth;
 body.project-page{
   margin:0 !important; max-width:none !important; padding:0 !important;
   background:#fff; color:var(--ink);
-  font-family:'Titillium Web', Verdana, Helvetica, sans-serif;
+  font-family:'Noto Sans', system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   font-size:16px; font-weight:400; line-height:1.55;
 }
 .project-page .wrap{ max-width:var(--maxw); margin:0 auto; padding:1.4rem 20px 5rem; }
 .project-page a{ color:var(--link); text-decoration:none; }
 .project-page a:hover, .project-page a:focus{ color:var(--link-hover); text-decoration:none; }
 .project-page strong, .project-page b{ font-weight:600; }
+.project-page h1, .project-page h2, .project-page h3, .project-page h4{ font-family:'Montserrat', system-ui, sans-serif; }
+
+/* honest-scope callout + real-vs-scaffold (CMU house style) */
+.callout-scope{ border-left:4px solid var(--ok); background:var(--pill); border-radius:0 10px 10px 0; padding:.9rem 1.1rem; margin:1.1rem 0; }
+.callout-scope.warn{ border-left-color:var(--warn); }
+.ok{ color:var(--ok); font-weight:700; } .scaf{ color:var(--warn); font-weight:700; }
 
 /* breadcrumb ------------------------------------------------------------ */
 .topnav{ font-size:14px; color:var(--faint); margin-bottom:1.6rem; }

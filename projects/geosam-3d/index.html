@@ -8,9 +8,9 @@
 <link rel="canonical" href="https://arunshar.github.io/portfolio/projects/geosam-3d/">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css?family=Titillium+Web:300,300italic,400,400italic,600,600italic" rel="stylesheet">
-<link rel="stylesheet" href="paper.gen.css?v=20260608f">
-<link rel="stylesheet" href="../../assets/paper.css?v=20260608f">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800&family=Noto+Sans:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="paper.gen.css?v=20260629d">
+<link rel="stylesheet" href="../../assets/paper.css?v=20260629d">
 <script>window.MathJax = { tex: { tags: "ams" } };</script>
 <script async id="MathJax-script" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js"></script>
 </head>
@@ -84,8 +84,10 @@ approximate heat-method geodesic. The resulting system is an engineering bridge 
 foundation models, monocular 3D reconstruction, and graph-based geometric reasoning.
 </p><!-- l. 263 --><p class="noindent">The project is intentionally packaged as both a GitHub repository and a Hugging Face Space. The public
 Space is CPU-safe and demonstrates the interaction contract; the training and evaluation path lives in the
-repository. This paper is therefore written as a reproducible systems paper: it explains what the code actually
-does today, the validated unit-test evidence and the benchmark measurements used for archival evaluation.
+repository. This paper is therefore written as a reproducible systems paper: it explains what the code
+actually does today and the validated unit-test evidence. The benchmark measurements are not yet
+available; the dataset loaders, monocular reconstruction, and SAM 2 projection are not implemented, so the
+ScanNet, Replica, and ScanNet++ evaluation described later is planned rather than reported.
 
 </p>
 <!-- l. 265 --><p class="noindent"><span class="paragraphHead" id="contributions"> <a id="x1-2000"></a><span class="ptmb8t-">Contributions:</span></span>
@@ -94,9 +96,9 @@ does today, the validated unit-test evidence and the benchmark measurements used
      Gaussian scene and propagates labels over Gaussian centroids.
      </dd><dt class="enumerate-enumitem">
   2. </dt><dd class="enumerate-enumitem">A differentiable heat-kernel geodesic layer using a k-nearest-neighbor graph Laplacian and a
+                                                                            
+                                                                            
      Varadhan-style distance approximation.
-                                                                            
-                                                                            
      </dd><dt class="enumerate-enumitem">
   3. </dt><dd class="enumerate-enumitem">A  per-Gaussian  feature  head  trained  with  contrastive  mask  consistency  rather  than  by
      fine-tuning the frozen image foundation models.
@@ -109,7 +111,7 @@ does today, the validated unit-test evidence and the benchmark measurements used
                                                                             
                                                                             
                                                                             
-<!-- l. 279 --><p class="noindent" id="detailed-geosam3d-architecture-the-diagram-exposes-the-2d-foundationmodel-encoder-monocular-gaussian-scene-builder-prompt-crossattention-graph-laplacian-geodesic-heat-decoder-and-evaluation-heads-the-bottom-geometry-panel-makes-the-central-claim-visual-propagation-should-follow-scene-connectivity-not-raw-euclidean-proximity"><img alt="Figure" src="figures/main-9ce1545d02ecafaea368cf747f3bb3df.svg" loading="lazy">
+<!-- l. 279 --><p class="noindent" id="detailed-geosam3d-architecture-the-diagram-exposes-the-2d-foundationmodel-encoder-monocular-gaussian-scene-builder-prompt-crossattention-graph-laplacian-geodesic-heat-decoder-and-evaluation-heads-the-bottom-geometry-panel-makes-the-central-claim-visual-propagation-should-follow-scene-connectivity-not-raw-euclidean-proximity"><img alt="Figure" src="figures/geosam-3d-arch.svg" loading="lazy">
 <a id="x1-2005r1"></a>
 </p>
 <figcaption class="caption"><span class="id">Figure 1:  </span><span class="content">Detailed  GeoSAM-3D  architecture.  The  diagram  exposes  the  2D  foundation-model
@@ -1421,6 +1423,6 @@ implemented demo outputs with model-backed inference when deployment resources a
     <p>Project page for "GeoSAM-3D: Geodesic Prompt Propagation for Open-Vocabulary 3D Scene Segmentation from Monocular Video", rendered from the LaTeX source. <a href="../../index.html">Back to homepage</a>.</p>
   </footer>
 </div>
-<script src="../../assets/paper.js?v=20260608f"></script>
+<script src="../../assets/paper.js?v=20260629d"></script>
 </body>
 </html>

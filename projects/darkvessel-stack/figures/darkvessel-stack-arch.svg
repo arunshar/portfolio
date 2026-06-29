@@ -1,0 +1,28 @@
+<svg viewBox="0 0 920 320" xmlns="http://www.w3.org/2000/svg" width="100%" role="img" aria-label="DarkVesselNet data flow">
+    <style>
+svg{--bg:#fbfcfe;--panel:#fff;--ink:#16202c;--mut:#5b6776;--line:#e6eaf0;--acc:#2257d6;--acc2:#0e9f6e;--warn:#b45309;--chip:#eef2f9;--code:#f3f5f9;}
+
+      .b{fill:var(--panel);stroke:var(--line);stroke-width:1.5}
+      .t{font-family:Montserrat;font-size:13px;fill:var(--ink)}
+      .s{font-family:'Noto Sans';font-size:11px;fill:var(--mut)}
+      .real{stroke:var(--acc2);stroke-width:2}
+      .asp{stroke:var(--warn);stroke-dasharray:5 4;stroke-width:2}
+      .ar{stroke:var(--mut);stroke-width:1.6;fill:none;marker-end:url(#a)}
+    </style>
+    <defs><marker id="a" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="var(--mut)"/></marker></defs>
+    <rect class="b real" x="10" y="16" width="180" height="48" rx="10"/><text class="t" x="22" y="38">Sentinel-1 SAR</text><text class="s" x="22" y="55">Lee speckle filter</text>
+    <rect class="b real" x="10" y="80" width="180" height="48" rx="10"/><text class="t" x="22" y="102">Sentinel-2 optical</text><text class="s" x="22" y="119">cloud mask + band ratios</text>
+    <rect class="b real" x="250" y="48" width="210" height="48" rx="10"/><text class="t" x="264" y="70">Distortion-aware co-reg</text><text class="s" x="264" y="87">RPC/pushbroom Jacobians</text>
+    <rect class="b real" x="520" y="48" width="200" height="48" rx="10"/><text class="t" x="534" y="70">GeoBackbone</text><text class="s" x="534" y="87">Prithvi-2 / Clay / SatMAE++</text>
+    <rect class="b real" x="10" y="170" width="180" height="48" rx="10"/><text class="t" x="22" y="192">AIS track</text><text class="s" x="22" y="209">TGARD rendezvous (gap)</text>
+    <rect class="b real" x="520" y="160" width="200" height="58" rx="10"/><text class="t" x="534" y="184">Pi-DPM anomaly head</text><text class="s" x="534" y="202">dark-vessel score + track</text>
+    <rect class="b" x="780" y="92" width="130" height="58" rx="10"/><text class="t" x="794" y="118">analyst-reviewable</text><text class="s" x="794" y="136">observation</text>
+    <path class="ar" d="M190,40 C220,40 225,68 248,70"/>
+    <path class="ar" d="M190,104 C220,104 225,76 248,72"/>
+    <path class="ar" d="M460,72 L518,72"/>
+    <path class="ar" d="M620,96 C620,120 600,150 600,158"/>
+    <path class="ar" d="M190,194 C360,194 420,196 518,192"/>
+    <path class="ar" d="M720,150 C750,150 760,120 778,120"/>
+    <text class="s" x="250" y="250" style="fill:var(--acc2)">green = real and tested (15 math tests)</text>
+    <text class="s" x="250" y="270" style="fill:var(--warn)">the 7-task config tree and xView3 numbers are the roadmap</text>
+  </svg>

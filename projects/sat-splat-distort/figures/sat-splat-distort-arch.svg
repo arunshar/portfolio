@@ -1,0 +1,22 @@
+<svg viewBox="0 0 920 300" width="100%" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Sat-Splat-Distort architecture"><style>
+.b{fill:#fff;stroke:#e6eaf0;stroke-width:1.5}
+.t{font-family:Montserrat,system-ui,sans-serif;font-size:13px;fill:#16202c}
+.s{font-family:'Noto Sans',system-ui,sans-serif;font-size:10.5px;fill:#5b6776}
+.real{stroke:#0e9f6e;stroke-width:2}
+.stub{stroke:#b45309;stroke-dasharray:5 4;stroke-width:2}
+.ar{stroke:#5b6776;stroke-width:1.6;fill:none;marker-end:url(#a)}
+.lg{font-family:'Noto Sans',system-ui,sans-serif;font-size:10.5px}
+</style>
+<defs><marker id="a" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#5b6776"/></marker></defs>
+<rect class="b" x="10" y="40" width="180" height="56" rx="10"/><text class="t" x="22" y="63">Non-pinhole camera</text><text class="s" x="22" y="81">satellite / pushbroom / fisheye / 360</text>
+<rect class="b real" x="250" y="16" width="200" height="52" rx="10"/><text class="t" x="262" y="38">Closed-form Jacobian</text><text class="s" x="262" y="56">4 cameras, 7/7 autograd tests</text>
+<rect class="b real" x="250" y="84" width="200" height="52" rx="10"/><text class="t" x="262" y="106">Distortion-prior grid</text><text class="s" x="262" y="124">learned residual, CPU-runnable</text>
+<rect class="b stub" x="510" y="50" width="200" height="56" rx="10"/><text class="t" x="522" y="73">Distortion-aware rasterizer</text><text class="s" x="522" y="91">CUDA fork, stubbed for CPU</text>
+<rect class="b" x="772" y="50" width="138" height="56" rx="10"/><text class="t" x="784" y="80">3D Gaussian scene</text>
+<path class="ar" d="M190,60 C220,60 222,42 248,42"/>
+<path class="ar" d="M190,76 C220,76 222,108 248,110"/>
+<path class="ar" d="M450,42 C475,42 482,74 508,78"/>
+<path class="ar" d="M450,110 C475,110 482,82 508,80"/>
+<path class="ar" d="M710,78 L770,78"/>
+<text class="s" x="250" y="170">benchmark numbers (PSNR on DFC2019) are leaderboard targets, not reproduced</text>
+<text class="lg" x="14" y="288" fill="#0e9f6e">green = real and tested</text><text class="lg" x="210" y="288" fill="#b45309">dashed amber = stub / target (off-the-shelf or roadmap)</text></svg>

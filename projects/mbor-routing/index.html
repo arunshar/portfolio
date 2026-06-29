@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MBOR: Multi-Level Bi-Objective Routing for real-time EV eco-routing</title>
+<meta name="description" content="Multi-Level Bi-Objective Routing precomputes and retrieves complete Pareto-optimal path sets for electric-vehicle route planning that balances energy use against travel time, using a boundary multigraph, a multi-level encoded Pareto frontier view, and 2D cost-interval pruning.">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800&family=Noto+Sans:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#fbfcfe;--panel:#fff;--ink:#16202c;--mut:#5b6776;--line:#e6eaf0;--acc:#2257d6;--acc2:#0e9f6e;--warn:#b45309;--chip:#eef2f9;--code:#f3f5f9}
+@media(prefers-color-scheme:dark){:root{--bg:#0e1116;--panel:#161b22;--ink:#e7ecf3;--mut:#9aa6b4;--line:#252c37;--acc:#6ea8fe;--acc2:#54d6a0;--warn:#ffb454;--chip:#1b212b;--code:#11151b}}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Noto Sans",system-ui,-apple-system,Segoe UI,Roboto,sans-serif;line-height:1.65;font-size:16px}
+h1,h2,h3{font-family:Montserrat,system-ui,sans-serif}
+a{color:var(--acc);text-decoration:none}a:hover{text-decoration:underline}
+.wrap{max-width:980px;margin:0 auto;padding:0 22px}
+header.hero{padding:56px 0 26px;text-align:center;border-bottom:1px solid var(--line)}
+.kept{font-size:13px;letter-spacing:.18em;text-transform:uppercase;color:var(--mut);font-weight:700}
+h1.title{font-size:38px;line-height:1.12;margin:14px 0 6px;font-weight:800}
+.subtitle{font-size:18px;color:var(--mut);max-width:780px;margin:0 auto 8px}
+.authors{margin:14px 0 4px;font-size:16px}.aff{color:var(--mut);font-size:14px}
+.links{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:20px 0 4px}
+.btn{display:inline-flex;align-items:center;gap:7px;background:var(--ink);color:var(--bg);padding:8px 15px;border-radius:999px;font-weight:600;font-size:14px}
+.btn.alt{background:transparent;color:var(--ink);border:1px solid var(--line)}
+.btn:hover{text-decoration:none;opacity:.92}
+.pills{display:flex;gap:7px;justify-content:center;flex-wrap:wrap;margin:16px 0 0}
+.pill{background:var(--chip);color:var(--mut);border:1px solid var(--line);border-radius:999px;padding:3px 11px;font-size:12.5px;font-weight:600}
+section{padding:30px 0;border-bottom:1px solid var(--line)}
+h2{font-size:24px;margin:0 0 12px}h3{font-size:17px;margin:20px 0 6px}
+p{margin:10px 0}.lead{font-size:17px}
+.fig{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;margin:14px 0}
+.figcap{color:var(--mut);font-size:13.5px;margin-top:8px;text-align:center}
+.callout{border-left:4px solid var(--acc2);background:var(--panel);border-radius:0 10px 10px 0;padding:14px 16px;margin:14px 0}
+.callout.warn{border-left-color:var(--warn)}.callout b{font-family:Montserrat}
+table{width:100%;border-collapse:collapse;margin:12px 0;font-size:14.5px}
+th,td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top}
+th{background:var(--chip);font-family:Montserrat;font-size:13px}
+.ok{color:var(--acc2);font-weight:700}.scaf{color:var(--warn);font-weight:700}
+code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13.5px;background:var(--code);padding:1px 6px;border-radius:5px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px}.card h3{margin-top:0}
+ul{margin:8px 0;padding-left:22px}li{margin:5px 0}
+footer{padding:26px 0 50px;color:var(--mut);font-size:13.5px;text-align:center}
+@media(max-width:740px){.grid2,.grid3{grid-template-columns:1fr}h1.title{font-size:30px}}
+</style></head>
+<body>
+
+<header class="hero"><div class="wrap">
+  <div class="kept">Spatial Optimization &middot; Eco-Routing</div>
+  <h1 class="title">MBOR</h1>
+  <div class="subtitle">Multi-Level Bi-Objective Routing: real-time electric-vehicle route planning that balances energy use against travel time over fragmented road networks, by precomputing and retrieving complete Pareto-optimal path sets instead of recomputing them per query.</div>
+  <div class="authors">Arun Sharma, with Prof. Shashi Shekhar</div>
+  <div class="aff">University of Minnesota &middot; preliminary research</div>
+  <div class="links">
+    <a class="btn alt" href="https://arunshar.com/">Portfolio</a>
+    <a class="btn alt" href="https://arunshar.com/projects/darkvessel-stack/">Related: distortion-aware stack</a>
+  </div>
+  <div class="pills">
+    <span class="pill">Bi-objective (energy + time)</span><span class="pill">Boundary multigraph</span><span class="pill">Pareto frontier precompute</span><span class="pill">Cost-interval pruning</span><span class="pill">Paper in preparation</span>
+  </div>
+</div></header>
+
+<section><div class="wrap">
+  <h2>Abstract</h2>
+  <p class="lead">An electric vehicle does not have one best route; it has a <b>trade-off curve</b>. The fastest route may drain the battery; the most energy-efficient may be slow. The right object to compute is the <b>Pareto-optimal set</b> of non-dominated routes, every route for which you cannot improve travel time without spending more energy and vice versa. Computing that set is expensive: bi-objective shortest path is NP-hard in the worst case, with exponentially many Pareto-optimal paths, and a city-scale graph recomputed per query is far too slow for real-time use. MBOR makes it interactive by <b>precomputing and reusing</b> the Pareto structure with three data structures: a <b>boundary multigraph</b> that summarizes inter-region path trade-offs, a <b>multi-level encoded Pareto frontier view</b> that stores the non-dominated sets compactly, and <b>2D cost-interval pruning with multi-edge pruning</b> that discards dominated path fragments early.</p>
+  <div class="callout warn"><b>Honest scope.</b> MBOR is <b>preliminary research</b> (algorithm design plus a reported timing result), developed with Prof. Shashi Shekhar and tied to Task 4 of his NSF proposal on multi-objective path selection. The reported result, more than <b>10x faster online</b> than prior methods on real-world road-network data, is from that preliminary work; it is <b>not yet a public, reproducible benchmark</b>, and unlike the other portfolio projects there is <b>no public code repository or live demo</b> here. The paper is in preparation. This page describes the design and the claim's provenance honestly rather than presenting a finished, reproduced artifact.</div>
+</div></section>
+
+<section><div class="wrap">
+  <h2>Why bi-objective routing is hard, and the idea</h2>
+  <p>Single-objective shortest path (Dijkstra, A*, contraction hierarchies) returns one route in microseconds. The moment you have <i>two</i> costs that cannot be collapsed into one number, energy and time, a single route is the wrong answer: different drivers sit at different points on the trade-off. You want the whole non-dominated frontier. The catch is that the frontier can be exponentially large and recomputing it per query does not scale. MBOR's bet is the same one that makes single-objective routing fast at city scale, <b>preprocess once, query fast</b>, lifted to the bi-objective setting.</p>
+  <div class="fig">
+  <svg viewBox="0 0 920 230" xmlns="http://www.w3.org/2000/svg" width="100%" role="img" aria-label="MBOR pipeline">
+    <style>.b{fill:var(--panel);stroke:var(--line);stroke-width:1.5}.t{font-family:Montserrat;font-size:12.5px;fill:var(--ink)}.s{font-family:'Noto Sans';font-size:10.5px;fill:var(--mut)}.ar{stroke:var(--mut);stroke-width:1.6;fill:none;marker-end:url(#a)}.dot{fill:var(--acc)}</style>
+    <defs><marker id="a" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="var(--mut)"/></marker></defs>
+    <text class="t" x="10" y="22" style="fill:var(--mut)">PREPROCESS (once)</text>
+    <rect class="b" x="10" y="34" width="180" height="50" rx="10"/><text class="t" x="22" y="56">partition + boundary</text><text class="s" x="22" y="74">boundary multigraph (BMR)</text>
+    <rect class="b" x="210" y="34" width="200" height="50" rx="10"/><text class="t" x="222" y="56">Pareto frontier view</text><text class="s" x="222" y="74">multi-level encoded, compact</text>
+    <path class="ar" d="M190,59 L208,59"/>
+    <text class="t" x="10" y="128" style="fill:var(--mut)">QUERY (real-time)</text>
+    <rect class="b" x="10" y="140" width="180" height="50" rx="10"/><text class="t" x="22" y="162">origin / destination</text><text class="s" x="22" y="180">+ driver trade-off</text>
+    <rect class="b" x="210" y="140" width="210" height="50" rx="10"/><text class="t" x="222" y="162">cost-interval pruning</text><text class="s" x="222" y="180">2D + multi-edge, drop dominated</text>
+    <rect class="b" x="445" y="140" width="190" height="50" rx="10"/><text class="t" x="457" y="162">Pareto-optimal routes</text><text class="s" x="457" y="180">complete non-dominated set</text>
+    <path class="ar" d="M190,165 L208,165"/><path class="ar" d="M420,165 L443,165"/>
+    <path class="ar" d="M310,84 L310,138" style="stroke-dasharray:4 3"/><text class="s" x="318" y="116">reuse</text>
+    <!-- pareto frontier mini plot -->
+    <text class="s" x="690" y="34">energy vs time frontier</text>
+    <line x1="690" y1="180" x2="690" y2="50" class="ar" style="marker-end:none;stroke:var(--mut)"/>
+    <line x1="690" y1="180" x2="900" y2="180" class="ar" style="marker-end:none;stroke:var(--mut)"/>
+    <text class="s" x="700" y="196">time</text><text class="s" x="660" y="60">energy</text>
+    <circle class="dot" cx="710" cy="70" r="4"/><circle class="dot" cx="740" cy="92" r="4"/><circle class="dot" cx="780" cy="120" r="4"/><circle class="dot" cx="835" cy="150" r="4"/><circle class="dot" cx="885" cy="168" r="4"/>
+    <path d="M710,70 Q770,90 885,168" fill="none" stroke="var(--acc)" stroke-width="1.4" stroke-dasharray="3 3"/>
+  </svg>
+  <div class="figcap">Preprocess the Pareto structure once over a region-partitioned boundary multigraph; at query time, prune dominated fragments and return the full non-dominated set fast.</div>
+  </div>
+</div></section>
+
+<section><div class="wrap">
+  <h2>The three data structures</h2>
+  <div class="grid3">
+    <div class="card"><h3>Boundary multigraph</h3><p>Partition the road network into regions and summarize, for each pair of boundary nodes, the Pareto-optimal inter-region trade-offs as parallel (multi) edges. Queries hop region-to-region over this small graph instead of the full network, the hierarchical-acceleration idea (Shekhar's BMR) lifted to two objectives.</p></div>
+    <div class="card"><h3>Multi-level encoded Pareto frontier view</h3><p>Store the non-dominated cost sets compactly and at multiple levels of granularity, so the precomputed frontier can be retrieved and stitched without re-deriving it per query.</p></div>
+    <div class="card"><h3>2D cost-interval + multi-edge pruning</h3><p>At query time, bound each partial path by a 2D (energy, time) cost interval and discard fragments that are already dominated, plus collapse redundant parallel edges, so the search never enumerates the exponential frontier in full.</p></div>
+  </div>
+</div></section>
+
+<section><div class="wrap">
+  <h2>Status and provenance</h2>
+  <table>
+    <thead><tr><th>Item</th><th>Status</th></tr></thead>
+    <tbody>
+      <tr><td>Algorithm design (boundary multigraph, Pareto frontier view, cost-interval pruning)</td><td><span class="ok">Designed</span> (preliminary research)</td></tr>
+      <tr><td>"More than 10x faster online" vs prior methods on real road-network data</td><td><span class="scaf">Reported preliminary result</span>, not a public reproducible benchmark</td></tr>
+      <tr><td>Public code repository / live demo</td><td><span class="scaf">None yet</span> (unlike the other portfolio projects)</td></tr>
+      <tr><td>Peer-reviewed paper</td><td><span class="scaf">In preparation</span>; tied to Prof. Shekhar's NSF proposal, Task 4</td></tr>
+    </tbody>
+  </table>
+  <h3>Honest next step</h3>
+  <p>Release a runnable reference implementation on a public OSM-derived graph (for example a metro road network with an energy model), and report query latency and Pareto-set completeness against NAMOA*dr / BOA* baselines as a reproducible benchmark, the same "make one thing real and measured" bar the other projects are held to.</p>
+</div></section>
+
+<footer><div class="wrap">
+  Preliminary research. Honest scope above: this is algorithm design plus a reported timing result, not a runnable repo or public benchmark; the paper is in preparation.
+  <br>Arun Sharma, with Prof. Shashi Shekhar &middot; <a href="https://arunshar.com/">portfolio</a>
+</div></footer>
+
+</body></html>

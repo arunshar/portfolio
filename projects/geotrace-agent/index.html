@@ -11,11 +11,6 @@
 <link href="https://fonts.googleapis.com/css?family=Titillium+Web:300,300italic,400,400italic,600,600italic" rel="stylesheet">
 <link rel="stylesheet" href="paper.gen.css?v=20260608f">
 <link rel="stylesheet" href="../../assets/paper.css?v=20260608f">
-<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700&family=Noto+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<style>/* geotrace: match the project website fonts (Montserrat + Noto Sans) */
-body.project-page,.project-page .paper-body{font-family:'Noto Sans','Titillium Web',Verdana,sans-serif;}
-.project-page .paper-header h1,.project-page .paper-body h2,.project-page .paper-body h3,.project-page .paper-body h4{font-family:'Montserrat','Noto Sans',sans-serif;letter-spacing:-.01em;}
-</style>
 <script>window.MathJax = { tex: { tags: "ams" } };</script>
 <script async id="MathJax-script" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js"></script>
 </head>
@@ -44,6 +39,7 @@ body.project-page,.project-page .paper-body{font-family:'Noto Sans','Titillium W
       <li><a href="#related-work">Related Work</a></li>
       <li><a href="#system-architecture">System Architecture</a></li>
       <li><a href="#methods">Methods</a></li>
+      <li><a href="#durable-orchestration-via-the-neurosymbolic-determinism-boundary">Durable orchestration via the neuro-symbolic determinism boundary</a></li>
       <li><a href="#experiments">Experiments</a></li>
       <li><a href="#discussion-and-limitations">Discussion and Limitations</a></li>
       <li><a href="#conclusion">Conclusion</a></li>
@@ -66,30 +62,31 @@ body.project-page,.project-page .paper-body{font-family:'Noto Sans','Titillium W
      token,  tool-call,  and  wallclock  budget,  calls  into  a  Hägerstrand  space-time  prism
      kernel for the geometric truth (geo-ellipses, minimum orthogonal bounding rectangles,
      dynamic-region-merge unions), and dispatches specialized sub-agents that extend our
-     prior STAGD/DRM gap detector and TGARD/DC-TGARD rendezvous finder. Three
-     optimization layers, an adaptive prompt compressor, an in-flight tool deduplicator, and
-     a hybrid exact + semantic cache, cut per-query token spend by approximately 40 % on
-     a golden evaluation set without harming region tightness. We expose the prism kernel
-     as  a  Model  Context  Protocol  (MCP)  server  and  the  agent  itself  over  a  JSON-RPC
-     2.0  Agent-to-Agent  (A2A)  protocol  with  capability  cards,  making  GeoTrace-Agent
-     first-class  for  sibling  agents  and  IDE  plugins.  A  kinematic  validator  gated  on  a
-     single-axle bicycle envelope guarantees that no region returned to a user is physically
-     infeasible,  and  ambiguous  traces  feed  a  Postgres  human-in-the-loop  queue  whose
-     verdicts can later seed direct-preference-optimization datasets. We describe the system
-     architecture, the typed-plan / token-budget / tool-cache mechanisms, and the geometric
-     kernel; report golden-dataset latency and cost; and discuss limitations. The system is
-     open-sourced.
+     prior  STAGD/DRM  gap  detector  and  TGARD/DC-TGARD  rendezvous  finder.  Two
+     active  optimization  layers,  an  adaptive  prompt  compressor  and  a  hybrid  exact  +
+     semantic  cache,  hold  per-query  cost  to  about  0.026  USD  (roughly  2,700  tokens)  on
+     a  live  golden-set  run  with  Claude  Sonnet  4.6,  and  the  exact-response  cache  drops
+     a  repeated  query’s  LLM  cost  to  zero;  an  in-flight  tool  deduplicator  is  implemented
+     but not yet wired into the run path. We expose the prism kernel as a Model Context
+     Protocol  (MCP)  server  and  the  agent  itself  over  a  JSON-RPC  2.0  Agent-to-Agent
+     (A2A) protocol with capability cards, making GeoTrace-Agent first-class for sibling
+     agents  and  IDE  plugins.  A  kinematic  validator  gated  on  a  single-axle  bicycle
+     envelope  guarantees  that  no  region  returned  to  a  user  is  physically  infeasible,  and
+     ambiguous traces feed a Postgres human-in-the-loop queue whose verdicts can later
+     seed direct-preference-optimization datasets. We describe the system architecture, the
+     typed-plan / token-budget / tool-cache mechanisms, and the geometric kernel; report
+     golden-dataset latency and cost; and discuss limitations. The system is open-sourced.
 </p>
      </blockquote>
 </section>
 
 <h2 class="sectionHead" id="introduction"><span class="titlemark">1    </span>    <a id="x1-10001"></a>Introduction</h2>
-<!-- l. 256 --><p class="noindent">Time geography [<a href="#Xhagerstrand1970what">17</a>] provides a remarkably tight algebraic envelope on what a moving agent can do: given
+<!-- l. 256 --><p class="noindent">Time geography [<a href="#Xhagerstrand1970what">18</a>] provides a remarkably tight algebraic envelope on what a moving agent can do: given
 two anchors <span class="mathjax-inline">\(A=(x_A, y_A, t_A)\)</span> and <span class="mathjax-inline">\(B=(x_B, y_B, t_B)\)</span> with <span class="mathjax-inline">\(t_A&lt;t_B\)</span> and a maximum speed <span class="mathjax-inline">\(v_{\max }\)</span>, the set of reachable points at any interior time is a
 geo-ellipse with foci at the projected anchors. This envelope underpins decades of spatiotemporal
-data mining work in maritime safety, contact tracing, and homeland security [<a href="#Xsharma2022sigspatial">35</a>–<a href="#Xsharma2025geoanomalies">38</a>]. In the
-modern era of large language models [<a href="#Xanthropic2024claude">1</a>, <a href="#Xopenai2024gpt4">28</a>], however, even the best agents tend to hallucinate
-spatial relationships, miscompute distances, or skip the kinematic check entirely [<a href="#Xchen2024spatialvlm">8</a>, <a href="#Xliu2024llava">25</a>].
+data mining work in maritime safety, contact tracing, and homeland security [<a href="#Xsharma2022sigspatial">37</a>–<a href="#Xsharma2025geoanomalies">40</a>]. In the
+modern era of large language models [<a href="#Xanthropic2024claude">1</a>, <a href="#Xopenai2024gpt4">30</a>], however, even the best agents tend to hallucinate
+spatial relationships, miscompute distances, or skip the kinematic check entirely [<a href="#Xchen2024spatialvlm">8</a>, <a href="#Xliu2024llava">26</a>].
 </p><!-- l. 259 --><p class="noindent">We present <span class="ptmb8t-">GeoTrace-Agent</span>, a multi-agent system that takes the opposite stance: every
 spatially-decidable sub-problem is computed deterministically by a numerical kernel before any LLM
 is asked to synthesize. The system answers natural-language questions over heterogeneous
@@ -101,91 +98,100 @@ orchestrating a small set of specialized sub-agents, each with a typed contract:
   </li>
   <li class="itemize">a         <span class="ptmb8t-">SpaceTimeReasoner         </span>that         owns         the         prism         /         geo-ellipse         /
   minimum-orthogonal-bounding-rectangle (MOBR) algebra;
+                                                                            
+                                                                            
   </li>
   <li class="itemize">a <span class="ptmb8t-">GapDetectorAgent </span>extending the STAGD + dynamic region merge (DRM) algorithm of Sharma
-  et al. [<a href="#Xsharma2024tist">37</a>] with an Abnormal Gap Measure that fuses kinematic plausibility and a Pi-DPM [<a href="#Xsharma2025geoanomalies">38</a>]
+  et al. [<a href="#Xsharma2024tist">39</a>] with an Abnormal Gap Measure that fuses kinematic plausibility and a Pi-DPM [<a href="#Xsharma2025geoanomalies">40</a>]
   reconstruction-error term;
   </li>
   <li class="itemize">a <span class="ptmb8t-">RendezvousFinderAgent </span>extending TGARD and the dual-convergence DC-TGARD variant of
-  Sharma et al. [<a href="#Xsharma2022sigspatial">35</a>] with bi-directional pruning and ellipse-symmetry early stopping; and
+  Sharma et al. [<a href="#Xsharma2022sigspatial">37</a>] with bi-directional pruning and ellipse-symmetry early stopping; and
   </li>
   <li class="itemize">a <span class="ptmb8t-">ValidatorAgent </span>that gates every region returned to the user on a single-axle kinematic-bicycle
-  envelope [<a href="#Xkong2015kinematic">20</a>].</li></ul>
-<!-- l. 269 --><p class="noindent">The orchestrator runs the PlanGraph under a hard <span class="ptmri8t-">token, tool-call, and wallclock </span>budget. Three
-optimization layers, sketched in Section <a href="#methods">4<!-- tex4ht:ref: sec:methods  --></a>, drive efficiency: (i) adaptive prompt compression with
-prefix-cache-aware assembly [<a href="#Xanthropic2024promptcache">2</a>] and structured-output enforcement; (ii) tool-call deduplication
-of in-flight calls and a hybrid exact + semantic cache; and (iii) parallel-safe topo-layer
-execution of the PlanGraph. Every stage emits an OpenTelemetry span [<a href="#Xopentelemetry2024">31</a>] with token-spend,
-cache-hit, and cost attributes, so an analyst can drill into any historical run.
+  envelope [<a href="#Xkong2015kinematic">21</a>].</li></ul>
+<!-- l. 269 --><p class="noindent">The orchestrator runs the PlanGraph under a hard <span class="ptmri8t-">token, tool-call, and wallclock </span>budget. Optimization
+layers, sketched in Section <a href="#methods">4<!-- tex4ht:ref: sec:methods  --></a>, drive efficiency: (i) adaptive prompt compression with prefix-cache-aware
+assembly [<a href="#Xanthropic2024promptcache">2</a>] and structured-output enforcement; (ii) a hybrid exact + semantic cache; and (iii)
+parallel-safe topo-layer execution of the PlanGraph. An in-flight tool deduplicator is implemented
+but not yet wired into the run path. Every stage emits an OpenTelemetry span [<a href="#Xopentelemetry2024">33</a>] with
+token-spend, cache-hit, and cost attributes, so an analyst can drill into any historical run.
 </p><!-- l. 272 --><p class="noindent">GeoTrace-Agent speaks the modern agent-protocol stack natively. The prism kernel is exposed as a Model
 Context Protocol [<a href="#Xanthropic2024mcp">3</a>] server so any MCP-aware client can call <span class="pcrr8t-">prism.compute </span>or <span class="pcrr8t-">prism.intersect</span>
 without going through this app’s HTTP surface; the agent itself advertises a capability card at
-<span class="pcrr8t-">/a2a/.well-known/capabilities </span>and accepts JSON-RPC 2.0 Agent-to-Agent (A2A) calls [<a href="#Xgoogle2024a2a">13</a>],
+<span class="pcrr8t-">/a2a/.well-known/capabilities </span>and accepts JSON-RPC 2.0 Agent-to-Agent (A2A) calls [<a href="#Xgoogle2024a2a">14</a>],
 mirroring the cross-agent communication patterns recently popularized in enterprise multi-agent
 frameworks [<a href="#Xcentific2025legalwiz">5</a>–<a href="#Xcentific2025art">7</a>]. Ambiguous traces (validator-confidence below a tunable threshold) flow into a Postgres
 human-in-the-loop (HITL) queue whose reviewer verdicts can be exported as preference triples for downstream
-direct-preference optimization [<a href="#Xrafailov2023dpo">32</a>], closing the loop between agentic reasoning and reinforcement learning.
-</p><!-- l. 275 --><p class="noindent">We make four contributions:
+direct-preference optimization [<a href="#Xrafailov2023dpo">34</a>], closing the loop between agentic reasoning and reinforcement learning.
+</p><!-- l. 275 --><p class="noindent">We  make  five  contributions:
   </p><dl class="enumerate-enumitem"><dt class="enumerate-enumitem">
 1. </dt><dd class="enumerate-enumitem">a <span class="ptmb8t-">typed PlanGraph </span>chain-of-thought representation that is statically validated, parallel-sortable,
   and replayable, with explicit per-node token and confidence priors;
   </dd><dt class="enumerate-enumitem">
-2. </dt><dd class="enumerate-enumitem">a <span class="ptmb8t-">three-layer efficiency stack </span>(adaptive prompt compression, in-flight tool deduplication, hybrid
-  exact + semantic cache) that reduces median per-query token spend by approximately 40 % on
-  the golden evaluation set;
+2. </dt><dd class="enumerate-enumitem">an <span class="ptmb8t-">efficiency stack </span>with two active layers (adaptive prompt compression and a hybrid exact +
+  semantic cache; an in-flight tool deduplicator is implemented but not yet wired into the run path),
+  reproduced at about 0.026 USD per query on a live golden-set run, with the exact-response cache
+  dropping a repeated query to zero LLM cost (Section <a href="#experiments">6<!-- tex4ht:ref: sec:expts  --></a>);
   </dd><dt class="enumerate-enumitem">
 3. </dt><dd class="enumerate-enumitem">a <span class="ptmb8t-">deterministic time-geographic kernel </span>integrating Hägerstrand prisms with the STAGD-DRM
   gap detector and the TGARD / DC-TGARD rendezvous finder, gated by a kinematic validator
-  that guarantees physical feasibility of every returned region; and
+  that guarantees physical feasibility of every returned region;
   </dd><dt class="enumerate-enumitem">
 4. </dt><dd class="enumerate-enumitem">a <span class="ptmb8t-">first-class agent-protocol surface </span>(MCP for tools, JSON-RPC 2.0 A2A for inter-agent calls,
   OpenTelemetry  traces,  HITL  queue)  suitable  for  production  deployment  alongside  enterprise
-  multi-agent frameworks.</dd></dl>
+  multi-agent frameworks; and
+  </dd><dt class="enumerate-enumitem">
+5. </dt><dd class="enumerate-enumitem">a <span class="ptmb8t-">durable-orchestration port </span>(Section <a href="#durable-orchestration-via-the-neurosymbolic-determinism-boundary">5<!-- tex4ht:ref: sec:durable  --></a>) that recognizes the neuro-symbolic trust boundary as a
+  <span class="ptmri8t-">determinism </span>boundary and maps it onto a durable workflow / activity split, inheriting the engine’s
+  crash-safe replay and a human-in-the-loop that survives worker restarts (exercised in the engine’s
+  test environment), with a lossless, geometrically-faithful serialization contract for the space-time
+  prism that crosses that boundary.</dd></dl>
 
 <h2 class="sectionHead" id="related-work"><span class="titlemark">2    </span>    <a id="x1-20002"></a>Related  Work</h2>
-<!-- l. 287 --><p class="noindent"><span class="ptmb8t-">Time geography and trajectory analysis: </span>Hägerstrand’s space-time prism [<a href="#Xhagerstrand1970what">17</a>, <a href="#Xmiller2005measuring">27</a>] is the
+<!-- l. 288 --><p class="noindent"><span class="ptmb8t-">Time geography and trajectory analysis: </span>Hägerstrand’s space-time prism [<a href="#Xhagerstrand1970what">18</a>, <a href="#Xmiller2005measuring">28</a>] is the
 foundational construct for reachability queries over moving objects; the geo-ellipse cross-section and
-its bounding-box approximation drive most modern indexing schemes [<a href="#Xkuijpers2008prism">21</a>]. Time geography
+its bounding-box approximation drive most modern indexing schemes [<a href="#Xkuijpers2008prism">22</a>]. Time geography
 has also influenced accessibility modeling, movement uncertainty, mobility-data mining, and
-GIScience more broadly [<a href="#Xdodge2008towards">10</a>, <a href="#Xgoodchild1992geographical">14</a>, <a href="#Xmiller1991modelling">26</a>, <a href="#Xzheng2015trajectory">46</a>]. Our prior work extended this lineage to abnormal
-trajectory-gap detection (STAGD with dynamic region merge) [<a href="#Xsharma2024tist">37</a>], ellipse-tightening rendezvous
-detection (TGARD and the dual-convergence DC-TGARD) [<a href="#Xsharma2022sigspatial">35</a>], and time-geography-driven
-query optimization for spatiotemporal joins [<a href="#Xsharma2022tist">36</a>]. GeoTrace-Agent embeds these algorithms as
+                                                                            
+                                                                            
+GIScience more broadly [<a href="#Xdodge2008towards">10</a>, <a href="#Xgoodchild1992geographical">15</a>, <a href="#Xmiller1991modelling">27</a>, <a href="#Xzheng2015trajectory">49</a>]. Our prior work extended this lineage to abnormal
+trajectory-gap detection (STAGD with dynamic region merge) [<a href="#Xsharma2024tist">39</a>], ellipse-tightening rendezvous
+detection (TGARD and the dual-convergence DC-TGARD) [<a href="#Xsharma2022sigspatial">37</a>], and time-geography-driven
+query optimization for spatiotemporal joins [<a href="#Xsharma2022tist">38</a>]. GeoTrace-Agent embeds these algorithms as
 deterministic agents, with a chain-of-thought planner deciding when to invoke them.
-</p><!-- l. 290 --><p class="noindent"><span class="ptmb8t-">LLM agents and chain of thought: </span>Recent agent frameworks emphasize chain-of-thought [<a href="#Xwang2023plan">41</a>, <a href="#Xwei2022cot">43</a>] and
-tool use [<a href="#Xschick2023toolformer">33</a>, <a href="#Xyao2023react">45</a>], with structured-output libraries [<a href="#Xopenai2024structured">29</a>] formalizing the latter. Planning work in classical AI
-[<a href="#Xghallab1998pddl">12</a>, <a href="#Xlavalle2006planning">24</a>] and search [<a href="#Xhart1968astar">16</a>] shows the value of explicit state, operators, and dependencies. Most existing LLM
+</p><!-- l. 291 --><p class="noindent"><span class="ptmb8t-">LLM agents and chain of thought: </span>Recent agent frameworks emphasize chain-of-thought [<a href="#Xwang2023plan">44</a>, <a href="#Xwei2022cot">46</a>] and
+tool use [<a href="#Xschick2023toolformer">35</a>, <a href="#Xyao2023react">48</a>], with structured-output libraries [<a href="#Xopenai2024structured">31</a>] formalizing the latter. Planning work in classical AI
+[<a href="#Xghallab1998pddl">13</a>, <a href="#Xlavalle2006planning">25</a>] and search [<a href="#Xhart1968astar">17</a>] shows the value of explicit state, operators, and dependencies. Most existing LLM
 systems however treat the chain of thought as free-form prose, complicating audit and replay. We instead
-                                                                            
-                                                                            
 emit a typed DAG (PlanGraph) whose nodes are statically validated against schemas the orchestrator owns,
 adapting planning-graph ideas to LLM-emitted plans while keeping geometric truth outside the model.
-</p><!-- l. 293 --><p class="noindent"><span class="ptmb8t-">Multi-agent systems and human-in-the-loop: </span>Centific’s recent line of work, LegalWiz for
+</p><!-- l. 294 --><p class="noindent"><span class="ptmb8t-">Multi-agent systems and human-in-the-loop: </span>Centific’s recent line of work, LegalWiz for
 contradiction detection in legal documents [<a href="#Xcentific2025legalwiz">5</a>], ContraGen for enterprise contradictions [<a href="#Xcentific2025contragen">6</a>], and
 ART for action-based reasoning over EHRs [<a href="#Xcentific2025art">7</a>], codifies a multi-agent + HITL pattern in which
 specialized agents coordinate via remote-procedure calls and a human reviewer closes the loop.
-Other production agentic stacks [<a href="#Xhong2024opendevin">18</a>, <a href="#Xjimenez2024swebench">19</a>, <a href="#Xwang2024survey">42</a>, <a href="#Xxie2024multimodal">44</a>] similarly emphasize agent specialization,
+Other production agentic stacks [<a href="#Xhong2024opendevin">19</a>, <a href="#Xjimenez2024swebench">20</a>, <a href="#Xwang2024survey">45</a>, <a href="#Xxie2024multimodal">47</a>] similarly emphasize agent specialization,
 evaluation, and observability. Our system inherits this pattern but pivots the domain from text to
 spatiotemporal trajectories and adds a deterministic geometric kernel as a first-class agent.
-</p><!-- l. 296 --><p class="noindent"><span class="ptmb8t-">Token and tool optimization: </span>Prompt caching [<a href="#Xanthropic2024promptcache">2</a>, <a href="#Xopenai2024autocache">30</a>], semantic caching for LLM responses [<a href="#Xbang2023gptcache">4</a>],
-KV-cache-aware decoding [<a href="#Xkwon2023vllm">22</a>], and structured-output-with-correction loops [<a href="#Xopenai2024structured">29</a>] have separately reduced
+</p><!-- l. 297 --><p class="noindent"><span class="ptmb8t-">Token and tool optimization: </span>Prompt caching [<a href="#Xanthropic2024promptcache">2</a>, <a href="#Xopenai2024autocache">32</a>], semantic caching for LLM responses [<a href="#Xbang2023gptcache">4</a>],
+KV-cache-aware decoding [<a href="#Xkwon2023vllm">23</a>], and structured-output-with-correction loops [<a href="#Xopenai2024structured">31</a>] have separately reduced
 LLM cost. Databases solved analogous problems through query optimization, indexes, and
-memoization decades earlier [<a href="#Xbeckmann1990rstar">9</a>, <a href="#Xguttman1984rtree">15</a>, <a href="#Xsellis1987multiple">40</a>]. GeoTrace-Agent applies the same systems instinct
+memoization decades earlier [<a href="#Xbeckmann1990rstar">9</a>, <a href="#Xguttman1984rtree">16</a>, <a href="#Xsellis1987multiple">42</a>]. GeoTrace-Agent applies the same systems instinct
 to agents: keep a single <span class="pcrr8t-">TokenOptimizer </span>choke-point, deduplicate in-flight calls, cache
 exact and semantic tool results, and expose every decision in an OpenTelemetry trace.
-</p><!-- l. 299 --><p class="noindent"><span class="ptmb8t-">Agent protocols: </span>The Model Context Protocol [<a href="#Xanthropic2024mcp">3</a>] standardizes JSON-RPC tool exposure
-between LLM clients and tool servers; the Agent-to-Agent (A2A) protocol [<a href="#Xgoogle2024a2a">13</a>] and
+</p><!-- l. 300 --><p class="noindent"><span class="ptmb8t-">Agent protocols: </span>The Model Context Protocol [<a href="#Xanthropic2024mcp">3</a>] standardizes JSON-RPC tool exposure
+between LLM clients and tool servers; the Agent-to-Agent (A2A) protocol [<a href="#Xgoogle2024a2a">14</a>] and
 capability-card discovery patterns standardize inter-agent calls. We adopt both and ship
 the prism kernel as an MCP server while exposing the orchestrator over A2A.
-</p><!-- l. 302 --><p class="noindent"><span class="ptmb8t-">Spatial databases and geospatial software: </span>GeoTrace-Agent is also influenced by classic
+</p><!-- l. 303 --><p class="noindent"><span class="ptmb8t-">Spatial databases and geospatial software: </span>GeoTrace-Agent is also influenced by classic
 spatial database ideas: explicit geometry types, indexable bounding boxes, and separation of
-query planning from execution [<a href="#Xegenhofer1994spatial">11</a>, <a href="#Xsamet1990applications">39</a>]. The production stack uses Postgres/PostGIS, Redis,
+query planning from execution [<a href="#Xegenhofer1994spatial">11</a>, <a href="#Xsamet1990applications">41</a>]. The production stack uses Postgres/PostGIS, Redis,
 Chroma, and a deterministic prism kernel; the LLM is not a substitute for these systems but an
 orchestrator that decides which query plan is appropriate for a user’s natural-language request.
 
 </p>
 <h2 class="sectionHead" id="system-architecture"><span class="titlemark">3    </span>    <a id="x1-30003"></a>System  Architecture</h2>
-<!-- l. 308 --><p class="noindent">GeoTrace-Agent is a 12-factor service. Figure <a href="#geotraceagent-request-path-the-planneragent-emits-a-typed-plangraph-the-orchestrator-toposorts-the-graph-and-runs-each-layer-in-parallel-under-a-hard-token-tool-wallclock-budget-specialized-subagents-call-into-the-deterministic-kernel-mcp-and-the-cache-otel-infrastructure">1<!-- tex4ht:ref: fig:arch  --></a> sketches the request path: an inbound HTTP query passes
+<!-- l. 309 --><p class="noindent">GeoTrace-Agent is a 12-factor service. Figure <a href="#geotraceagent-request-path-the-planneragent-emits-a-typed-plangraph-the-orchestrator-toposorts-the-graph-and-runs-each-layer-in-parallel-under-a-hard-token-tool-wallclock-budget-specialized-subagents-call-into-the-deterministic-kernel-mcp-and-the-cache-otel-infrastructure">1<!-- tex4ht:ref: fig:arch  --></a> sketches the request path: an inbound HTTP query passes
 the input guard, is rewritten and routed, planned, executed across parallel topo layers, summarized,
 scrubbed by an output filter, and returned with a full trace, cost ledger, and HITL flag.
 </p>
@@ -195,7 +201,7 @@ scrubbed by an output filter, and returned with a full trace, cost ledger, and H
                                                                             
                                                                             
                                                                             
-<!-- l. 312 --><p class="noindent" id="geotraceagent-request-path-the-planneragent-emits-a-typed-plangraph-the-orchestrator-toposorts-the-graph-and-runs-each-layer-in-parallel-under-a-hard-token-tool-wallclock-budget-specialized-subagents-call-into-the-deterministic-kernel-mcp-and-the-cache-otel-infrastructure"> <img alt="Figure" src="figures/geotrace_agent_neurips-56b396c37e096c9b7d7f50c2be0193cb.svg" loading="lazy">
+<!-- l. 313 --><p class="noindent" id="geotraceagent-request-path-the-planneragent-emits-a-typed-plangraph-the-orchestrator-toposorts-the-graph-and-runs-each-layer-in-parallel-under-a-hard-token-tool-wallclock-budget-specialized-subagents-call-into-the-deterministic-kernel-mcp-and-the-cache-otel-infrastructure"> <img alt="Figure" src="figures/geotrace_agent_neurips-56b396c37e096c9b7d7f50c2be0193cb.svg" loading="lazy">
 <a id="x1-3001r1"></a>
 </p>
 <figcaption class="caption"><span class="id">Figure 1:   </span><span class="content">GeoTrace-Agent   request   path.   The   PlannerAgent   emits   a   typed   <span class="ptmri8t-">PlanGraph</span>;   the
@@ -205,7 +211,7 @@ infrastructure.                                                                 
                                                                             
                                                                             
 </figure>
-<!-- l. 355 --><p class="noindent"><span class="ptmb8t-">State. </span>The system separates four orthogonal concerns. Geometric truth lives in
+<!-- l. 356 --><p class="noindent"><span class="ptmb8t-">State. </span>The system separates four orthogonal concerns. Geometric truth lives in
 <span class="pcrr8t-">app/components/space_time_prism.py </span>and is unit-testable. Semantic reasoning is
 delegated to the LLM only through the planner; the other agents are deterministic kernels or thin
 clients on top. Budgets are enforced at a single choke-point: every LLM call goes through the
@@ -213,25 +219,25 @@ clients on top. Budgets are enforced at a single choke-point: every LLM call goe
 <span class="pcrr8t-">terminated_by_budget = true</span>. Provenance is captured by OpenTelemetry: every stage writes
 a span with <span class="pcrr8t-">tool.name</span>, <span class="pcrr8t-">tool.cache_hit</span>, <span class="pcrr8t-">tool.cost_usd</span>, <span class="pcrr8t-">tool.tokens_in</span>,
 and <span class="pcrr8t-">tool.tokens_out</span>; the trace identifier flows back to the user in the response.
-</p><!-- l. 357 --><p class="noindent"><span class="ptmb8t-">Deployment. </span>A docker-compose stack ships the API (FastAPI), Postgres+PostGIS, Redis, Chroma, an
-OpenTelemetry collector, Tempo for traces, Langfuse [<a href="#Xlangfuse2024">23</a>] for LLM-trace dashboards, and a Streamlit ops
+</p><!-- l. 358 --><p class="noindent"><span class="ptmb8t-">Deployment. </span>A docker-compose stack ships the API (FastAPI), Postgres+PostGIS, Redis, Chroma, an
+OpenTelemetry collector, Tempo for traces, Langfuse [<a href="#Xlangfuse2024">24</a>] for LLM-trace dashboards, and a Streamlit ops
 console for the HITL reviewer. The same image runs in Kubernetes with horizontal pod autoscaling on RPS.
 
 </p>
-<!-- l. 359 --><p class="noindent"><span class="paragraphHead" id="problem-formulation"> <a id="x1-4000"></a><span class="ptmb8t-">Problem  formulation:</span></span>
+<!-- l. 360 --><p class="noindent"><span class="paragraphHead" id="problem-formulation"> <a id="x1-4000"></a><span class="ptmb8t-">Problem  formulation:</span></span>
 An input query <span class="mathjax-inline">\(q\)</span> contains natural language, optional anchors <span class="mathjax-inline">\(\mathcal {A}=\{(lat_i,lon_i,t_i)\}_{i=1}^n\)</span>, a domain label <span class="mathjax-inline">\(d\in \{\text {vessel},\text {vehicle},\text {pedestrian},\text {uav}\}\)</span>, and a budget
 vector <span class="mathjax-inline">\(b=(B_{\mathrm {tok}}, B_{\mathrm {tool}}, B_{\mathrm {sec}})\)</span>. The system must return an answer <span class="mathjax-inline">\(a\)</span>, a set of candidate regions <span class="mathjax-inline">\(\mathcal {R}\)</span>, a confidence score, and
 a trace identifier. The hard correctness requirement is not that the natural-language answer
 sounds plausible; it is that every region <span class="mathjax-inline">\(r\in \mathcal {R}\)</span> passes the deterministic feasibility predicate </p><div class="mathjax-env mathjax-equation">\begin{equation} \mathrm {Valid}(r,d) = \mathbf {1}\left [ \max _{(p_i,t_i),(p_j,t_j)\in r} \frac {\|p_i-p_j\|}{|t_i-t_j|+\epsilon } \le v_{\max }(d) \right ], \label {eq:valid} \end{equation}</div>
 <p><a id="x1-4001r1"></a>
-<!-- l. 370 --></p><p class="noindent">with stricter checks when acceleration, curvature, or S-KBM state is available. A
+<!-- l. 371 --></p><p class="noindent">with stricter checks when acceleration, curvature, or S-KBM state is available. A
 query is therefore a budgeted planning problem over typed tools: </p><div class="mathjax-env mathjax-equation">\begin{equation} \min _{\mathcal {G}}\;\mathrm {Cost}(\mathcal {G};q) \quad \text {s.t.}\quad \forall r\in \mathcal {R}(\mathcal {G},q),\; \mathrm {Valid}(r,d)=1,\quad \mathrm {Budget}(\mathcal {G})\preceq b, \label {eq:budgeted-plan} \end{equation}</div>
 <p><a id="x1-4002r2"></a>
-<!-- l. 378 --></p><p class="noindent">where <span class="mathjax-inline">\(\mathcal {G}\)</span> is the PlanGraph emitted by the planner. The LLM is used to propose <span class="mathjax-inline">\(\mathcal {G}\)</span> and summarize its
+<!-- l. 379 --></p><p class="noindent">where <span class="mathjax-inline">\(\mathcal {G}\)</span> is the PlanGraph emitted by the planner. The LLM is used to propose <span class="mathjax-inline">\(\mathcal {G}\)</span> and summarize its
 results; geometry, validation, caching, and budget accounting are deterministic.
 
 </p>
-<!-- l. 380 --><p class="noindent"><span class="paragraphHead" id="plangraph-semantics"> <a id="x1-5000"></a><span class="ptmb8t-">PlanGraph  semantics:</span></span>
+<!-- l. 381 --><p class="noindent"><span class="paragraphHead" id="plangraph-semantics"> <a id="x1-5000"></a><span class="ptmb8t-">PlanGraph  semantics:</span></span>
 A PlanGraph is a finite directed acyclic graph <span class="mathjax-inline">\(\mathcal {G}=(V,E)\)</span> whose node <span class="mathjax-inline">\(v\in V\)</span> has type <span class="mathjax-inline">\(\tau (v)\)</span>, dependency set <span class="mathjax-inline">\(\mathrm {deps}(v)\)</span>,
 JSON-serializable inputs, output schema, expected token cost, expected tool cost, and confidence
 prior. Topological layers <span class="mathjax-inline">\(\mathcal {L}_1,\ldots ,\mathcal {L}_m\)</span> define concurrency: nodes within a layer may run in parallel, but
@@ -246,7 +252,7 @@ ReAct loop: the model is allowed to plan, but the orchestrator owns the type sys
                                                                             
                                                                             
                                                                             
-<!-- l. 385 --><p class="noindent" id="typed-execution-model-the-llm-emits-a-plangraph-not-a-final-spatial-answer-the-orchestrator-validates-the-graph-executes-deterministic-tools-in-parallelsafe-layers-and-exposes-cachecosttrace-metadata-for-every-node"> <img alt="Figure" src="figures/geotrace_agent_neurips-2e34ac7861f8332ed781b67c3b6e1db8.svg" loading="lazy">
+<!-- l. 386 --><p class="noindent" id="typed-execution-model-the-llm-emits-a-plangraph-not-a-final-spatial-answer-the-orchestrator-validates-the-graph-executes-deterministic-tools-in-parallelsafe-layers-and-exposes-cachecosttrace-metadata-for-every-node"> <img alt="Figure" src="figures/geotrace_agent_neurips-2e34ac7861f8332ed781b67c3b6e1db8.svg" loading="lazy">
 <a id="x1-5001r2"></a>
 </p>
 <figcaption class="caption"><span class="id">Figure 2:  </span><span class="content">Typed  execution  model.  The  LLM  emits  a  PlanGraph,  not  a  final  spatial  answer.  The
@@ -256,7 +262,7 @@ cache/cost/trace metadata for every node.                                       
                                                                             
 </figure>
 
-<!-- l. 420 --><p class="noindent"><span class="paragraphHead" id="trust-boundary"> <a id="x1-6000"></a><span class="ptmb8t-">Trust  boundary:</span></span>
+<!-- l. 421 --><p class="noindent"><span class="paragraphHead" id="trust-boundary"> <a id="x1-6000"></a><span class="ptmb8t-">Trust  boundary:</span></span>
 The architecture has a strict trust boundary. The LLM may choose a tool and summarize a tool result, but it
 cannot directly manufacture a returned region. Returned regions originate from the prism, gap,
 rendezvous, or validator components. This boundary makes failures easier to localize: if a region
@@ -268,7 +274,7 @@ portfolio-quality work because it converts a vague “LLM agent” into an audit
 <h2 class="sectionHead" id="methods"><span class="titlemark">4    </span>    <a id="x1-70004"></a>Methods</h2>
 
 <h3 class="subsectionHead" id="typed-plangraph-chainofthought"><span class="titlemark">4.1    </span>    <a id="x1-80004.1"></a>Typed PlanGraph chain-of-thought</h3>
-<!-- l. 428 --><p class="noindent">The planner does not emit free-form prose. It emits a JSON object validated against a strict schema
+<!-- l. 429 --><p class="noindent">The planner does not emit free-form prose. It emits a JSON object validated against a strict schema
 (<span class="pcrr8t-">PlanGraph</span>), each node being one of {<span class="pcrr8t-">prism.compute</span>, <span class="pcrr8t-">gaps.detect</span>, <span class="pcrr8t-">rendezvous.tgard</span>,
 <span class="pcrr8t-">rendezvous.dc_tgard</span>, <span class="pcrr8t-">validate.kinematic</span>, <span class="pcrr8t-">retrieve.semantic</span>, <span class="pcrr8t-">summarize</span>}. A node
 carries its <span class="pcrr8t-">deps </span>(DAG edges), <span class="pcrr8t-">inputs</span>, <span class="pcrr8t-">expected_tokens</span>, and <span class="pcrr8t-">confidence_prior</span>.
@@ -279,7 +285,7 @@ request budget; an over-budget plan raises <span class="pcrr8t-">PlanInfeasible<
 
 </p>
 <h3 class="subsectionHead" id="tokenconsumption-optimization"><span class="titlemark">4.2    </span>    <a id="x1-90004.2"></a>Token-consumption optimization</h3>
-<!-- l. 431 --><p class="noindent">A single <span class="pcrr8t-">TokenOptimizer.call_llm_* </span>entry point owns every LLM call. It performs four jobs: </p>
+<!-- l. 432 --><p class="noindent">A single <span class="pcrr8t-">TokenOptimizer.call_llm_* </span>entry point owns every LLM call. It performs four jobs: </p>
   <ul class="itemize1">
   <li class="itemize"><span class="ptmri8t-">Adaptive prompt compression. </span>Prompts above <span class="mathjax-inline">\(\sim \)</span>2k tokens are head-tail-truncated with a marker so
   the model still sees the lead and the question; the middle is elided.
@@ -293,50 +299,51 @@ request budget; an over-budget plan raises <span class="pcrr8t-">PlanInfeasible<
   </li>
   <li class="itemize"><span class="ptmri8t-">Per-call  </span><span class="pcrro8t-">max_tokens </span><span class="ptmri8t-">clamp.  </span>The  optimizer  caps  <span class="pcrr8t-">max_tokens </span>against  the  remaining  run
   budget so the orchestrator never overshoots even on planner regressions.</li></ul>
-<!-- l. 438 --><p class="noindent">Every call returns <span class="pcrr8t-">(text, tokens_in, tokens_out, cost_usd, cache_hit)</span>;
+<!-- l. 439 --><p class="noindent">Every call returns <span class="pcrr8t-">(text, tokens_in, tokens_out, cost_usd, cache_hit)</span>;
 the orchestrator accumulates these into the per-stage cost ledger.
 
 </p>
 <h3 class="subsectionHead" id="toolcall-optimization"><span class="titlemark">4.3    </span>    <a id="x1-100004.3"></a>Tool-call optimization</h3>
-<!-- l. 441 --><p class="noindent">Three mechanisms reduce tool spend. </p>
+<!-- l. 442 --><p class="noindent">Three mechanisms reduce tool spend. </p>
   <ul class="itemize1">
   <li class="itemize"><span class="ptmri8t-">Parallel-safe topo layers. </span>The orchestrator runs each PlanGraph layer with <span class="pcrr8t-">asyncio.gather</span>
   so independent sub-agents proceed concurrently.
   </li>
-  <li class="itemize"><span class="ptmri8t-">In-flight                    tool                    deduplication.                    </span><span class="pcrr8t-">ToolBatcher        </span>keys
-  concurrent calls by <span class="pcrr8t-">(tool, sha256(args))</span>; a second caller short-circuits to the first call’s
-  awaitable. This is distinct from the cache because matches are within a single run.
+  <li class="itemize"><span class="ptmri8t-">In-flight             tool             deduplication.             </span><span class="pcrr8t-">ToolBatcher     </span>keys             concurrent
+  calls by <span class="pcrr8t-">(tool, sha256(args))</span>; a second caller short-circuits to the first call’s awaitable.
+  This is distinct from the cache because matches are within a single run. It is implemented but not
+  yet wired into the orchestrator run path, so it is excluded from the measured efficiency numbers.
   </li>
   <li class="itemize"><span class="ptmri8t-">Hybrid cache. </span><span class="pcrr8t-">SemanticCache </span>layers an exact-key Redis lookup over a near-key embedding
   lookup.  Identical  anchor  pairs  return  the  same  prism  in  <span class="mathjax-inline">\(O(1)\)</span>;  near-duplicate  questions  return  prior
   answers above a configurable similarity.</li></ul>
 
 <h3 class="subsectionHead" id="geometric-kernel-prism-geoellipse-mobr-drm"><span class="titlemark">4.4    </span>    <a id="x1-110004.4"></a>Geometric kernel: prism, geo-ellipse, MOBR, DRM</h3>
-<!-- l. 449 --><p class="noindent">For an anchor pair <span class="mathjax-inline">\(A=(x_A,y_A,t_A), B=(x_B,y_B,t_B)\)</span> with budget <span class="mathjax-inline">\(T = t_B-t_A\)</span> and speed bound <span class="mathjax-inline">\(v_{\max }\)</span>, the prism is the union of geo-ellipses </p><div class="mathjax-env mathjax-equation">\begin{equation} \mathcal {E}_t = \left \{ p : \frac {\|p - A\|}{v_{\max }} \le t-t_A \,\wedge \, \frac {\|p - B\|}{v_{\max }} \le t_B-t \right \}, \quad t\in [t_A,t_B], \label {eq:ellipse} \end{equation}</div>
+<!-- l. 450 --><p class="noindent">For an anchor pair <span class="mathjax-inline">\(A=(x_A,y_A,t_A), B=(x_B,y_B,t_B)\)</span> with budget <span class="mathjax-inline">\(T = t_B-t_A\)</span> and speed bound <span class="mathjax-inline">\(v_{\max }\)</span>, the prism is the union of geo-ellipses </p><div class="mathjax-env mathjax-equation">\begin{equation} \mathcal {E}_t = \left \{ p : \frac {\|p - A\|}{v_{\max }} \le t-t_A \,\wedge \, \frac {\|p - B\|}{v_{\max }} \le t_B-t \right \}, \quad t\in [t_A,t_B], \label {eq:ellipse} \end{equation}</div>
 <p><a id="x1-11001r3"></a>
-<!-- l. 454 --></p><p class="noindent">which we approximate by the inscribed ellipse with foci <span class="mathjax-inline">\(A, B\)</span> and semi-major axis <span class="mathjax-inline">\(a(t) = \tfrac {1}{2} v_{\max } (T)\)</span>. Distances are evaluated in a
+<!-- l. 455 --></p><p class="noindent">which we approximate by the inscribed ellipse with foci <span class="mathjax-inline">\(A, B\)</span> and semi-major axis <span class="mathjax-inline">\(a(t) = \tfrac {1}{2} v_{\max } (T)\)</span>. Distances are evaluated in a
 local equirectangular projection centered on the anchor midpoint so they are Euclidean to first order; for
 continental-scale anchors we switch to a UTM zone via <span class="pcrr8t-">pyproj</span>. The MOBR is the orthogonal bounding
 rectangle of the boundary ellipse; the dynamic region merge (DRM) of overlapping ellipses uses an
 R*-tree index and a maximal-union sweep, recovering the STAGD-DRM behavior of Sharma et
-al. [<a href="#Xsharma2024tist">37</a>]. The two-prism intersection <span class="pcrr8t-">intersect(P, Q) </span>samples <span class="mathjax-inline">\(n\)</span> time slices in the overlap
+al. [<a href="#Xsharma2024tist">39</a>]. The two-prism intersection <span class="pcrr8t-">intersect(P, Q) </span>samples <span class="mathjax-inline">\(n\)</span> time slices in the overlap
 window and unions per-slice ellipse intersections; this is the operation that powers TGARD.
 
 </p>
 <h3 class="subsectionHead" id="stagddrm-and-tgard-dctgard-agents"><span class="titlemark">4.5    </span>    <a id="x1-120004.5"></a>STAGD-DRM and TGARD / DC-TGARD agents</h3>
-<!-- l. 457 --><p class="noindent">The GapDetectorAgent walks a trajectory, finds gaps where consecutive samples are farther
+<!-- l. 458 --><p class="noindent">The GapDetectorAgent walks a trajectory, finds gaps where consecutive samples are farther
 apart than a coverage threshold, indexes each gap’s prism MOBR in an R*-tree, unions
 overlapping bounding boxes, and scores each cluster with the Abnormal Gap Measure </p><div class="mathjax-env mathjax-equation">\begin{equation} \mathrm {AGM}(g) = \lambda \, (1 - p_{\text {phys}}(g)) + (1-\lambda )\, p_{\text {data}}(g), \label {eq:agm} \end{equation}</div>
 <p><a id="x1-12001r4"></a>
-<!-- l. 462 --></p><p class="noindent">where <span class="mathjax-inline">\(p_{\text {phys}} = \min (1, v_{\max } / v_{\text {required}})\)</span> and <span class="mathjax-inline">\(p_{\text {data}}\)</span> is a calibrated tail probability over the Pi-DPM [<a href="#Xsharma2025geoanomalies">38</a>] reconstruction error.
-</p><!-- l. 465 --><p class="noindent">The RendezvousFinderAgent pairwise-intersects prisms; in the dual-convergence variant
-DC-TGARD [<a href="#Xsharma2022sigspatial">35</a>] it walks the time interval from both ends, pruning slices whose intersection
+<!-- l. 463 --></p><p class="noindent">where <span class="mathjax-inline">\(p_{\text {phys}} = \min (1, v_{\max } / v_{\text {required}})\)</span> and <span class="mathjax-inline">\(p_{\text {data}}\)</span> is a calibrated tail probability over the Pi-DPM [<a href="#Xsharma2025geoanomalies">40</a>] reconstruction error.
+</p><!-- l. 466 --><p class="noindent">The RendezvousFinderAgent pairwise-intersects prisms; in the dual-convergence variant
+DC-TGARD [<a href="#Xsharma2022sigspatial">37</a>] it walks the time interval from both ends, pruning slices whose intersection
 becomes empty, and records the tightened time window <span class="mathjax-inline">\([\,t_0 + (t_1-t_0)\,\ell ,\; t_0 + (t_1-t_0)\,h\,]\)</span>. The DC variant is provably correct
 and complete and is empirically faster in expectation when overlaps are short.
 
 </p>
 <h3 class="subsectionHead" id="kinematic-validator-skbm-gate"><span class="titlemark">4.6    </span>    <a id="x1-130004.6"></a>Kinematic validator (S-KBM gate)</h3>
-<!-- l. 468 --><p class="noindent">Every region returned to the user is forced through a <span class="pcrr8t-">ValidatorAgent </span>that recomputes a
+<!-- l. 469 --><p class="noindent">Every region returned to the user is forced through a <span class="pcrr8t-">ValidatorAgent </span>that recomputes a
 worst-case required speed across the region’s centroid and time window, compares against
 the per-domain envelope (vessel: <span class="mathjax-inline">\(25\)</span> kt, vehicle: <span class="mathjax-inline">\(130\)</span> km/h, pedestrian: <span class="mathjax-inline">\(2\)</span> m/s, UAV: <span class="mathjax-inline">\(30\)</span> m/s), and raises
 <span class="pcrr8t-">KinematicViolation </span>on infeasibility. The validator is a hard invariant: a region that does not pass is
@@ -344,24 +351,24 @@ never returned. This is the single most important difference between an LLM-only
 
 </p>
 <h3 class="subsectionHead" id="mcp-server-and-a2a-protocol"><span class="titlemark">4.7    </span>    <a id="x1-140004.7"></a>MCP server and A2A protocol</h3>
-<!-- l. 471 --><p class="noindent">The prism kernel is exposed as a Model Context Protocol [<a href="#Xanthropic2024mcp">3</a>] server speaking JSON-RPC 2.0 over stdio
+<!-- l. 472 --><p class="noindent">The prism kernel is exposed as a Model Context Protocol [<a href="#Xanthropic2024mcp">3</a>] server speaking JSON-RPC 2.0 over stdio
 with three tools: <span class="pcrr8t-">prism.compute</span>, <span class="pcrr8t-">prism.intersect</span>, <span class="pcrr8t-">prism.merge_dynamic</span>. Any MCP-aware
 client, IDE plugin, or sibling agent can invoke them directly. The orchestrator additionally exposes a
 JSON-RPC 2.0 Agent-to-Agent endpoint at <span class="pcrr8t-">/a2a/jsonrpc </span>and advertises a capability card at
 <span class="pcrr8t-">/a2a/.well-known/capabilities</span>; outbound <span class="pcrr8t-">A2AClient </span>calls cache cards for 60
+                                                                            
+                                                                            
 seconds and propagate the OpenTelemetry trace identifier as a <span class="pcrr8t-">traceparent </span>header.
-                                                                            
-                                                                            
 
 </p>
-<!-- l. 473 --><p class="noindent"><span class="paragraphHead" id="prism-geometry-in-local-coordinates"> <a id="x1-15000"></a><span class="ptmb8t-">Prism geometry in local coordinates:</span></span>
+<!-- l. 474 --><p class="noindent"><span class="paragraphHead" id="prism-geometry-in-local-coordinates"> <a id="x1-15000"></a><span class="ptmb8t-">Prism geometry in local coordinates:</span></span>
 For a pair of anchors <span class="mathjax-inline">\(A,B\)</span> we project latitude/longitude to a local tangent plane centered at the midpoint. Let <span class="mathjax-inline">\(c=\|B-A\|/2\)</span>, <span class="mathjax-inline">\(a(t)=v_{\max }(t_B-t_A)/2\)</span>,
 and <span class="mathjax-inline">\(b(t)=\sqrt {a(t)^2-c^2}\)</span> when the anchor pair is reachable. The ellipse at time <span class="mathjax-inline">\(t\)</span> can be written as </p><div class="mathjax-env mathjax-equation">\begin{equation} \frac {(u^\top (p-m))^2}{a(t)^2}+ \frac {(v^\top (p-m))^2}{b(t)^2} \le 1, \label {eq:ellipse-canonical} \end{equation}</div>
 <p><a id="x1-15001r5"></a>
-<!-- l. 481 --></p><p class="noindent">where <span class="mathjax-inline">\(m=(A+B)/2\)</span>, <span class="mathjax-inline">\(u=(B-A)/\|B-A\|\)</span>, and <span class="mathjax-inline">\(v\)</span> is the perpendicular unit vector. The MOBR is obtained by projecting
+<!-- l. 482 --></p><p class="noindent">where <span class="mathjax-inline">\(m=(A+B)/2\)</span>, <span class="mathjax-inline">\(u=(B-A)/\|B-A\|\)</span>, and <span class="mathjax-inline">\(v\)</span> is the perpendicular unit vector. The MOBR is obtained by projecting
 the ellipse axes onto the coordinate axes, giving half-widths </p><div class="mathjax-env mathjax-equation">\begin{equation} h_x=\sqrt {a(t)^2 u_x^2+b(t)^2 v_x^2},\qquad h_y=\sqrt {a(t)^2 u_y^2+b(t)^2 v_y^2}. \label {eq:mobr} \end{equation}</div>
 <p><a id="x1-15002r6"></a>
-<!-- l. 487 --></p><p class="noindent">These bounds are cheap enough for repeated tool calls and tight enough for R-tree pruning.
+<!-- l. 488 --></p><p class="noindent">These bounds are cheap enough for repeated tool calls and tight enough for R-tree pruning.
 Exact polygon intersections are only computed after MOBR filtering. This mirrors the database
 principle that a coarse index should prune before the expensive exact predicate runs.
 </p>
@@ -371,7 +378,7 @@ principle that a coarse index should prune before the expensive exact predicate 
                                                                             
                                                                             
                                                                             
-<!-- l. 491 --><p class="noindent" id="spacetime-prism-slice-in-a-local-tangent-plane-the-deterministic-kernel-computes-the-geoellipse-and-its-mobr-downstream-gap-and-rendezvous-agents-use-these-objects-rather-than-asking-the-llm-to-reason-about-distances"> <img alt="Figure" src="figures/geotrace_agent_neurips-342620c87520535f61ac18b69539e905.svg" loading="lazy">                 <a id="x1-15003r3"></a>
+<!-- l. 492 --><p class="noindent" id="spacetime-prism-slice-in-a-local-tangent-plane-the-deterministic-kernel-computes-the-geoellipse-and-its-mobr-downstream-gap-and-rendezvous-agents-use-these-objects-rather-than-asking-the-llm-to-reason-about-distances"> <img alt="Figure" src="figures/geotrace_agent_neurips-342620c87520535f61ac18b69539e905.svg" loading="lazy">                 <a id="x1-15003r3"></a>
 </p>
 <figcaption class="caption"><span class="id">Figure 3: </span><span class="content">Space-time prism slice in a local tangent plane. The deterministic kernel computes the
 geo-ellipse and its MOBR; downstream gap and rendezvous agents use these objects rather than
@@ -380,7 +387,7 @@ asking the LLM to reason about distances.                                       
                                                                             
 </figure>
 
-<!-- l. 515 --><p class="noindent"><span class="paragraphHead" id="gap-detection-algorithm"> <a id="x1-16000"></a><span class="ptmb8t-">Gap detection algorithm:</span></span>
+<!-- l. 516 --><p class="noindent"><span class="paragraphHead" id="gap-detection-algorithm"> <a id="x1-16000"></a><span class="ptmb8t-">Gap detection algorithm:</span></span>
 Algorithm <a href="#stagddrm-gap-detection-with-agm-scoring">1<!-- tex4ht:ref: alg:gap  --></a> shows the implementation-level STAGD-DRM path. The algorithm is deliberately
 database-like: compute candidate prisms, index their MOBRs, merge overlaps, then score only the surviving
 clusters. The LLM does not inspect every raw point. It receives a compact, typed summary of the
@@ -389,7 +396,7 @@ detected clusters and asks follow-up tools only if the query requires deeper exp
 <div class="algorithm">
                                                                             
                                                                             
-<!-- l. 518 --><p class="noindent"></p><figure class="float" id="x1-16001r1"><span id="stagddrm-gap-detection-with-agm-scoring"></span>
+<!-- l. 519 --><p class="noindent"></p><figure class="float" id="x1-16001r1"><span id="stagddrm-gap-detection-with-agm-scoring"></span>
                                                                             
                                                                             
 
@@ -422,7 +429,7 @@ detected clusters and asks follow-up tools only if the query requires deeper exp
 </figure>
 </div>
 
-<!-- l. 539 --><p class="noindent"><span class="paragraphHead" id="rendezvous-algorithm"> <a id="x1-17000"></a><span class="ptmb8t-">Rendezvous  algorithm:</span></span>
+<!-- l. 540 --><p class="noindent"><span class="paragraphHead" id="rendezvous-algorithm"> <a id="x1-17000"></a><span class="ptmb8t-">Rendezvous  algorithm:</span></span>
 The rendezvous agent intersects two or more prisms over their shared time window. A naive implementation
 samples every time slice and intersects all polygons. DC-TGARD short-circuits this by walking inward
 from both ends, pruning empty slices early, and tightening the candidate window before polygon union. In
@@ -431,16 +438,16 @@ MOBRs already prove that an intersection is impossible. This is why tool-result 
 anchors and domain cap: the same prism and intersection computations recur across analyst questions.
 
 </p>
-<!-- l. 542 --><p class="noindent"><span class="paragraphHead" id="budget-accounting"> <a id="x1-18000"></a><span class="ptmb8t-">Budget  accounting:</span></span>
+<!-- l. 543 --><p class="noindent"><span class="paragraphHead" id="budget-accounting"> <a id="x1-18000"></a><span class="ptmb8t-">Budget  accounting:</span></span>
 Each graph node returns a tuple <span class="mathjax-inline">\((o,c)\)</span>, where <span class="mathjax-inline">\(o\)</span> is the typed output and <span class="mathjax-inline">\(c=(t_{\mathrm {in}},t_{\mathrm {out}},u_{\mathrm {tool}},s_{\mathrm {wall}},\mathrm {usd})\)</span> is the cost vector.
 The orchestrator accumulates costs monotonically and checks </p><div class="mathjax-env mathjax-equation">\begin{equation} \sum _{v\in V_{\mathrm {done}}} c_v \preceq b \label {eq:cost} \end{equation}</div>
 <p><a id="x1-18001r7"></a>
-<!-- l. 548 --></p><p class="noindent">after every layer. If the next layer would exceed budget, the orchestrator returns a partial answer with
+<!-- l. 549 --></p><p class="noindent">after every layer. If the next layer would exceed budget, the orchestrator returns a partial answer with
 <span class="pcrr8t-">terminated_by_budget=true</span>, completed regions, and missing-node diagnostics. This behavior is
 preferable to silent truncation because the caller can decide whether to reissue the query with a larger budget.
 
 </p>
-<!-- l. 550 --><p class="noindent"><span class="paragraphHead" id="cache-correctness"> <a id="x1-19000"></a><span class="ptmb8t-">Cache  correctness:</span></span>
+<!-- l. 551 --><p class="noindent"><span class="paragraphHead" id="cache-correctness"> <a id="x1-19000"></a><span class="ptmb8t-">Cache  correctness:</span></span>
 The exact cache is safe when the key includes tool name, normalized arguments, code version,
 and domain config. The semantic cache is riskier because near-duplicate queries can differ in
 ways that matter. GeoTrace-Agent therefore uses semantic hits only for high-level retrieval
@@ -449,7 +456,7 @@ prevents a dangerous failure mode: reusing a prism from a near but not identical
 A semantic cache hit can save text tokens, but it cannot replace a geometric predicate.
 
 </p>
-<!-- l. 553 --><p class="noindent"><span class="paragraphHead" id="humanintheloop-queue"> <a id="x1-20000"></a><span class="ptmb8t-">Human-in-the-loop queue:</span></span>
+<!-- l. 554 --><p class="noindent"><span class="paragraphHead" id="humanintheloop-queue"> <a id="x1-20000"></a><span class="ptmb8t-">Human-in-the-loop queue:</span></span>
 The validator does not force every uncertain case into a binary answer. When confidence falls below the
 configured threshold, the response marks <span class="pcrr8t-">hitl_required=true </span>and writes a Postgres row containing
 the question, PlanGraph, regions, validator outputs, and trace id. The Streamlit console lets a
@@ -458,45 +465,180 @@ triple for Pi-GRPO. This is an important design connection: GeoTrace-Agent creat
 supervision from ambiguous operational cases instead of discarding them as failures.
 
 </p>
-<h2 class="sectionHead" id="experiments"><span class="titlemark">5    </span>    <a id="x1-210005"></a>Experiments</h2>
-<!-- l. 560 --><p class="noindent"><span class="ptmb8t-">Golden dataset. </span>We curated three anchor questions (<span class="pcrr8t-">g-001 </span>rendezvous, <span class="pcrr8t-">g-002 </span>gap audit,
-<span class="pcrr8t-">g-003 </span>prism only) and replay them through the orchestrator. Each item carries an <span class="ptmri8t-">expected </span>block
-(region count bounds, allowed methods, required validator pass) that the offline evaluator checks.
-Results are written under <span class="pcrr8t-">evaluation/eval_results/&lt;timestamp&gt;.md,json</span>.
-</p><!-- l. 563 --><p class="noindent"><span class="ptmb8t-">Latency, tokens, cost: </span>Table <a href="#goldendataset-results-tighter-is-smaller-mean-values-across-the-three-items">1<!-- tex4ht:ref: tab:metrics  --></a> reports median and p95 latency, mean tokens per query, and mean USD
-cost per query for the configured live-planner path. The structural metric (region tightness)
-is the ratio of the rendezvous polygon area to the union MOBR area; smaller is tighter. The
-table is a diagnostic trend table for the current implementation; production instrumentation
-ships with the system and should replace these numbers after a deployment run.
+<h2 class="sectionHead" id="durable-orchestration-via-the-neurosymbolic-determinism-boundary"><span class="titlemark">5    </span>    <a id="x1-210005"></a>Durable orchestration via the neuro-symbolic determinism boundary</h2>
+<!-- l. 561 --><p class="noindent">The trust boundary of Section <a href="#system-architecture">3<!-- tex4ht:ref: sec:arch  --></a> is not only an auditing device; it is a <span class="ptmri8t-">determinism </span>boundary, and that
+observation is what makes GeoTrace-Agent portable to a durable-execution runtime. Only two steps in a
+run are truly nondeterministic: the planner that emits the PlanGraph and the answer synthesizer, both LLM
+calls whose output can vary for a fixed input. Every other step is pure, the same input yielding the same
+output every time: the prism kernel, TGARD / DC-TGARD, the gap detector (STAGD/DRM plus a
+fixed evaluation-mode Pi-DPM forward pass, with no sampling), the kinematic validator, the
+budget guard, and confidence aggregation. Durable-execution engines such as Temporal [<a href="#Xtemporal2024durable">43</a>]
+demand exactly this split. Workflow code must be deterministic so the engine can reconstruct it by
+replaying its recorded event history; anything nondeterministic or side-effecting must be an
+<span class="ptmri8t-">activity</span>, whose result is recorded once and replayed verbatim. GeoTrace-Agent’s neuro / symbolic
+line therefore coincides with the workflow / activity line (Table <a href="#the-neurosymbolic-boundary-is-the-workflow-activity-boundary-the-languagemodel-steps-must-be-activities-for-correctness-the-geometric-kernels-are-activities-only-for-sandbox-hygiene-a-distinction-the-port-makes-explicit">1<!-- tex4ht:ref: tab:durable  --></a>). The conceptual mapping is
+one-to-one, but the port is not a mechanical lift: it required net-new, runtime-specific engineering, the
+                                                                            
+                                                                            
+version-stable serialization contract below and a dump-then-validate step that re-anchors result
+class identity across the separate workflow and activity sandboxes. That this engineering is
+small and localized rather than a rewrite is itself the evidence that the boundary is real.
 </p>
 <div class="table">
                                                                             
                                                                             
-<!-- l. 565 --><p class="noindent"></p><figure class="float" id="x1-21001r1"><span id="goldendataset-results-tighter-is-smaller-mean-values-across-the-three-items"></span>
+<!-- l. 563 --><p class="noindent"></p><figure class="float" id="x1-21001r1"><span id="the-neurosymbolic-boundary-is-the-workflow-activity-boundary-the-languagemodel-steps-must-be-activities-for-correctness-the-geometric-kernels-are-activities-only-for-sandbox-hygiene-a-distinction-the-port-makes-explicit"></span>
                                                                             
                                                                             
-
-<figcaption class="caption"><span class="id">Table 1: </span><span class="content">Golden-dataset results. Tighter is smaller. Mean values across the three items.         </span></figcaption><!-- tex4ht:label?: x1-21001r1  -->
 <div class="tabular">
- <table class="tabular" id="TBL-2"><colgroup id="TBL-2-1g"><col id="TBL-2-1"><col id="TBL-2-2"><col id="TBL-2-3"><col id="TBL-2-4"><col id="TBL-2-5"></colgroup><tr id="TBL-2-1-" style="vertical-align:baseline;"><td class="td11" id="TBL-2-1-1" style="white-space:normal; text-align:left;"> Metric                                              </td><td class="td11" id="TBL-2-1-2" style="white-space:normal; text-align:center;"> p50 latency (s)  </td><td class="td11" id="TBL-2-1-3" style="white-space:normal; text-align:center;"> p95 latency (s)  </td><td class="td11" id="TBL-2-1-4" style="white-space:normal; text-align:center;"> tokens / query  </td><td class="td11" id="TBL-2-1-5" style="white-space:normal; text-align:center;"> cost USD / query  </td>
-</tr><tr id="TBL-2-2-" style="vertical-align:baseline;"><td class="td11" id="TBL-2-2-1" style="white-space:normal; text-align:left;"> Full pipeline                                     </td><td class="td11" id="TBL-2-2-2" style="white-space:normal; text-align:center;">     1.9            </td><td class="td11" id="TBL-2-2-3" style="white-space:normal; text-align:center;">     3.4            </td><td class="td11" id="TBL-2-2-4" style="white-space:normal; text-align:center;">    4,210         </td><td class="td11" id="TBL-2-2-5" style="white-space:normal; text-align:center;">     0.034            </td>
-</tr><tr id="TBL-2-3-" style="vertical-align:baseline;"><td class="td11" id="TBL-2-3-1" style="white-space:normal; text-align:left;"> Without semantic cache (ablation)  </td><td class="td11" id="TBL-2-3-2" style="white-space:normal; text-align:center;">     2.6            </td><td class="td11" id="TBL-2-3-3" style="white-space:normal; text-align:center;">     4.5            </td><td class="td11" id="TBL-2-3-4" style="white-space:normal; text-align:center;">    6,980         </td><td class="td11" id="TBL-2-3-5" style="white-space:normal; text-align:center;">     0.054            </td>
-</tr><tr id="TBL-2-4-" style="vertical-align:baseline;"><td class="td11" id="TBL-2-4-1" style="white-space:normal; text-align:left;"> Without tool dedup (ablation)          </td><td class="td11" id="TBL-2-4-2" style="white-space:normal; text-align:center;">     2.1            </td><td class="td11" id="TBL-2-4-3" style="white-space:normal; text-align:center;">     3.7            </td><td class="td11" id="TBL-2-4-4" style="white-space:normal; text-align:center;">    4,980         </td><td class="td11" id="TBL-2-4-5" style="white-space:normal; text-align:center;">     0.039            </td>
+ <table class="tabular" id="TBL-2"><colgroup id="TBL-2-1g"><col id="TBL-2-1"><col id="TBL-2-2"><col id="TBL-2-3"></colgroup><tr id="TBL-2-1-" style="vertical-align:baseline;"><td class="td11" id="TBL-2-1-1" style="white-space:normal; text-align:left;"> <!-- l. 568 --><p class="noindent"><span class="ptmr8t-x-x-90">GeoTrace step</span>                                 </p></td><td class="td11" id="TBL-2-1-2" style="white-space:normal; text-align:left;"> <!-- l. 568 --><p class="noindent"><span class="ptmr8t-x-x-90">Placement</span>                  </p></td><td class="td11" id="TBL-2-1-3" style="white-space:normal; text-align:left;"> <!-- l. 568 --><p class="noindent"><span class="ptmr8t-x-x-90">Why</span>                                                                     </p></td>
+</tr><tr id="TBL-2-2-" style="vertical-align:baseline;"><td class="td11" id="TBL-2-2-1" style="white-space:normal; text-align:left;"> <!-- l. 570 --><p class="noindent"><span class="ptmr8t-x-x-90">Topo   schedule,   budget   guard,
+   confidence   aggregation,   HITL
+   gate</span>                                                  </p></td><td class="td11" id="TBL-2-2-2" style="white-space:normal; text-align:left;"> <!-- l. 570 --><p class="noindent"><span class="ptmr8t-x-x-90">workflow</span>                   </p></td><td class="td11" id="TBL-2-2-3" style="white-space:normal; text-align:left;"> <!-- l. 570 --><p class="noindent"><span class="ptmr8t-x-x-90">deterministic and side-effect-free; must replay
+   identically</span>                                                            </p></td>
+</tr><tr id="TBL-2-3-" style="vertical-align:baseline;"><td class="td11" id="TBL-2-3-1" style="white-space:normal; text-align:left;"> <!-- l. 571 --><p class="noindent"><span class="ptmr8t-x-x-90">Planner, answer synthesizer</span>            </p></td><td class="td11" id="TBL-2-3-2" style="white-space:normal; text-align:left;"> <!-- l. 571 --><p class="noindent"><span class="ptmr8t-x-x-90">activity</span>                       </p></td><td class="td11" id="TBL-2-3-3" style="white-space:normal; text-align:left;"> <!-- l. 571 --><p class="noindent"><span class="ptmr8t-x-x-90">nondeterministic  (LLM  calls);  recorded  once
+   so replay never re-calls the model</span>                       </p></td>
+</tr><tr id="TBL-2-4-" style="vertical-align:baseline;"><td class="td11" id="TBL-2-4-1" style="white-space:normal; text-align:left;"> <!-- l. 572 --><p class="noindent"><span class="ptmr8t-x-x-90">Prism,  TGARD  /  DC-TGARD,
+   gap         detector,         kinematic
+   validation</span>                                         </p></td><td class="td11" id="TBL-2-4-2" style="white-space:normal; text-align:left;"> <!-- l. 572 --><p class="noindent"><span class="ptmr8t-x-x-90">activity</span>                       </p></td><td class="td11" id="TBL-2-4-3" style="white-space:normal; text-align:left;"> <!-- l. 572 --><p class="noindent"><span class="ptmr8t-x-x-90">pure, but kept out of the deterministic sandbox
+   because   they   import   heavy   numeric   and
+   geometric code</span>                                                    </p></td>
+</tr><tr id="TBL-2-5-" style="vertical-align:baseline;"><td class="td11" id="TBL-2-5-1" style="white-space:normal; text-align:left;"> <!-- l. 573 --><p class="noindent"><span class="ptmr8t-x-x-90">Semantic-cache     read,     HITL
+   enqueue</span>                                           </p></td><td class="td11" id="TBL-2-5-2" style="white-space:normal; text-align:left;"> <!-- l. 573 --><p class="noindent"><span class="ptmr8t-x-x-90">activity</span>                       </p></td><td class="td11" id="TBL-2-5-3" style="white-space:normal; text-align:left;"> <!-- l. 573 --><p class="noindent"><span class="ptmr8t-x-x-90">external     side     effect;     at-least-once     and
+   idempotent (dedup on the per-run trace id)</span>         </p></td>
 
-</tr></table>                                                                 </div>
+</tr></table>                                                      </div>
+
+<figcaption class="caption"><span class="id">Table 1: </span><span class="content">The neuro-symbolic boundary is the workflow / activity boundary. The language-model
+steps <span class="ptmri8t-">must </span>be activities for correctness; the geometric kernels are activities only for sandbox hygiene,
+a distinction the port makes explicit.
+</span></figcaption><!-- tex4ht:label?: x1-21001r1  -->
                                                                             
                                                                             
 </figure>
 </div>
-<!-- l. 581 --><p class="noindent"><span class="ptmb8t-">Ablation. </span>Removing the semantic cache raises mean tokens by <span class="mathjax-inline">\(\sim \)</span>66 % and cost by <span class="mathjax-inline">\(\sim \)</span>59 %;
-removing tool deduplication adds <span class="mathjax-inline">\(\sim \)</span>18 % tokens. The two layers are complementary:
-deduplication catches in-run duplicates that the cross-run cache cannot anticipate.
-</p><!-- l. 584 --><p class="noindent"><span class="ptmb8t-">Validator audits. </span>On a stress slice of 50 random region candidates with synthetic timing
-perturbations, the validator caught 100 % of regions whose required speed exceeded
-the per-domain envelope by <span class="mathjax-inline">\(&gt; 5\,\%\)</span>, raising <span class="pcrr8t-">KinematicViolation </span>as designed.
+
+<!-- l. 580 --><p class="noindent"><span class="paragraphHead" id="relation-to-durableexecution-systems"> <a id="x1-22000"></a><span class="ptmb8t-">Relation to durable-execution systems.</span></span>
+Durable execution is not new. It descends from sagas [<a href="#Xgarciamolina1987sagas">12</a>] and the broader event-sourcing and
+deterministic-replay tradition, and it is offered by several workflow engines (AWS Step Functions, Netflix
+Conductor, Apache Airflow, and Temporal’s Cadence lineage [<a href="#Xtemporal2024durable">43</a>]). We claim none of that
+machinery as a contribution. The contribution is the observation that a neuro-symbolic spatial
+agent already carries a determinism boundary, its trust boundary, that coincides with the one
+such engines require, so the agent maps onto durable execution without re-architecture; and
+the geometric-faithfulness serialization contract below that lets symbolic objects cross that
+boundary intact. The novelty is the coincidence and the contract, not durable execution itself.
 
 </p>
-<!-- l. 586 --><p class="noindent"><span class="paragraphHead" id="evaluation-philosophy"> <a id="x1-22000"></a><span class="ptmb8t-">Evaluation  philosophy:</span></span>
+<!-- l. 583 --><p class="noindent"><span class="paragraphHead" id="what-durability-buys"> <a id="x1-23000"></a><span class="ptmb8t-">What  durability  buys.</span></span>
+Three properties follow. First, crash safety: a worker dying mid-run loses nothing, because the plan, every
+completed node, and the synthesized answer are in history, and a redelivered activity that already finished is
+replayed as its recorded result rather than re-run. Second, a durable human-in-the-loop. The bare
+orchestrator awaits its low-confidence enqueue and then returns immediately, never blocking the run on the
+reviewer’s verdict; under durable execution the workflow enqueues and then waits on a human-approval
+signal through a durable wait condition, parking the run for as long as a reviewer takes, minutes or days,
+and surviving worker restarts. The signal carries a verdict and an optional rewrite: a supplied
+correction replaces the answer, otherwise the synthesized answer ships unchanged. That long-lived,
+human-gated run is precisely the pattern durable-execution AI stacks productize. Third, a live,
+queryable run: a synchronous query returns stage, tokens, and cost without mutation, while the
+review verdict arrives as an asynchronous signal. These are properties the engine provides by
+construction, not results we measure under injected faults; we exercise them in the time-skipping test
+environment (see Honest scope below), which is what turns the abstract’s “replayable” claim and the
+human-in-the-loop queue of Section <a href="#methods">4<!-- tex4ht:ref: sec:methods  --></a> from design intent into engine-guaranteed behavior.
+
+</p>
+<!-- l. 586 --><p class="noindent"><span class="paragraphHead" id="determinism-discipline-and-effectivelyonce-side-effects"> <a id="x1-24000"></a><span class="ptmb8t-">Determinism discipline and effectively-once side effects.</span></span>
+The workflow takes its wallclock from the engine’s deterministic clock and its trace id from the engine’s
+seeded generator, performs no I/O and no model calls, and runs only pure, side-effect-free work inline (the
+plan-graph topological schedule, the budget guard, and confidence aggregation); every model call and every
+side effect is an activity with a per-call timeout and a bounded retry, the language-model steps getting a
+longer deadline than the geometric kernels. Side effects are effectively-once, that is at-least-once delivery
+plus idempotency, with the HITL enqueue deduplicating on the replay-stable per-run trace id (a
+workflow-seeded UUID, constant across replays). We do not claim true exactly-once execution of
+arbitrary side effects, which is not deliverable, and the implementation is explicit about that.
+
+</p>
+<!-- l. 589 --><p class="noindent"><span class="paragraphHead" id="the-serialization-contract"> <a id="x1-25000"></a><span class="ptmb8t-">The serialization contract.</span></span>
+The one piece of real engineering the port requires is a version-stable serialization for the intermediate
+symbolic objects that cross the activity boundary. A prism produced by a PRISM activity and consumed
+by a downstream TGARD activity cannot be handed over as a live in-memory handle; it is
+packed into a flat payload and rebuilt by the consumer. We implement this round trip for the
+prism and verify two properties: it is lossless through a JSON round trip (every field of the
+frozen prism is restored, nothing recomputed), and it is geometrically faithful (an intersection
+computed against a rebuilt prism equals one computed against the original). The serialized
+payload is the contract that keeps the workflow free of live geometric handles.
+
+                                                                            
+                                                                            
+</p>
+<!-- l. 592 --><p class="noindent"><span class="paragraphHead" id="honest-scope"> <a id="x1-26000"></a><span class="ptmb8t-">Honest  scope.</span></span>
+The runtime is not on GeoTrace-Agent’s production path today. The workflow logic, the determinism
+boundary, and the durable human-in-the-loop signal are implemented and exercised in the engine’s
+time-skipping test environment: the high-confidence path returns the synthesized answer, and the
+low-confidence path durably waits for the review signal and then ships the reviewer’s correction when one
+is supplied. The symbolic geometry path runs end to end through the real activity boundary, with two
+prisms serialized by PRISM activities, rebuilt and intersected by a TGARD activity into a non-empty
+rendezvous region; the language-model activities are mocked in these tests, and we do not yet inject worker
+faults to measure recovery time. The remaining production wiring is pointing the planner and summarizer
+activities at live model endpoints and the cache and HITL activities at their real stores.
+
+</p>
+<!-- l. 595 --><p class="noindent"><span class="paragraphHead" id="composition-with-a-modelserving-stack"> <a id="x1-27000"></a><span class="ptmb8t-">Composition with a model-serving stack.</span></span>
+Durability and model serving are orthogonal and compose cleanly, and this is the intended serving design
+rather than something we have wired today. The durable-execution engine owns control, deciding what
+runs, in what order, how it retries, and when it waits for a human, while a model-serving stack such as
+NVIDIA NeMo [<a href="#Xnvidia2024nemo">29</a>] would own the tokens: the planner and synthesizer activities would call NeMo-served
+models, NeMo Guardrails would back the input and output filters, and NeMo Retriever would back the
+<span class="pcrr8t-">retrieve.semantic </span>node. Because every model call is an activity, a slow or failed endpoint is retried
+and recorded without breaking workflow determinism. We have not implemented this NeMo or NIM
+wiring; it is future work, and the present activities call the existing in-process components.
+What is already real in the code is the boundary that makes such serving safe to attach: the
+model produces tokens, always behind an activity, and the engine decides everything else.
+
+</p>
+<h2 class="sectionHead" id="experiments"><span class="titlemark">6    </span>    <a id="x1-280006"></a>Experiments</h2>
+<!-- l. 602 --><p class="noindent"><span class="ptmb8t-">Golden dataset. </span>We curated three anchor questions (<span class="pcrr8t-">g-001 </span>rendezvous, <span class="pcrr8t-">g-002 </span>gap audit,
+<span class="pcrr8t-">g-003 </span>prism only) and replay them through the orchestrator. Each item carries an <span class="ptmri8t-">expected </span>block
+(region count bounds, allowed methods, required validator pass) that the offline evaluator checks.
+Results are written under <span class="pcrr8t-">evaluation/eval_results/&lt;timestamp&gt;.md,json</span>.
+</p><!-- l. 605 --><p class="noindent"><span class="ptmb8t-">Latency, tokens, cost: </span>Table <a href="#live-goldenset-run-claude-sonnet-46-and-cache-ablation-reproduced-artifacts-under-evaluation">2<!-- tex4ht:ref: tab:metrics  --></a> reports the live golden-set run, end to end against the planner with Claude Sonnet
+4.6 (<span class="pcrr8t-">evaluation/eval_results/</span>), and the cache ablation (<span class="pcrr8t-">evaluation/ablation_results/</span>).
+The golden set is small (three queries), so p95 (which needs at least 20 cases) is not reported, and <span class="pcrr8t-">g-002 </span>is
+a non-deterministic planner mis-plan. The structural metric (region tightness) is the ratio of the rendezvous
+polygon area to the union MOBR area; smaller is tighter, but it is not scored by this run.
+</p>
+<div class="table">
+                                                                            
+                                                                            
+<!-- l. 607 --><p class="noindent"></p><figure class="float" id="x1-28001r2"><span id="live-goldenset-run-claude-sonnet-46-and-cache-ablation-reproduced-artifacts-under-evaluation"></span>
+                                                                            
+                                                                            
+
+<figcaption class="caption"><span class="id">Table 2: </span><span class="content">Live golden-set run (Claude Sonnet 4.6) and cache ablation. Reproduced; artifacts under
+<span class="pcrr8t-">evaluation/</span>.                                                               </span></figcaption><!-- tex4ht:label?: x1-28001r2  -->
+<div class="tabular">
+ <table class="tabular" id="TBL-3"><colgroup id="TBL-3-1g"><col id="TBL-3-1"><col id="TBL-3-2"><col id="TBL-3-3"><col id="TBL-3-4"><col id="TBL-3-5"></colgroup><tr id="TBL-3-1-" style="vertical-align:baseline;"><td class="td11" id="TBL-3-1-1" style="white-space:normal; text-align:left;"> Configuration                     </td><td class="td11" id="TBL-3-1-2" style="white-space:normal; text-align:center;">  pass rate     </td><td class="td11" id="TBL-3-1-3" style="white-space:normal; text-align:center;"> tokens / query  </td><td class="td11" id="TBL-3-1-4" style="white-space:normal; text-align:center;"> cost USD / query  </td><td class="td11" id="TBL-3-1-5" style="white-space:normal; text-align:center;"> p50 latency (s)  </td>
+</tr><tr id="TBL-3-2-" style="vertical-align:baseline;"><td class="td11" id="TBL-3-2-1" style="white-space:normal; text-align:left;"> Full pipeline (golden run)   </td><td class="td11" id="TBL-3-2-2" style="white-space:normal; text-align:center;"> 66.7 % (2/3)  </td><td class="td11" id="TBL-3-2-3" style="white-space:normal; text-align:center;">    2,736         </td><td class="td11" id="TBL-3-2-4" style="white-space:normal; text-align:center;">     0.026            </td><td class="td11" id="TBL-3-2-5" style="white-space:normal; text-align:center;">     28            </td>
+</tr><tr id="TBL-3-3-" style="vertical-align:baseline;"><td class="td11" id="TBL-3-3-1" style="white-space:normal; text-align:left;"> Cache on, cold                    </td><td class="td11" id="TBL-3-3-2" style="white-space:normal; text-align:center;">     –           </td><td class="td11" id="TBL-3-3-3" style="white-space:normal; text-align:center;">    2,870         </td><td class="td11" id="TBL-3-3-4" style="white-space:normal; text-align:center;">     0.026            </td><td class="td11" id="TBL-3-3-5" style="white-space:normal; text-align:center;">    20–34         </td>
+</tr><tr id="TBL-3-4-" style="vertical-align:baseline;"><td class="td11" id="TBL-3-4-1" style="white-space:normal; text-align:left;"> Cache on, warm (repeat)     </td><td class="td11" id="TBL-3-4-2" style="white-space:normal; text-align:center;">     –           </td><td class="td11" id="TBL-3-4-3" style="white-space:normal; text-align:center;">     0             </td><td class="td11" id="TBL-3-4-4" style="white-space:normal; text-align:center;">     0.000            </td><td class="td11" id="TBL-3-4-5" style="white-space:normal; text-align:center;">    sub-ms        </td>
+</tr><tr id="TBL-3-5-" style="vertical-align:baseline;"><td class="td11" id="TBL-3-5-1" style="white-space:normal; text-align:left;"> Cache off, warm (control)  </td><td class="td11" id="TBL-3-5-2" style="white-space:normal; text-align:center;">     –           </td><td class="td11" id="TBL-3-5-3" style="white-space:normal; text-align:center;">    2,330         </td><td class="td11" id="TBL-3-5-4" style="white-space:normal; text-align:center;">     0.022            </td><td class="td11" id="TBL-3-5-5" style="white-space:normal; text-align:center;">    20–28         </td>
+
+</tr></table>                                                               </div>
+                                                                            
+                                                                            
+</figure>
+</div>
+<!-- l. 624 --><p class="noindent"><span class="ptmb8t-">Cache ablation. </span>The exact/semantic response cache is measured on identical repeats: a warm repeat drops
+to zero tokens and zero cost (planner and summarizer served from cache), while the cache-off control shows
+the repeat still costs the cold amount, confirming the saving is the cache. The cache does not fire on
+novel queries, so we make no blanket per-query reduction claim. An in-flight tool deduplicator
+(<span class="pcrr8t-">ToolBatcher</span>) is implemented but not yet wired into the run path, so it is excluded.
+</p><!-- l. 627 --><p class="noindent"><span class="ptmb8t-">Validator audits. </span>On 200 random vessel anchor pairs (seed 42), the kinematic gate raised
+<span class="pcrr8t-">KinematicViolation </span>on 100 % of pairs whose implied required speed exceeded the per-domain
+envelope by <span class="mathjax-inline">\(&gt; 5\,\%\)</span> (18/18), with zero false positives on the 182 feasible pairs. The gate is on the
+observations (consecutive-anchor reachability), not on a region’s bounding-box diagonal.
+
+</p>
+<!-- l. 629 --><p class="noindent"><span class="paragraphHead" id="evaluation-philosophy"> <a id="x1-29000"></a><span class="ptmb8t-">Evaluation  philosophy:</span></span>
 The current repository contains a golden dataset and smoke/regression tests, not a full public benchmark.
 The paper therefore separates three evidence layers. The first layer is <span class="ptmri8t-">invariant evidence</span>: unit tests for prism
 shape, cache behavior, planner schema, orchestrator execution, and validator checks. The second is
@@ -508,26 +650,26 @@ where demo queries are written as if they were a statistically meaningful benchm
 <div class="table">
                                                                             
                                                                             
-<!-- l. 589 --><p class="noindent"></p><figure class="float" id="x1-22001r2"><span id="repositorygrounded-acceptance-checks-these-checks-protect-the-deterministic-parts-of-the-system-before-any-llm-result-is-trusted"></span>
+<!-- l. 632 --><p class="noindent"></p><figure class="float" id="x1-29001r3"><span id="repositorygrounded-acceptance-checks-these-checks-protect-the-deterministic-parts-of-the-system-before-any-llm-result-is-trusted"></span>
                                                                             
                                                                             
 
-<figcaption class="caption"><span class="id">Table 2: </span><span class="content">Repository-grounded acceptance checks. These checks protect the deterministic parts of
-the system before any LLM result is trusted.                                          </span></figcaption><!-- tex4ht:label?: x1-22001r2  -->
+<figcaption class="caption"><span class="id">Table 3: </span><span class="content">Repository-grounded acceptance checks. These checks protect the deterministic parts of
+the system before any LLM result is trusted.                                          </span></figcaption><!-- tex4ht:label?: x1-29001r3  -->
 <div class="tabular">
- <table class="tabular" id="TBL-3"><colgroup id="TBL-3-1g"><col id="TBL-3-1"><col id="TBL-3-2"><col id="TBL-3-3"></colgroup><tr id="TBL-3-1-" style="vertical-align:baseline;"><td class="td11" id="TBL-3-1-1" style="white-space:normal; text-align:left;"> <!-- l. 595 --><p class="noindent">Check                                  </p></td><td class="td11" id="TBL-3-1-2" style="white-space:normal; text-align:left;"> <!-- l. 595 --><p class="noindent">Evidence captured                                            </p></td><td class="td11" id="TBL-3-1-3" style="white-space:normal; text-align:left;"> <!-- l. 595 --><p class="noindent">Expected status      </p></td>
-</tr><tr id="TBL-3-2-" style="vertical-align:baseline;"><td class="td11" id="TBL-3-2-1" style="white-space:normal; text-align:left;"> <!-- l. 597 --><p class="noindent">Prism geometry                   </p></td><td class="td11" id="TBL-3-2-2" style="white-space:normal; text-align:left;"> <!-- l. 597 --><p class="noindent">ellipse/MOBR          area,          reachability,
-  impossible-anchor rejection                             </p></td><td class="td11" id="TBL-3-2-3" style="white-space:normal; text-align:left;"> <!-- l. 597 --><p class="noindent">pass                        </p></td>
-</tr><tr id="TBL-3-3-" style="vertical-align:baseline;"><td class="td11" id="TBL-3-3-1" style="white-space:normal; text-align:left;"> <!-- l. 598 --><p class="noindent">Planner schema                    </p></td><td class="td11" id="TBL-3-3-2" style="white-space:normal; text-align:left;"> <!-- l. 598 --><p class="noindent">PlanGraph    type    validation,    dependency
-  validation, cycle rejection                                 </p></td><td class="td11" id="TBL-3-3-3" style="white-space:normal; text-align:left;"> <!-- l. 598 --><p class="noindent">pass                        </p></td>
-</tr><tr id="TBL-3-4-" style="vertical-align:baseline;"><td class="td11" id="TBL-3-4-1" style="white-space:normal; text-align:left;"> <!-- l. 599 --><p class="noindent">Orchestrator                         </p></td><td class="td11" id="TBL-3-4-2" style="white-space:normal; text-align:left;"> <!-- l. 599 --><p class="noindent">topo-layer execution, budget stop, stage trace
-  serialization                                                      </p></td><td class="td11" id="TBL-3-4-3" style="white-space:normal; text-align:left;"> <!-- l. 599 --><p class="noindent">pass                        </p></td>
-</tr><tr id="TBL-3-5-" style="vertical-align:baseline;"><td class="td11" id="TBL-3-5-1" style="white-space:normal; text-align:left;"> <!-- l. 600 --><p class="noindent">Semantic cache                    </p></td><td class="td11" id="TBL-3-5-2" style="white-space:normal; text-align:left;"> <!-- l. 600 --><p class="noindent">exact hit, miss, and near-hit behavior remain
-  separated                                                           </p></td><td class="td11" id="TBL-3-5-3" style="white-space:normal; text-align:left;"> <!-- l. 600 --><p class="noindent">pass                        </p></td>
-</tr><tr id="TBL-3-6-" style="vertical-align:baseline;"><td class="td11" id="TBL-3-6-1" style="white-space:normal; text-align:left;"> <!-- l. 601 --><p class="noindent">Validator                              </p></td><td class="td11" id="TBL-3-6-2" style="white-space:normal; text-align:left;"> <!-- l. 601 --><p class="noindent">infeasible                   speed                   raises
-  <span class="pcrr8t-">KinematicViolation</span>             </p></td><td class="td11" id="TBL-3-6-3" style="white-space:normal; text-align:left;"> <!-- l. 601 --><p class="noindent">pass                        </p></td>
-</tr><tr id="TBL-3-7-" style="vertical-align:baseline;"><td class="td11" id="TBL-3-7-1" style="white-space:normal; text-align:left;"> <!-- l. 602 --><p class="noindent">API integration                    </p></td><td class="td11" id="TBL-3-7-2" style="white-space:normal; text-align:left;"> <!-- l. 602 --><p class="noindent"><span class="pcrr8t-">/healthz</span>,  <span class="pcrr8t-">/v1/query</span>,  A2A  capability
-  card serialize                                                     </p></td><td class="td11" id="TBL-3-7-3" style="white-space:normal; text-align:left;"> <!-- l. 602 --><p class="noindent">pass                        </p></td>
+ <table class="tabular" id="TBL-4"><colgroup id="TBL-4-1g"><col id="TBL-4-1"><col id="TBL-4-2"><col id="TBL-4-3"></colgroup><tr id="TBL-4-1-" style="vertical-align:baseline;"><td class="td11" id="TBL-4-1-1" style="white-space:normal; text-align:left;"> <!-- l. 638 --><p class="noindent">Check                                  </p></td><td class="td11" id="TBL-4-1-2" style="white-space:normal; text-align:left;"> <!-- l. 638 --><p class="noindent">Evidence captured                                            </p></td><td class="td11" id="TBL-4-1-3" style="white-space:normal; text-align:left;"> <!-- l. 638 --><p class="noindent">Expected status      </p></td>
+</tr><tr id="TBL-4-2-" style="vertical-align:baseline;"><td class="td11" id="TBL-4-2-1" style="white-space:normal; text-align:left;"> <!-- l. 640 --><p class="noindent">Prism geometry                   </p></td><td class="td11" id="TBL-4-2-2" style="white-space:normal; text-align:left;"> <!-- l. 640 --><p class="noindent">ellipse/MOBR          area,          reachability,
+  impossible-anchor rejection                             </p></td><td class="td11" id="TBL-4-2-3" style="white-space:normal; text-align:left;"> <!-- l. 640 --><p class="noindent">pass                        </p></td>
+</tr><tr id="TBL-4-3-" style="vertical-align:baseline;"><td class="td11" id="TBL-4-3-1" style="white-space:normal; text-align:left;"> <!-- l. 641 --><p class="noindent">Planner schema                    </p></td><td class="td11" id="TBL-4-3-2" style="white-space:normal; text-align:left;"> <!-- l. 641 --><p class="noindent">PlanGraph    type    validation,    dependency
+  validation, cycle rejection                                 </p></td><td class="td11" id="TBL-4-3-3" style="white-space:normal; text-align:left;"> <!-- l. 641 --><p class="noindent">pass                        </p></td>
+</tr><tr id="TBL-4-4-" style="vertical-align:baseline;"><td class="td11" id="TBL-4-4-1" style="white-space:normal; text-align:left;"> <!-- l. 642 --><p class="noindent">Orchestrator                         </p></td><td class="td11" id="TBL-4-4-2" style="white-space:normal; text-align:left;"> <!-- l. 642 --><p class="noindent">topo-layer execution, budget stop, stage trace
+  serialization                                                      </p></td><td class="td11" id="TBL-4-4-3" style="white-space:normal; text-align:left;"> <!-- l. 642 --><p class="noindent">pass                        </p></td>
+</tr><tr id="TBL-4-5-" style="vertical-align:baseline;"><td class="td11" id="TBL-4-5-1" style="white-space:normal; text-align:left;"> <!-- l. 643 --><p class="noindent">Semantic cache                    </p></td><td class="td11" id="TBL-4-5-2" style="white-space:normal; text-align:left;"> <!-- l. 643 --><p class="noindent">exact hit, miss, and near-hit behavior remain
+  separated                                                           </p></td><td class="td11" id="TBL-4-5-3" style="white-space:normal; text-align:left;"> <!-- l. 643 --><p class="noindent">pass                        </p></td>
+</tr><tr id="TBL-4-6-" style="vertical-align:baseline;"><td class="td11" id="TBL-4-6-1" style="white-space:normal; text-align:left;"> <!-- l. 644 --><p class="noindent">Validator                              </p></td><td class="td11" id="TBL-4-6-2" style="white-space:normal; text-align:left;"> <!-- l. 644 --><p class="noindent">infeasible                   speed                   raises
+  <span class="pcrr8t-">KinematicViolation</span>             </p></td><td class="td11" id="TBL-4-6-3" style="white-space:normal; text-align:left;"> <!-- l. 644 --><p class="noindent">pass                        </p></td>
+</tr><tr id="TBL-4-7-" style="vertical-align:baseline;"><td class="td11" id="TBL-4-7-1" style="white-space:normal; text-align:left;"> <!-- l. 645 --><p class="noindent">API integration                    </p></td><td class="td11" id="TBL-4-7-2" style="white-space:normal; text-align:left;"> <!-- l. 645 --><p class="noindent"><span class="pcrr8t-">/healthz</span>,  <span class="pcrr8t-">/v1/query</span>,  A2A  capability
+  card serialize                                                     </p></td><td class="td11" id="TBL-4-7-3" style="white-space:normal; text-align:left;"> <!-- l. 645 --><p class="noindent">pass                        </p></td>
 
 </tr></table>                                                         </div>
                                                                             
@@ -535,7 +677,7 @@ the system before any LLM result is trusted.                                    
 </figure>
 </div>
 
-<!-- l. 607 --><p class="noindent"><span class="paragraphHead" id="goldencase-details"> <a id="x1-23000"></a><span class="ptmb8t-">Golden-case  details:</span></span>
+<!-- l. 650 --><p class="noindent"><span class="paragraphHead" id="goldencase-details"> <a id="x1-30000"></a><span class="ptmb8t-">Golden-case  details:</span></span>
 The three golden items are deliberately small. <span class="pcrr8t-">g-001 </span>is a rendezvous query requiring the planner to
 choose a prism intersection path and the validator to approve returned regions. <span class="pcrr8t-">g-002 </span>is a
 gap audit where the gap detector should produce a candidate region and an abnormality score.
@@ -546,24 +688,24 @@ PlanGraph shape, the planner is not using the typed tool vocabulary correctly.
 <div class="table">
                                                                             
                                                                             
-<!-- l. 610 --><p class="noindent"></p><figure class="float" id="x1-23001r3"><span id="goldencase-expected-behavior-counts-are-acceptance-ranges-for-the-current-repository-not-claims-about-a-large-external-corpus"></span>
+<!-- l. 653 --><p class="noindent"></p><figure class="float" id="x1-30001r4"><span id="goldencase-expected-behavior-counts-are-acceptance-ranges-for-the-current-repository-not-claims-about-a-large-external-corpus"></span>
                                                                             
                                                                             
 
-<figcaption class="caption"><span class="id">Table 3: </span><span class="content">Golden-case expected behavior. Counts are acceptance ranges for the current repository,
-not claims about a large external corpus.                                             </span></figcaption><!-- tex4ht:label?: x1-23001r3  -->
+<figcaption class="caption"><span class="id">Table 4: </span><span class="content">Golden-case expected behavior. Counts are acceptance ranges for the current repository,
+not claims about a large external corpus.                                             </span></figcaption><!-- tex4ht:label?: x1-30001r4  -->
 <div class="tabular">
- <table class="tabular" id="TBL-4"><colgroup id="TBL-4-1g"><col id="TBL-4-1"><col id="TBL-4-2"><col id="TBL-4-3"><col id="TBL-4-4"></colgroup><tr id="TBL-4-1-" style="vertical-align:baseline;"><td class="td11" id="TBL-4-1-1" style="white-space:normal; text-align:left;"> <!-- l. 616 --><p class="noindent">Case                 </p></td><td class="td11" id="TBL-4-1-2" style="white-space:normal; text-align:left;"> <!-- l. 616 --><p class="noindent">Primary route                            </p></td><td class="td11" id="TBL-4-1-3" style="white-space:normal; text-align:left;"> <!-- l. 616 --><p class="noindent">Required checks              </p></td><td class="td11" id="TBL-4-1-4" style="white-space:normal; text-align:left;"> <!-- l. 616 --><p class="noindent">Expected result         </p></td>
-</tr><tr id="TBL-4-2-" style="vertical-align:baseline;"><td class="td11" id="TBL-4-2-1" style="white-space:normal; text-align:left;"> <!-- l. 618 --><p class="noindent"><span class="pcrr8t-">g-001</span>      </p></td><td class="td11" id="TBL-4-2-2" style="white-space:normal; text-align:left;"> <!-- l. 618 --><p class="noindent">prism          intersection          <span class="mathjax-inline">\(\rightarrow \)</span>
-  rendezvous <span class="mathjax-inline">\(\rightarrow \)</span> validator                </p></td><td class="td11" id="TBL-4-2-3" style="white-space:normal; text-align:left;"> <!-- l. 618 --><p class="noindent">at  least  one  candidate
+ <table class="tabular" id="TBL-5"><colgroup id="TBL-5-1g"><col id="TBL-5-1"><col id="TBL-5-2"><col id="TBL-5-3"><col id="TBL-5-4"></colgroup><tr id="TBL-5-1-" style="vertical-align:baseline;"><td class="td11" id="TBL-5-1-1" style="white-space:normal; text-align:left;"> <!-- l. 659 --><p class="noindent">Case                 </p></td><td class="td11" id="TBL-5-1-2" style="white-space:normal; text-align:left;"> <!-- l. 659 --><p class="noindent">Primary route                            </p></td><td class="td11" id="TBL-5-1-3" style="white-space:normal; text-align:left;"> <!-- l. 659 --><p class="noindent">Required checks              </p></td><td class="td11" id="TBL-5-1-4" style="white-space:normal; text-align:left;"> <!-- l. 659 --><p class="noindent">Expected result         </p></td>
+</tr><tr id="TBL-5-2-" style="vertical-align:baseline;"><td class="td11" id="TBL-5-2-1" style="white-space:normal; text-align:left;"> <!-- l. 661 --><p class="noindent"><span class="pcrr8t-">g-001</span>      </p></td><td class="td11" id="TBL-5-2-2" style="white-space:normal; text-align:left;"> <!-- l. 661 --><p class="noindent">prism          intersection          <span class="mathjax-inline">\(\rightarrow \)</span>
+  rendezvous <span class="mathjax-inline">\(\rightarrow \)</span> validator                </p></td><td class="td11" id="TBL-5-2-3" style="white-space:normal; text-align:left;"> <!-- l. 661 --><p class="noindent">at  least  one  candidate
   region,      all      regions
-  feasible                            </p></td><td class="td11" id="TBL-4-2-4" style="white-space:normal; text-align:left;"> <!-- l. 618 --><p class="noindent">pass                           </p></td>
-</tr><tr id="TBL-4-3-" style="vertical-align:baseline;"><td class="td11" id="TBL-4-3-1" style="white-space:normal; text-align:left;"> <!-- l. 619 --><p class="noindent"><span class="pcrr8t-">g-002</span>      </p></td><td class="td11" id="TBL-4-3-2" style="white-space:normal; text-align:left;"> <!-- l. 619 --><p class="noindent">gap  detector  <span class="mathjax-inline">\(\rightarrow \)</span>  DRM  merge  <span class="mathjax-inline">\(\rightarrow \)</span>
-  AGM score                               </p></td><td class="td11" id="TBL-4-3-3" style="white-space:normal; text-align:left;"> <!-- l. 619 --><p class="noindent">abnormal gap score and
-  time window present       </p></td><td class="td11" id="TBL-4-3-4" style="white-space:normal; text-align:left;"> <!-- l. 619 --><p class="noindent">pass                           </p></td>
-</tr><tr id="TBL-4-4-" style="vertical-align:baseline;"><td class="td11" id="TBL-4-4-1" style="white-space:normal; text-align:left;"> <!-- l. 620 --><p class="noindent"><span class="pcrr8t-">g-003</span>      </p></td><td class="td11" id="TBL-4-4-2" style="white-space:normal; text-align:left;"> <!-- l. 620 --><p class="noindent">direct prism kernel                    </p></td><td class="td11" id="TBL-4-4-3" style="white-space:normal; text-align:left;"> <!-- l. 620 --><p class="noindent">geometry          returned
+  feasible                            </p></td><td class="td11" id="TBL-5-2-4" style="white-space:normal; text-align:left;"> <!-- l. 661 --><p class="noindent">pass                           </p></td>
+</tr><tr id="TBL-5-3-" style="vertical-align:baseline;"><td class="td11" id="TBL-5-3-1" style="white-space:normal; text-align:left;"> <!-- l. 662 --><p class="noindent"><span class="pcrr8t-">g-002</span>      </p></td><td class="td11" id="TBL-5-3-2" style="white-space:normal; text-align:left;"> <!-- l. 662 --><p class="noindent">gap  detector  <span class="mathjax-inline">\(\rightarrow \)</span>  DRM  merge  <span class="mathjax-inline">\(\rightarrow \)</span>
+  AGM score                               </p></td><td class="td11" id="TBL-5-3-3" style="white-space:normal; text-align:left;"> <!-- l. 662 --><p class="noindent">abnormal gap score and
+  time window present       </p></td><td class="td11" id="TBL-5-3-4" style="white-space:normal; text-align:left;"> <!-- l. 662 --><p class="noindent">pass                           </p></td>
+</tr><tr id="TBL-5-4-" style="vertical-align:baseline;"><td class="td11" id="TBL-5-4-1" style="white-space:normal; text-align:left;"> <!-- l. 663 --><p class="noindent"><span class="pcrr8t-">g-003</span>      </p></td><td class="td11" id="TBL-5-4-2" style="white-space:normal; text-align:left;"> <!-- l. 663 --><p class="noindent">direct prism kernel                    </p></td><td class="td11" id="TBL-5-4-3" style="white-space:normal; text-align:left;"> <!-- l. 663 --><p class="noindent">geometry          returned
   without      unnecessary
-  agents                              </p></td><td class="td11" id="TBL-4-4-4" style="white-space:normal; text-align:left;"> <!-- l. 620 --><p class="noindent">pass                           </p></td>
+  agents                              </p></td><td class="td11" id="TBL-5-4-4" style="white-space:normal; text-align:left;"> <!-- l. 663 --><p class="noindent">pass                           </p></td>
 
 </tr></table>                                                                      </div>
                                                                             
@@ -571,8 +713,8 @@ not claims about a large external corpus.                                       
 </figure>
 </div>
 
-<!-- l. 625 --><p class="noindent"><span class="paragraphHead" id="expected-trend-table"> <a id="x1-24000"></a><span class="ptmb8t-">Expected  trend  table:</span></span>
-Table <a href="#expected-trend-for-a-first-full-run-these-are-diagnostic-targets-for-the-current-implementation-and-should-be-replaced-by-measured-deployment-numbers">4<!-- tex4ht:ref: tab:expected  --></a> gives the first deployment trend table to replace once real traces are available. The expected shape is
+<!-- l. 668 --><p class="noindent"><span class="paragraphHead" id="expected-trend-table"> <a id="x1-31000"></a><span class="ptmb8t-">Expected  trend  table:</span></span>
+Table <a href="#expected-trend-for-a-first-full-run-these-are-diagnostic-targets-for-the-current-implementation-and-should-be-replaced-by-measured-deployment-numbers">5<!-- tex4ht:ref: tab:expected  --></a> gives the first deployment trend table to replace once real traces are available. The expected shape is
 more important than the individual numbers. Typed planning should reduce parser/format failures. Semantic
 caching should reduce token count but should not change geometry. Tool deduplication should mainly help
 p95 latency under concurrent or redundant tool requests. Removing the validator may make the system
@@ -581,19 +723,19 @@ appear faster but should be treated as invalid because it changes the correctnes
 <div class="table">
                                                                             
                                                                             
-<!-- l. 628 --><p class="noindent"></p><figure class="float" id="x1-24001r4"><span id="expected-trend-for-a-first-full-run-these-are-diagnostic-targets-for-the-current-implementation-and-should-be-replaced-by-measured-deployment-numbers"></span>
+<!-- l. 671 --><p class="noindent"></p><figure class="float" id="x1-31001r5"><span id="expected-trend-for-a-first-full-run-these-are-diagnostic-targets-for-the-current-implementation-and-should-be-replaced-by-measured-deployment-numbers"></span>
                                                                             
                                                                             
 
-<figcaption class="caption"><span class="id">Table 4:   </span><span class="content">Expected   trend   for   a   first   full   run.   These   are   diagnostic   targets   for   the   current
-implementation and should be replaced by measured deployment numbers.                   </span></figcaption><!-- tex4ht:label?: x1-24001r4  -->
+<figcaption class="caption"><span class="id">Table 5:   </span><span class="content">Expected   trend   for   a   first   full   run.   These   are   diagnostic   targets   for   the   current
+implementation and should be replaced by measured deployment numbers.                   </span></figcaption><!-- tex4ht:label?: x1-31001r5  -->
 <div class="tabular">
- <table class="tabular" id="TBL-5"><colgroup id="TBL-5-1g"><col id="TBL-5-1"><col id="TBL-5-2"><col id="TBL-5-3"><col id="TBL-5-4"><col id="TBL-5-5"></colgroup><tr id="TBL-5-1-" style="vertical-align:baseline;"><td class="td11" id="TBL-5-1-1" style="white-space:normal; text-align:left;"> Configuration                     </td><td class="td11" id="TBL-5-1-2" style="white-space:normal; text-align:center;"> schema fail <span class="mathjax-inline">\(\downarrow \)</span>  </td><td class="td11" id="TBL-5-1-3" style="white-space:normal; text-align:center;"> tokens/query <span class="mathjax-inline">\(\downarrow \)</span>  </td><td class="td11" id="TBL-5-1-4" style="white-space:normal; text-align:center;"> p95 latency <span class="mathjax-inline">\(\downarrow \)</span>  </td><td class="td11" id="TBL-5-1-5" style="white-space:normal; text-align:center;"> infeasible regions <span class="mathjax-inline">\(\downarrow \)</span>  </td>
-</tr><tr id="TBL-5-2-" style="vertical-align:baseline;"><td class="td11" id="TBL-5-2-1" style="white-space:normal; text-align:left;"> Free-form agent baseline    </td><td class="td11" id="TBL-5-2-2" style="white-space:normal; text-align:center;">    0.18         </td><td class="td11" id="TBL-5-2-3" style="white-space:normal; text-align:center;">    7,400         </td><td class="td11" id="TBL-5-2-4" style="white-space:normal; text-align:center;">    5.8          </td><td class="td11" id="TBL-5-2-5" style="white-space:normal; text-align:center;">      0.12              </td>
-</tr><tr id="TBL-5-3-" style="vertical-align:baseline;"><td class="td11" id="TBL-5-3-1" style="white-space:normal; text-align:left;"> Typed PlanGraph only        </td><td class="td11" id="TBL-5-3-2" style="white-space:normal; text-align:center;">    0.04         </td><td class="td11" id="TBL-5-3-3" style="white-space:normal; text-align:center;">    6,100         </td><td class="td11" id="TBL-5-3-4" style="white-space:normal; text-align:center;">    5.0          </td><td class="td11" id="TBL-5-3-5" style="white-space:normal; text-align:center;">      0.08              </td>
-</tr><tr id="TBL-5-4-" style="vertical-align:baseline;"><td class="td11" id="TBL-5-4-1" style="white-space:normal; text-align:left;"> + exact cache / tool dedup  </td><td class="td11" id="TBL-5-4-2" style="white-space:normal; text-align:center;">    0.04         </td><td class="td11" id="TBL-5-4-3" style="white-space:normal; text-align:center;">    5,200         </td><td class="td11" id="TBL-5-4-4" style="white-space:normal; text-align:center;">    3.9          </td><td class="td11" id="TBL-5-4-5" style="white-space:normal; text-align:center;">      0.08              </td>
-</tr><tr id="TBL-5-5-" style="vertical-align:baseline;"><td class="td11" id="TBL-5-5-1" style="white-space:normal; text-align:left;"> + semantic cache                 </td><td class="td11" id="TBL-5-5-2" style="white-space:normal; text-align:center;">    0.04         </td><td class="td11" id="TBL-5-5-3" style="white-space:normal; text-align:center;">    4,200         </td><td class="td11" id="TBL-5-5-4" style="white-space:normal; text-align:center;">    3.4          </td><td class="td11" id="TBL-5-5-5" style="white-space:normal; text-align:center;">      0.08              </td>
-</tr><tr id="TBL-5-6-" style="vertical-align:baseline;"><td class="td11" id="TBL-5-6-1" style="white-space:normal; text-align:left;"> + S-KBM validator             </td><td class="td11" id="TBL-5-6-2" style="white-space:normal; text-align:center;">    0.04         </td><td class="td11" id="TBL-5-6-3" style="white-space:normal; text-align:center;">    4,250         </td><td class="td11" id="TBL-5-6-4" style="white-space:normal; text-align:center;">    3.5          </td><td class="td11" id="TBL-5-6-5" style="white-space:normal; text-align:center;">      0.00              </td>
+ <table class="tabular" id="TBL-6"><colgroup id="TBL-6-1g"><col id="TBL-6-1"><col id="TBL-6-2"><col id="TBL-6-3"><col id="TBL-6-4"><col id="TBL-6-5"></colgroup><tr id="TBL-6-1-" style="vertical-align:baseline;"><td class="td11" id="TBL-6-1-1" style="white-space:normal; text-align:left;"> Configuration                     </td><td class="td11" id="TBL-6-1-2" style="white-space:normal; text-align:center;"> schema fail <span class="mathjax-inline">\(\downarrow \)</span>  </td><td class="td11" id="TBL-6-1-3" style="white-space:normal; text-align:center;"> tokens/query <span class="mathjax-inline">\(\downarrow \)</span>  </td><td class="td11" id="TBL-6-1-4" style="white-space:normal; text-align:center;"> p95 latency <span class="mathjax-inline">\(\downarrow \)</span>  </td><td class="td11" id="TBL-6-1-5" style="white-space:normal; text-align:center;"> infeasible regions <span class="mathjax-inline">\(\downarrow \)</span>  </td>
+</tr><tr id="TBL-6-2-" style="vertical-align:baseline;"><td class="td11" id="TBL-6-2-1" style="white-space:normal; text-align:left;"> Free-form agent baseline    </td><td class="td11" id="TBL-6-2-2" style="white-space:normal; text-align:center;">    0.18         </td><td class="td11" id="TBL-6-2-3" style="white-space:normal; text-align:center;">    7,400         </td><td class="td11" id="TBL-6-2-4" style="white-space:normal; text-align:center;">    5.8          </td><td class="td11" id="TBL-6-2-5" style="white-space:normal; text-align:center;">      0.12              </td>
+</tr><tr id="TBL-6-3-" style="vertical-align:baseline;"><td class="td11" id="TBL-6-3-1" style="white-space:normal; text-align:left;"> Typed PlanGraph only        </td><td class="td11" id="TBL-6-3-2" style="white-space:normal; text-align:center;">    0.04         </td><td class="td11" id="TBL-6-3-3" style="white-space:normal; text-align:center;">    6,100         </td><td class="td11" id="TBL-6-3-4" style="white-space:normal; text-align:center;">    5.0          </td><td class="td11" id="TBL-6-3-5" style="white-space:normal; text-align:center;">      0.08              </td>
+</tr><tr id="TBL-6-4-" style="vertical-align:baseline;"><td class="td11" id="TBL-6-4-1" style="white-space:normal; text-align:left;"> + exact cache / tool dedup  </td><td class="td11" id="TBL-6-4-2" style="white-space:normal; text-align:center;">    0.04         </td><td class="td11" id="TBL-6-4-3" style="white-space:normal; text-align:center;">    5,200         </td><td class="td11" id="TBL-6-4-4" style="white-space:normal; text-align:center;">    3.9          </td><td class="td11" id="TBL-6-4-5" style="white-space:normal; text-align:center;">      0.08              </td>
+</tr><tr id="TBL-6-5-" style="vertical-align:baseline;"><td class="td11" id="TBL-6-5-1" style="white-space:normal; text-align:left;"> + semantic cache                 </td><td class="td11" id="TBL-6-5-2" style="white-space:normal; text-align:center;">    0.04         </td><td class="td11" id="TBL-6-5-3" style="white-space:normal; text-align:center;">    4,200         </td><td class="td11" id="TBL-6-5-4" style="white-space:normal; text-align:center;">    3.4          </td><td class="td11" id="TBL-6-5-5" style="white-space:normal; text-align:center;">      0.08              </td>
+</tr><tr id="TBL-6-6-" style="vertical-align:baseline;"><td class="td11" id="TBL-6-6-1" style="white-space:normal; text-align:left;"> + S-KBM validator             </td><td class="td11" id="TBL-6-6-2" style="white-space:normal; text-align:center;">    0.04         </td><td class="td11" id="TBL-6-6-3" style="white-space:normal; text-align:center;">    4,250         </td><td class="td11" id="TBL-6-6-4" style="white-space:normal; text-align:center;">    3.5          </td><td class="td11" id="TBL-6-6-5" style="white-space:normal; text-align:center;">      0.00              </td>
 
 </tr></table>                                                             </div>
                                                                             
@@ -601,7 +743,7 @@ implementation and should be replaced by measured deployment numbers.           
 </figure>
 </div>
 
-<!-- l. 645 --><p class="noindent"><span class="paragraphHead" id="how-to-read-the-numbers"> <a id="x1-25000"></a><span class="ptmb8t-">How to read the numbers:</span></span>
+<!-- l. 688 --><p class="noindent"><span class="paragraphHead" id="how-to-read-the-numbers"> <a id="x1-32000"></a><span class="ptmb8t-">How to read the numbers:</span></span>
 The typed PlanGraph row should primarily reduce schema failures because the model must emit a constrained
 JSON plan. Caching should reduce tokens and latency but should not reduce infeasible regions by itself.
 The validator row should drive infeasible returned regions to zero, with a small latency cost. If a measured
@@ -610,7 +752,7 @@ aggressively. If the validator row does not reduce infeasible regions, then the 
 hard gate or the infeasible-region detector is using a different physical envelope than the system under test.
 
 </p>
-<!-- l. 648 --><p class="noindent"><span class="paragraphHead" id="ablation-matrix"> <a id="x1-26000"></a><span class="ptmb8t-">Ablation  matrix:</span></span>
+<!-- l. 691 --><p class="noindent"><span class="paragraphHead" id="ablation-matrix"> <a id="x1-33000"></a><span class="ptmb8t-">Ablation  matrix:</span></span>
 The strongest experimental story for GeoTrace-Agent is not one aggregate score; it is the decomposition of
 failures by subsystem. Removing typed plans should increase parsing and replay failures. Removing
 topo-layer parallelism should raise wallclock without changing correctness. Removing the exact cache
@@ -621,28 +763,28 @@ change immediate answers but should weaken the supervision flywheel for future P
 <div class="table">
                                                                             
                                                                             
-<!-- l. 651 --><p class="noindent"></p><figure class="float" id="x1-26001r5"><span id="subsystem-ablations-and-the-metric-most-likely-to-move"></span>
+<!-- l. 694 --><p class="noindent"></p><figure class="float" id="x1-33001r6"><span id="subsystem-ablations-and-the-metric-most-likely-to-move"></span>
                                                                             
                                                                             
 
-<figcaption class="caption"><span class="id">Table 5: </span><span class="content">Subsystem ablations and the metric most likely to move.                          </span></figcaption><!-- tex4ht:label?: x1-26001r5  -->
+<figcaption class="caption"><span class="id">Table 6: </span><span class="content">Subsystem ablations and the metric most likely to move.                          </span></figcaption><!-- tex4ht:label?: x1-33001r6  -->
 <div class="tabular">
- <table class="tabular" id="TBL-6"><colgroup id="TBL-6-1g"><col id="TBL-6-1"><col id="TBL-6-2"><col id="TBL-6-3"></colgroup><tr id="TBL-6-1-" style="vertical-align:baseline;"><td class="td11" id="TBL-6-1-1" style="white-space:normal; text-align:left;"> <!-- l. 657 --><p class="noindent">Ablation                            </p></td><td class="td11" id="TBL-6-1-2" style="white-space:normal; text-align:left;"> <!-- l. 657 --><p class="noindent">Primary metric shift                       </p></td><td class="td11" id="TBL-6-1-3" style="white-space:normal; text-align:left;"> <!-- l. 657 --><p class="noindent">Likely diagnosis                      </p></td>
-</tr><tr id="TBL-6-2-" style="vertical-align:baseline;"><td class="td11" id="TBL-6-2-1" style="white-space:normal; text-align:left;"> <!-- l. 659 --><p class="noindent">Free-form            planner
-  output                                 </p></td><td class="td11" id="TBL-6-2-2" style="white-space:normal; text-align:left;"> <!-- l. 659 --><p class="noindent">schema    failures    and    replay
-  failures increase                             </p></td><td class="td11" id="TBL-6-2-3" style="white-space:normal; text-align:left;"> <!-- l. 659 --><p class="noindent">model  is  doing  planning  in
+ <table class="tabular" id="TBL-7"><colgroup id="TBL-7-1g"><col id="TBL-7-1"><col id="TBL-7-2"><col id="TBL-7-3"></colgroup><tr id="TBL-7-1-" style="vertical-align:baseline;"><td class="td11" id="TBL-7-1-1" style="white-space:normal; text-align:left;"> <!-- l. 700 --><p class="noindent">Ablation                            </p></td><td class="td11" id="TBL-7-1-2" style="white-space:normal; text-align:left;"> <!-- l. 700 --><p class="noindent">Primary metric shift                       </p></td><td class="td11" id="TBL-7-1-3" style="white-space:normal; text-align:left;"> <!-- l. 700 --><p class="noindent">Likely diagnosis                      </p></td>
+</tr><tr id="TBL-7-2-" style="vertical-align:baseline;"><td class="td11" id="TBL-7-2-1" style="white-space:normal; text-align:left;"> <!-- l. 702 --><p class="noindent">Free-form            planner
+  output                                 </p></td><td class="td11" id="TBL-7-2-2" style="white-space:normal; text-align:left;"> <!-- l. 702 --><p class="noindent">schema    failures    and    replay
+  failures increase                             </p></td><td class="td11" id="TBL-7-2-3" style="white-space:normal; text-align:left;"> <!-- l. 702 --><p class="noindent">model  is  doing  planning  in
   prose                                        </p></td>
-</tr><tr id="TBL-6-3-" style="vertical-align:baseline;"><td class="td11" id="TBL-6-3-1" style="white-space:normal; text-align:left;"> <!-- l. 660 --><p class="noindent">No topo parallelism           </p></td><td class="td11" id="TBL-6-3-2" style="white-space:normal; text-align:left;"> <!-- l. 660 --><p class="noindent">p95 latency increases                     </p></td><td class="td11" id="TBL-6-3-3" style="white-space:normal; text-align:left;"> <!-- l. 660 --><p class="noindent">independent      tool      calls
+</tr><tr id="TBL-7-3-" style="vertical-align:baseline;"><td class="td11" id="TBL-7-3-1" style="white-space:normal; text-align:left;"> <!-- l. 703 --><p class="noindent">No topo parallelism           </p></td><td class="td11" id="TBL-7-3-2" style="white-space:normal; text-align:left;"> <!-- l. 703 --><p class="noindent">p95 latency increases                     </p></td><td class="td11" id="TBL-7-3-3" style="white-space:normal; text-align:left;"> <!-- l. 703 --><p class="noindent">independent      tool      calls
   serialized                                 </p></td>
-</tr><tr id="TBL-6-4-" style="vertical-align:baseline;"><td class="td11" id="TBL-6-4-1" style="white-space:normal; text-align:left;"> <!-- l. 661 --><p class="noindent">No tool dedup                    </p></td><td class="td11" id="TBL-6-4-2" style="white-space:normal; text-align:left;"> <!-- l. 661 --><p class="noindent">duplicate   tool   calls   per   query
-  increase                                          </p></td><td class="td11" id="TBL-6-4-3" style="white-space:normal; text-align:left;"> <!-- l. 661 --><p class="noindent">agents   converge   on   same
+</tr><tr id="TBL-7-4-" style="vertical-align:baseline;"><td class="td11" id="TBL-7-4-1" style="white-space:normal; text-align:left;"> <!-- l. 704 --><p class="noindent">No tool dedup                    </p></td><td class="td11" id="TBL-7-4-2" style="white-space:normal; text-align:left;"> <!-- l. 704 --><p class="noindent">duplicate   tool   calls   per   query
+  increase                                          </p></td><td class="td11" id="TBL-7-4-3" style="white-space:normal; text-align:left;"> <!-- l. 704 --><p class="noindent">agents   converge   on   same
   request                                     </p></td>
-</tr><tr id="TBL-6-5-" style="vertical-align:baseline;"><td class="td11" id="TBL-6-5-1" style="white-space:normal; text-align:left;"> <!-- l. 662 --><p class="noindent">No exact cache                   </p></td><td class="td11" id="TBL-6-5-2" style="white-space:normal; text-align:left;"> <!-- l. 662 --><p class="noindent">repeated prism latency increases   </p></td><td class="td11" id="TBL-6-5-3" style="white-space:normal; text-align:left;"> <!-- l. 662 --><p class="noindent">deterministic                  calls
+</tr><tr id="TBL-7-5-" style="vertical-align:baseline;"><td class="td11" id="TBL-7-5-1" style="white-space:normal; text-align:left;"> <!-- l. 705 --><p class="noindent">No exact cache                   </p></td><td class="td11" id="TBL-7-5-2" style="white-space:normal; text-align:left;"> <!-- l. 705 --><p class="noindent">repeated prism latency increases   </p></td><td class="td11" id="TBL-7-5-3" style="white-space:normal; text-align:left;"> <!-- l. 705 --><p class="noindent">deterministic                  calls
   recomputed                              </p></td>
-</tr><tr id="TBL-6-6-" style="vertical-align:baseline;"><td class="td11" id="TBL-6-6-1" style="white-space:normal; text-align:left;"> <!-- l. 663 --><p class="noindent">No semantic cache             </p></td><td class="td11" id="TBL-6-6-2" style="white-space:normal; text-align:left;"> <!-- l. 663 --><p class="noindent">tokens/query and cost increase      </p></td><td class="td11" id="TBL-6-6-3" style="white-space:normal; text-align:left;"> <!-- l. 663 --><p class="noindent">near-duplicate      text      not
+</tr><tr id="TBL-7-6-" style="vertical-align:baseline;"><td class="td11" id="TBL-7-6-1" style="white-space:normal; text-align:left;"> <!-- l. 706 --><p class="noindent">No semantic cache             </p></td><td class="td11" id="TBL-7-6-2" style="white-space:normal; text-align:left;"> <!-- l. 706 --><p class="noindent">tokens/query and cost increase      </p></td><td class="td11" id="TBL-7-6-3" style="white-space:normal; text-align:left;"> <!-- l. 706 --><p class="noindent">near-duplicate      text      not
   reused                                      </p></td>
-</tr><tr id="TBL-6-7-" style="vertical-align:baseline;"><td class="td11" id="TBL-6-7-1" style="white-space:normal; text-align:left;"> <!-- l. 664 --><p class="noindent">No validator                       </p></td><td class="td11" id="TBL-6-7-2" style="white-space:normal; text-align:left;"> <!-- l. 664 --><p class="noindent">infeasible     regions     can     be
-  returned                                          </p></td><td class="td11" id="TBL-6-7-3" style="white-space:normal; text-align:left;"> <!-- l. 664 --><p class="noindent">correctness             boundary
+</tr><tr id="TBL-7-7-" style="vertical-align:baseline;"><td class="td11" id="TBL-7-7-1" style="white-space:normal; text-align:left;"> <!-- l. 707 --><p class="noindent">No validator                       </p></td><td class="td11" id="TBL-7-7-2" style="white-space:normal; text-align:left;"> <!-- l. 707 --><p class="noindent">infeasible     regions     can     be
+  returned                                          </p></td><td class="td11" id="TBL-7-7-3" style="white-space:normal; text-align:left;"> <!-- l. 707 --><p class="noindent">correctness             boundary
   removed                                   </p></td>
 
 </tr></table>                                                        </div>
@@ -651,7 +793,7 @@ change immediate answers but should weaken the supervision flywheel for future P
 </figure>
 </div>
 
-<!-- l. 669 --><p class="noindent"><span class="paragraphHead" id="qualitative-result-examples"> <a id="x1-27000"></a><span class="ptmb8t-">Qualitative result examples:</span></span>
+<!-- l. 712 --><p class="noindent"><span class="paragraphHead" id="qualitative-result-examples"> <a id="x1-34000"></a><span class="ptmb8t-">Qualitative result examples:</span></span>
 A good <span class="pcrr8t-">g-001 </span>response should not say only that two vessels could have met. It should name the feasible
 time window, describe the prism intersection region, report validator status, and include the trace id. A good
 <span class="pcrr8t-">g-002 </span>response should distinguish missing data from abnormal motion: a long gap is not
@@ -661,7 +803,7 @@ weather tools. These examples matter because agent systems often fail by over-an
 GeoTrace-Agent is designed to answer with exactly the tools the PlanGraph requires.
 
 </p>
-<!-- l. 672 --><p class="noindent"><span class="paragraphHead" id="stress-tests"> <a id="x1-28000"></a><span class="ptmb8t-">Stress  tests:</span></span>
+<!-- l. 715 --><p class="noindent"><span class="paragraphHead" id="stress-tests"> <a id="x1-35000"></a><span class="ptmb8t-">Stress  tests:</span></span>
 The next iteration should add four stress suites. The first perturbs timestamps while keeping coordinates
 fixed, which should monotonically change required speed and validator decisions. The second perturbs
 coordinates while keeping timestamps fixed, testing projection and distance calculations. The third floods
@@ -670,7 +812,7 @@ natural-language questions whose anchors differ slightly; semantic cache should 
 exact geometry must recompute. These tests directly target the most likely production failures.
 
 </p>
-<!-- l. 675 --><p class="noindent"><span class="paragraphHead" id="deployment-telemetry"> <a id="x1-29000"></a><span class="ptmb8t-">Deployment  telemetry:</span></span>
+<!-- l. 718 --><p class="noindent"><span class="paragraphHead" id="deployment-telemetry"> <a id="x1-36000"></a><span class="ptmb8t-">Deployment  telemetry:</span></span>
 OpenTelemetry spans are part of the evaluation design, not just engineering garnish. Every serious run
 should export per-stage latency, token count, tool count, cache hit, cost, and exception type. The trace id in
 the response is the bridge between a user-facing answer and a debug session. For portfolio
@@ -678,7 +820,7 @@ use, this gives the project a research-grade story: the system is not only an al
 instrumented agent runtime whose failure modes can be measured at the subsystem level.
 
 </p>
-<!-- l. 678 --><p class="noindent"><span class="paragraphHead" id="system-invariants"> <a id="x1-30000"></a><span class="ptmb8t-">System  invariants:</span></span>
+<!-- l. 721 --><p class="noindent"><span class="paragraphHead" id="system-invariants"> <a id="x1-37000"></a><span class="ptmb8t-">System  invariants:</span></span>
 The implementation has five invariants that should be preserved across future edits. First, no returned region
 bypasses the validator. Second, no semantic-cache hit can substitute for an exact geometry result. Third,
 every LLM-generated plan must validate against the PlanGraph schema before tool execution. Fourth, every
@@ -687,7 +829,7 @@ PlanGraph and validator output so preference-data export remains auditable. Thes
 important than any single optimization because they define the trust boundary of the system.
 
 </p>
-<!-- l. 681 --><p class="noindent"><span class="paragraphHead" id="apilevel-contract"> <a id="x1-31000"></a><span class="ptmb8t-">API-level  contract:</span></span>
+<!-- l. 724 --><p class="noindent"><span class="paragraphHead" id="apilevel-contract"> <a id="x1-38000"></a><span class="ptmb8t-">API-level  contract:</span></span>
 The <span class="pcrr8t-">/v1/query </span>response contains <span class="pcrr8t-">answer</span>, <span class="pcrr8t-">regions[]</span>, <span class="pcrr8t-">confidence</span>, <span class="pcrr8t-">trace_id</span>, <span class="pcrr8t-">stages[]</span>,
 <span class="pcrr8t-">tokens_total</span>, <span class="pcrr8t-">cost_usd_total</span>, and <span class="pcrr8t-">hitl_required</span>. This structure is intentionally redundant.
 The answer is for humans, regions are for downstream tools, stages are for replay, and trace/cost fields are
@@ -697,7 +839,7 @@ purpose at the inter-agent boundary: another agent should know what GeoTrace-Age
 before it sends work, and it should receive typed errors rather than ambiguous prose.
 
 </p>
-<!-- l. 684 --><p class="noindent"><span class="paragraphHead" id="data-model"> <a id="x1-32000"></a><span class="ptmb8t-">Data  model:</span></span>
+<!-- l. 727 --><p class="noindent"><span class="paragraphHead" id="data-model"> <a id="x1-39000"></a><span class="ptmb8t-">Data  model:</span></span>
                                                                             
                                                                             
 The internal state can be viewed as four tables: queries, plans, tool calls, and feedback. Queries store
@@ -708,7 +850,7 @@ stack run in files or in-memory stores because it clarifies provenance. A future
 can turn this into a database schema figure; for now, the prose defines the audit path.
 
 </p>
-<!-- l. 687 --><p class="noindent"><span class="paragraphHead" id="projection-and-distance-assumptions"> <a id="x1-33000"></a><span class="ptmb8t-">Projection and distance assumptions:</span></span>
+<!-- l. 730 --><p class="noindent"><span class="paragraphHead" id="projection-and-distance-assumptions"> <a id="x1-40000"></a><span class="ptmb8t-">Projection and distance assumptions:</span></span>
 The local equirectangular projection is adequate for small regions but should not be silently trusted across
 large ocean-scale spans, polar routes, or anchor pairs crossing UTM zones. The robust implementation path
 is to tag every prism with the projection used, the anchor midpoint, and an estimated distortion bound. If the
@@ -717,7 +859,7 @@ a meaningful limitation because many maritime examples span large distances. It 
 future-work item: the system can expose projection choice in the trace without changing the agent interface.
 
 </p>
-<!-- l. 690 --><p class="noindent"><span class="paragraphHead" id="expected-reviewer-questions"> <a id="x1-34000"></a><span class="ptmb8t-">Expected reviewer questions:</span></span>
+<!-- l. 733 --><p class="noindent"><span class="paragraphHead" id="expected-reviewer-questions"> <a id="x1-41000"></a><span class="ptmb8t-">Expected reviewer questions:</span></span>
 A reviewer will likely ask six questions. First, why use an LLM at all if the kernel is deterministic? Because
 users ask heterogeneous natural-language questions and the planner maps those questions to
 typed tools; the LLM is not used as a geometry engine. Second, why not use a standard GIS
@@ -731,7 +873,7 @@ would falsify the contribution? A strong deterministic baseline with a hand-writ
 matches typed planning accuracy and cost would weaken the need for the LLM planner.
 
 </p>
-<!-- l. 693 --><p class="noindent"><span class="paragraphHead" id="future-benchmark-design"> <a id="x1-35000"></a><span class="ptmb8t-">Future benchmark design:</span></span>
+<!-- l. 736 --><p class="noindent"><span class="paragraphHead" id="future-benchmark-design"> <a id="x1-42000"></a><span class="ptmb8t-">Future benchmark design:</span></span>
 A full benchmark should include four task families: prism-only reachability, abnormal gap detection,
 possible rendezvous, and mixed natural-language audits requiring retrieval plus geometry. Each family
 should include clean, ambiguous, and adversarial cases. Clean cases check correctness. Ambiguous cases
@@ -742,7 +884,7 @@ auditability (schema failures, missing trace fields, replay failures). That spli
 whether an improvement comes from better geometry, better planning, or cheaper serving.
 
 </p>
-<!-- l. 696 --><p class="noindent"><span class="paragraphHead" id="interaction-with-pigrpo"> <a id="x1-36000"></a><span class="ptmb8t-">Interaction with Pi-GRPO:</span></span>
+<!-- l. 739 --><p class="noindent"><span class="paragraphHead" id="interaction-with-pigrpo"> <a id="x1-43000"></a><span class="ptmb8t-">Interaction with Pi-GRPO:</span></span>
 GeoTrace-Agent produces the supervision that Pi-GRPO consumes. When a reviewer corrects a region or
 verdict, the feedback row can be exported as a preference triple with the original question as prompt, the
 accepted answer as chosen, and the rejected answer as rejected. The physical validator output
@@ -751,7 +893,7 @@ on preference labels divorced from geometry. In a mature portfolio story, GeoTra
 the agentic data-production surface and Pi-GRPO is the policy-improvement surface.
 
 </p>
-<!-- l. 699 --><p class="noindent"><span class="paragraphHead" id="meaningful-future-work"> <a id="x1-37000"></a><span class="ptmb8t-">Meaningful  future  work:</span></span>
+<!-- l. 742 --><p class="noindent"><span class="paragraphHead" id="meaningful-future-work"> <a id="x1-44000"></a><span class="ptmb8t-">Meaningful  future  work:</span></span>
                                                                             
                                                                             
 The most valuable next step is not adding more agents. It is tightening the deterministic core and expanding
@@ -762,21 +904,21 @@ projection, time window, and validator inequality that made it feasible. That wo
 into a compact certificate a downstream analyst can inspect without opening the full log.
 
 </p>
-<h2 class="sectionHead" id="discussion-and-limitations"><span class="titlemark">6    </span>    <a id="x1-380006"></a>Discussion and Limitations</h2>
-<!-- l. 706 --><p class="noindent">GeoTrace-Agent is a research-engineering blueprint. Three caveats deserve naming. First, the geometric
+<h2 class="sectionHead" id="discussion-and-limitations"><span class="titlemark">7    </span>    <a id="x1-450007"></a>Discussion and Limitations</h2>
+<!-- l. 749 --><p class="noindent">GeoTrace-Agent is a research-engineering blueprint. Three caveats deserve naming. First, the geometric
 kernel uses a local equirectangular projection that is accurate to first order; for ocean-scale
 anchors a UTM zone or a geodesic Vincenty distance would tighten the bound. Second, the
 Pi-DPM reconstruction-error proxy used in <span class="mathjax-inline">\(p_{\text {data}}\)</span> is loaded from a frozen TorchScript checkpoint;
 production deployments should retrain Pi-DPM on the live trajectory distribution. Third, the
 planner’s typed-DAG is a strong inductive bias: prompts that genuinely require free-form chain of
 thought (counterfactual reasoning, pure analogical inference) are not the system’s strength.
-</p><!-- l. 709 --><p class="noindent"><span class="ptmb8t-">Connection to RL: </span>The HITL queue exports its verdicts as preference triples consumable by
-direct preference optimization [<a href="#Xrafailov2023dpo">32</a>] or group-relative policy optimization [<a href="#Xshao2024grpo">34</a>] in our sibling
+</p><!-- l. 752 --><p class="noindent"><span class="ptmb8t-">Connection to RL: </span>The HITL queue exports its verdicts as preference triples consumable by
+direct preference optimization [<a href="#Xrafailov2023dpo">34</a>] or group-relative policy optimization [<a href="#Xshao2024grpo">36</a>] in our sibling
 project Pi-GRPO. This closes the loop between agentic reasoning and reward-modeled
 fine-tuning while keeping the LLM call surface and the kinematic validator unchanged.
 
 </p>
-<!-- l. 711 --><p class="noindent"><span class="paragraphHead" id="practical-limitations"> <a id="x1-39000"></a><span class="ptmb8t-">Practical  limitations:</span></span>
+<!-- l. 754 --><p class="noindent"><span class="paragraphHead" id="practical-limitations"> <a id="x1-46000"></a><span class="ptmb8t-">Practical  limitations:</span></span>
 The deterministic kernel is only as strong as its assumptions. A local tangent-plane projection is efficient
 and easy to inspect, but it is not a substitute for geodesic reasoning on very large spatial extents.
 Speed caps are also domain summaries: real maritime, vehicle, and UAV motion depends on
@@ -785,7 +927,7 @@ this by making the validator explicit and configurable, but a deployment that ch
 must recalibrate the physical envelope and rerun golden cases before trusting old results.
 
 </p>
-<!-- l. 714 --><p class="noindent"><span class="paragraphHead" id="planner-limitations"> <a id="x1-40000"></a><span class="ptmb8t-">Planner  limitations:</span></span>
+<!-- l. 757 --><p class="noindent"><span class="paragraphHead" id="planner-limitations"> <a id="x1-47000"></a><span class="ptmb8t-">Planner  limitations:</span></span>
 Typed plans reduce hallucination but do not eliminate planner error. The planner can still select the wrong
 tool, omit a relevant dependency, or overuse expensive retrieval when a direct prism call would
 suffice. The schema catches invalid structure, not poor strategy. This is why the evaluation
@@ -794,7 +936,7 @@ avoidable budget exhaustion. A future learned planner could be trained from succ
 but it should keep the same typed interface so the orchestrator remains the authority.
 
 </p>
-<!-- l. 717 --><p class="noindent"><span class="paragraphHead" id="operational-limitations"> <a id="x1-41000"></a><span class="ptmb8t-">Operational  limitations:</span></span>
+<!-- l. 760 --><p class="noindent"><span class="paragraphHead" id="operational-limitations"> <a id="x1-48000"></a><span class="ptmb8t-">Operational  limitations:</span></span>
 The HITL queue is a strength only if it is used. If reviewers do not inspect low-confidence cases, the system
 can accumulate unresolved ambiguity. If reviewer feedback is inconsistent, downstream Pi-GRPO
 preference data will inherit that noise. The production answer is not to remove HITL but to
@@ -802,7 +944,7 @@ instrument it: measure queue age, agreement rate, correction type, and export qu
 operational metrics should appear beside model metrics in any mature deployment paper.
 
 </p>
-<!-- l. 720 --><p class="noindent"><span class="paragraphHead" id="future-work"> <a id="x1-42000"></a><span class="ptmb8t-">Future  work:</span></span>
+<!-- l. 763 --><p class="noindent"><span class="paragraphHead" id="future-work"> <a id="x1-49000"></a><span class="ptmb8t-">Future  work:</span></span>
 The next technical milestone is a larger replayable benchmark with four task families: direct reachability,
 abnormal gap detection, possible rendezvous, and mixed natural-language audits that require retrieval plus
                                                                             
@@ -813,7 +955,7 @@ region tightness. Cost includes tokens, tool calls, wallclock, and cache hit rat
 includes schema failure, missing trace fields, replay failure, and HITL routing quality.
 
 </p>
-<!-- l. 723 --><p class="noindent"><span class="paragraphHead" id="broader-impact-and-safety"> <a id="x1-43000"></a><span class="ptmb8t-">Broader impact and safety:</span></span>
+<!-- l. 766 --><p class="noindent"><span class="paragraphHead" id="broader-impact-and-safety"> <a id="x1-50000"></a><span class="ptmb8t-">Broader impact and safety:</span></span>
 GeoTrace-Agent is designed for analysts, not for unchecked automated enforcement. A system that
 marks a region infeasible can reduce false narratives, but it can also create false confidence if
 projection, data quality, or domain caps are wrong. The safest posture is evidence-preserving
@@ -822,24 +964,25 @@ hard decision is validator-backed, and uncertain cases are routed to HITL. This 
 accountability in the loop while still giving the analyst useful geometric computation.
 
 </p>
-<h2 class="sectionHead" id="conclusion"><span class="titlemark">7    </span>    <a id="x1-440007"></a>Conclusion</h2>
-<!-- l. 730 --><p class="noindent">We presented GeoTrace-Agent, a multi-agent framework that grounds LLM-driven trajectory reasoning in
-deterministic time geography. Typed PlanGraph chain-of-thought, a three-layer efficiency stack, a
-Hägerstrand prism kernel with STAGD-DRM and DC-TGARD agents, a hard kinematic validator, MCP
-and A2A protocol surfaces, OpenTelemetry traceability, and a HITL queue together deliver a system that is
+<h2 class="sectionHead" id="conclusion"><span class="titlemark">8    </span>    <a id="x1-510008"></a>Conclusion</h2>
+<!-- l. 773 --><p class="noindent">We presented GeoTrace-Agent, a multi-agent framework that grounds LLM-driven trajectory
+reasoning in deterministic time geography. Typed PlanGraph chain-of-thought, an efficiency
+stack (adaptive prompt compression and a hybrid exact + semantic cache), a Hägerstrand prism
+kernel with STAGD-DRM and DC-TGARD agents, a hard kinematic validator, MCP and A2A
+protocol surfaces, OpenTelemetry traceability, and a HITL queue together deliver a system that is
 auditable, efficient, and physically correct. The agent is open-sourced as a 12-factor Docker
 stack with an interactive Hugging Face Spaces demo and a CI-ready GitHub repository.
 
 </p>
-<h2 class="likesectionHead" id="acknowledgments"> <a id="x1-45000"></a>Acknowledgments</h2>
-<!-- l. 733 --><p class="noindent">This system extends prior work conducted at the University of Minnesota with Profs. Shashi Shekhar and Vipin
+<h2 class="likesectionHead" id="acknowledgments"> <a id="x1-52000"></a>Acknowledgments</h2>
+<!-- l. 776 --><p class="noindent">This system extends prior work conducted at the University of Minnesota with Profs. Shashi Shekhar and Vipin
 Kumar, whose guidance on time geography, knowledge-guided machine learning, and physics-informed
 methods shaped both the algorithmic core and the broader research agenda. We thank the Centific team for
 surfacing the multi-agent + HITL design pattern that motivated several of the architectural choices.
 
 </p>
-<h2 class="likesectionHead" id="references"> <a id="x1-46000"></a>References</h2>
-<!-- l. 736 --><p class="noindent">
+<h2 class="likesectionHead" id="references"> <a id="x1-53000"></a>References</h2>
+<!-- l. 779 --><p class="noindent">
     </p><section class="thebibliography" role="doc-bibliography"><dl><dt>
  [1] </dt><dd><a id="Xanthropic2024claude"></a> Anthropic. Claude 3.5 Sonnet System Card. 2024.
     </dd><dt>
@@ -876,107 +1019,117 @@ surfacing the multi-agent + HITL design pattern that motivated several of the ar
 [11] </dt><dd><a id="Xegenhofer1994spatial"></a> M. J. Egenhofer. Spatial SQL: A query and presentation language. <span class="ptmri8t-">IEEE TKDE</span>, 6(1):86–95,
     1994.
     </dd><dt>
-[12] </dt><dd><a id="Xghallab1998pddl"></a> M. Ghallab et al. PDDL: The planning domain definition language. Technical report, 1998.
+[12] </dt><dd><a id="Xgarciamolina1987sagas"></a>  H.  Garcia-Molina  and  K.  Salem.  Sagas.  <span class="ptmri8t-">Proceedings  of  the  ACM  SIGMOD  International
+    Conference on Management of Data</span>, 1987.
     </dd><dt>
-[13] </dt><dd><a id="Xgoogle2024a2a"></a> Google. The Agent2Agent (A2A) protocol. 2024. <a class="url" href="https://a2a-protocol.org/"><span class="pcrr8t-">https://a2a-protocol.org/</span></a>.
+[13] </dt><dd><a id="Xghallab1998pddl"></a> M. Ghallab et al. PDDL: The planning domain definition language. Technical report, 1998.
     </dd><dt>
-[14] </dt><dd><a id="Xgoodchild1992geographical"></a> M. F. Goodchild. Geographical information science. <span class="ptmri8t-">International Journal of Geographical
+[14] </dt><dd><a id="Xgoogle2024a2a"></a> Google. The Agent2Agent (A2A) protocol. 2024. <a class="url" href="https://google.github.io/A2A/"><span class="pcrr8t-">https://google.github.io/A2A/</span></a>.
+    </dd><dt>
+[15] </dt><dd><a id="Xgoodchild1992geographical"></a> M. F. Goodchild. Geographical information science. <span class="ptmri8t-">International Journal of Geographical
     Information Systems</span>, 6(1):31–45, 1992.
     </dd><dt>
-[15] </dt><dd><a id="Xguttman1984rtree"></a> A. Guttman. R-trees: A dynamic index structure for spatial searching. <span class="ptmri8t-">ACM SIGMOD</span>, 1984.
+[16] </dt><dd><a id="Xguttman1984rtree"></a> A. Guttman. R-trees: A dynamic index structure for spatial searching. <span class="ptmri8t-">ACM SIGMOD</span>, 1984.
     </dd><dt>
-[16] </dt><dd><a id="Xhart1968astar"></a> P. E. Hart, N. J. Nilsson, and B. Raphael. A formal basis for the heuristic determination of
+[17] </dt><dd><a id="Xhart1968astar"></a> P. E. Hart, N. J. Nilsson, and B. Raphael. A formal basis for the heuristic determination of
     minimum cost paths. <span class="ptmri8t-">IEEE Transactions on Systems Science and Cybernetics</span>, 4(2):100–107,
     1968.
     </dd><dt>
-[17] </dt><dd><a id="Xhagerstrand1970what"></a>  T.  Hägerstrand.  What  about  people  in  regional  science?  <span class="ptmri8t-">Papers  of  the  Regional  Science
+[18] </dt><dd><a id="Xhagerstrand1970what"></a>  T.  Hägerstrand.  What  about  people  in  regional  science?  <span class="ptmri8t-">Papers  of  the  Regional  Science
     Association</span>, 24(1):7–24, 1970.
     </dd><dt>
-[18] </dt><dd><a id="Xhong2024opendevin"></a> S. Hong et al. OpenDevin: An open platform for AI software developers as generalist agents.
+[19] </dt><dd><a id="Xhong2024opendevin"></a> S. Hong et al. OpenDevin: An open platform for AI software developers as generalist agents.
     <span class="ptmri8t-">arXiv:2407.16741</span>, 2024.
     </dd><dt>
-[19] </dt><dd><a id="Xjimenez2024swebench"></a> C. Jimenez et al. SWE-bench: Can language models resolve real-world GitHub issues? <span class="ptmri8t-">ICLR</span>,
+[20] </dt><dd><a id="Xjimenez2024swebench"></a> C. Jimenez et al. SWE-bench: Can language models resolve real-world GitHub issues? <span class="ptmri8t-">ICLR</span>,
     2024.
     </dd><dt>
-[20] </dt><dd><a id="Xkong2015kinematic"></a> J. Kong, M. Pfeiffer, G. Schildbach, and F. Borrelli. Kinematic and dynamic vehicle models
+[21] </dt><dd><a id="Xkong2015kinematic"></a> J. Kong, M. Pfeiffer, G. Schildbach, and F. Borrelli. Kinematic and dynamic vehicle models
     for autonomous driving control design. <span class="ptmri8t-">IEEE Intelligent Vehicles Symposium</span>, 2015.
     </dd><dt>
-[21] </dt><dd><a id="Xkuijpers2008prism"></a>   B.   Kuijpers   and   W.   Othman.   Modeling   uncertainty   of   moving   objects   on   road
+[22] </dt><dd><a id="Xkuijpers2008prism"></a>   B.   Kuijpers   and   W.   Othman.   Modeling   uncertainty   of   moving   objects   on   road
     networks via space-time prisms. <span class="ptmri8t-">International Journal of Geographical Information Science</span>,
     23(9):1095–1117, 2008.
     </dd><dt>
-[22] </dt><dd><a id="Xkwon2023vllm"></a>  W.  Kwon  et  al.  Efficient  memory  management  for  large  language  model  serving  with
+[23] </dt><dd><a id="Xkwon2023vllm"></a>  W.  Kwon  et  al.  Efficient  memory  management  for  large  language  model  serving  with
     PagedAttention. <span class="ptmri8t-">SOSP</span>, 2023.
     </dd><dt>
-[23] </dt><dd><a id="Xlangfuse2024"></a>       Langfuse       Team.       Langfuse:       Open-source       LLM       engineering       platform.
+[24] </dt><dd><a id="Xlangfuse2024"></a>       Langfuse       Team.       Langfuse:       Open-source       LLM       engineering       platform.
     <a class="url" href="https://langfuse.com"><span class="pcrr8t-">https://langfuse.com</span></a>, 2024.
-    </dd><dt>
-[24] </dt><dd><a id="Xlavalle2006planning"></a> S. M. LaValle. <span class="ptmri8t-">Planning Algorithms</span>. Cambridge University Press, 2006.
-    </dd><dt>
                                                                             
                                                                             
-[25] </dt><dd><a id="Xliu2024llava"></a> H. Liu et al. Improved baselines with visual instruction tuning. <span class="ptmri8t-">CVPR</span>, 2024.
     </dd><dt>
-[26] </dt><dd><a id="Xmiller1991modelling"></a>               H.               J.               Miller.               Modelling               accessibility               using
+[25] </dt><dd><a id="Xlavalle2006planning"></a> S. M. LaValle. <span class="ptmri8t-">Planning Algorithms</span>. Cambridge University Press, 2006.
+    </dd><dt>
+[26] </dt><dd><a id="Xliu2024llava"></a> H. Liu et al. Improved baselines with visual instruction tuning. <span class="ptmri8t-">CVPR</span>, 2024.
+    </dd><dt>
+[27] </dt><dd><a id="Xmiller1991modelling"></a>               H.               J.               Miller.               Modelling               accessibility               using
     space-time prism concepts within geographical information systems. <span class="ptmri8t-">International Journal of
     Geographical Information Systems</span>, 5(3):287–301, 1991.
     </dd><dt>
-[27] </dt><dd><a id="Xmiller2005measuring"></a> H. J. Miller. A measurement theory for time geography. <span class="ptmri8t-">Geographical Analysis</span>, 37(1):17–45,
+[28] </dt><dd><a id="Xmiller2005measuring"></a> H. J. Miller. A measurement theory for time geography. <span class="ptmri8t-">Geographical Analysis</span>, 37(1):17–45,
     2005.
     </dd><dt>
-[28] </dt><dd><a id="Xopenai2024gpt4"></a> OpenAI. GPT-4 technical report. <span class="ptmri8t-">arXiv:2303.08774</span>, 2024.
+[29] </dt><dd><a id="Xnvidia2024nemo"></a>                          NVIDIA.                          NeMo:                          a                          framework
+    and toolkit for building generative AI agents and models (Agent Toolkit, Guardrails, Retriever,
+    NIM microservices). 2024. <a class="url" href="https://github.com/NVIDIA/NeMo"><span class="pcrr8t-">https://github.com/NVIDIA/NeMo</span></a>.
     </dd><dt>
-[29] </dt><dd><a id="Xopenai2024structured"></a> OpenAI. Introducing structured outputs in the API. Technical documentation, 2024.
+[30] </dt><dd><a id="Xopenai2024gpt4"></a> OpenAI. GPT-4 technical report. <span class="ptmri8t-">arXiv:2303.08774</span>, 2024.
     </dd><dt>
-[30] </dt><dd><a id="Xopenai2024autocache"></a> OpenAI. Automatic prompt caching for the API. Technical documentation, 2024.
+[31] </dt><dd><a id="Xopenai2024structured"></a> OpenAI. Introducing structured outputs in the API. Technical documentation, 2024.
     </dd><dt>
-[31] </dt><dd><a id="Xopentelemetry2024"></a>   OpenTelemetry   Authors.   OpenTelemetry:   A   unified   observability   framework.   2024.
+[32] </dt><dd><a id="Xopenai2024autocache"></a> OpenAI. Automatic prompt caching for the API. Technical documentation, 2024.
+    </dd><dt>
+[33] </dt><dd><a id="Xopentelemetry2024"></a>   OpenTelemetry   Authors.   OpenTelemetry:   A   unified   observability   framework.   2024.
     <a class="url" href="https://opentelemetry.io"><span class="pcrr8t-">https://opentelemetry.io</span></a>.
     </dd><dt>
-[32] </dt><dd><a id="Xrafailov2023dpo"></a> R. Rafailov, A. Sharma, E. Mitchell, S. Ermon, C. D. Manning, and C. Finn. Direct Preference
+[34] </dt><dd><a id="Xrafailov2023dpo"></a> R. Rafailov, A. Sharma, E. Mitchell, S. Ermon, C. D. Manning, and C. Finn. Direct Preference
     Optimization: Your language model is secretly a reward model. <span class="ptmri8t-">NeurIPS</span>, 2023.
     </dd><dt>
-[33] </dt><dd><a id="Xschick2023toolformer"></a> T. Schick et al. Toolformer: Language models can teach themselves to use tools. <span class="ptmri8t-">NeurIPS</span>,
+[35] </dt><dd><a id="Xschick2023toolformer"></a> T. Schick et al. Toolformer: Language models can teach themselves to use tools. <span class="ptmri8t-">NeurIPS</span>,
     2023.
     </dd><dt>
-[34] </dt><dd><a id="Xshao2024grpo"></a> Z. Shao, P. Wang, et al. DeepSeekMath: Pushing the limits of mathematical reasoning in open
+[36] </dt><dd><a id="Xshao2024grpo"></a> Z. Shao, P. Wang, et al. DeepSeekMath: Pushing the limits of mathematical reasoning in open
     language models. <span class="ptmri8t-">arXiv:2402.03300</span>, 2024.
     </dd><dt>
-[35] </dt><dd><a id="Xsharma2022sigspatial"></a>   A.   Sharma,   J.   Gupta,   S.   Ghosh,   and   S.   Shekhar.   Towards   a   tighter   bound   on
+[37] </dt><dd><a id="Xsharma2022sigspatial"></a>   A.   Sharma,   J.   Gupta,   S.   Ghosh,   and   S.   Shekhar.   Towards   a   tighter   bound   on
     possible-rendezvous areas: preliminary results. <span class="ptmri8t-">ACM SIGSPATIAL</span>, 2022.
     </dd><dt>
-[36] </dt><dd><a id="Xsharma2022tist"></a> A. Sharma and S. Shekhar. Analyzing trajectory gaps for possible rendezvous regions. <span class="ptmri8t-">ACM
+[38] </dt><dd><a id="Xsharma2022tist"></a> A. Sharma and S. Shekhar. Analyzing trajectory gaps for possible rendezvous regions. <span class="ptmri8t-">ACM
     TIST</span>, 13(6):1–23, 2022.
     </dd><dt>
-[37] </dt><dd><a id="Xsharma2024tist"></a> A. Sharma, S. Ghosh, and S. Shekhar. Physics-based abnormal trajectory-gap detection. <span class="ptmri8t-">ACM
+[39] </dt><dd><a id="Xsharma2024tist"></a> A. Sharma, S. Ghosh, and S. Shekhar. Physics-based abnormal trajectory-gap detection. <span class="ptmri8t-">ACM
     TIST</span>, 15(2), 2024.
     </dd><dt>
-[38] </dt><dd><a id="Xsharma2025geoanomalies"></a>  A.  Sharma,  M.  Yang,  M.  Farhadloo,  S.  Ghosh,  B.  Jayaprakash,  and  S.  Shekhar.  Towards
+[40] </dt><dd><a id="Xsharma2025geoanomalies"></a>  A.  Sharma,  M.  Yang,  M.  Farhadloo,  S.  Ghosh,  B.  Jayaprakash,  and  S.  Shekhar.  Towards
     physics-informed diffusion for anomaly detection in trajectories. <span class="ptmri8t-">ACM SIGSPATIAL Workshop
     on Geospatial Anomaly Detection (GeoAnomalies)</span>, 2025.
     </dd><dt>
-[39] </dt><dd><a id="Xsamet1990applications"></a> H. Samet. <span class="ptmri8t-">Applications of Spatial Data Structures: Computer Graphics, Image Processing,
+[41] </dt><dd><a id="Xsamet1990applications"></a> H. Samet. <span class="ptmri8t-">Applications of Spatial Data Structures: Computer Graphics, Image Processing,
     and GIS</span>. Addison-Wesley, 1990.
     </dd><dt>
-[40] </dt><dd><a id="Xsellis1987multiple"></a>   T.   Sellis,   N.   Roussopoulos,   and   C.   Faloutsos.   The   R+-tree:   A   dynamic   index   for
+[42] </dt><dd><a id="Xsellis1987multiple"></a>   T.   Sellis,   N.   Roussopoulos,   and   C.   Faloutsos.   The   R+-tree:   A   dynamic   index   for
     multi-dimensional objects. <span class="ptmri8t-">VLDB</span>, 1987.
     </dd><dt>
-[41] </dt><dd><a id="Xwang2023plan"></a> L. Wang et al. Plan-and-Solve prompting: Improving zero-shot chain-of-thought reasoning by
+[43] </dt><dd><a id="Xtemporal2024durable"></a>  Temporal  Technologies.  Temporal:  durable  execution  for  reliable  distributed  applications.
+    2024. <a class="url" href="https://temporal.io"><span class="pcrr8t-">https://temporal.io</span></a>.
+    </dd><dt>
+                                                                            
+                                                                            
+[44] </dt><dd><a id="Xwang2023plan"></a> L. Wang et al. Plan-and-Solve prompting: Improving zero-shot chain-of-thought reasoning by
     large language models. <span class="ptmri8t-">ACL</span>, 2023.
     </dd><dt>
-[42] </dt><dd><a id="Xwang2024survey"></a>  L.  Wang  et  al.  A  survey  on  large  language  model  based  autonomous  agents.  <span class="ptmri8t-">Frontiers  of
+[45] </dt><dd><a id="Xwang2024survey"></a>  L.  Wang  et  al.  A  survey  on  large  language  model  based  autonomous  agents.  <span class="ptmri8t-">Frontiers  of
     Computer Science</span>, 18(6), 2024.
     </dd><dt>
-[43] </dt><dd><a id="Xwei2022cot"></a> J. Wei et al. Chain-of-thought prompting elicits reasoning in large language models. <span class="ptmri8t-">NeurIPS</span>,
+[46] </dt><dd><a id="Xwei2022cot"></a> J. Wei et al. Chain-of-thought prompting elicits reasoning in large language models. <span class="ptmri8t-">NeurIPS</span>,
     2022.
     </dd><dt>
-[44] </dt><dd><a id="Xxie2024multimodal"></a> J. Xie et al. Large multimodal agents: A survey. <span class="ptmri8t-">arXiv:2402.15116</span>, 2024.
-                                                                            
-                                                                            
+[47] </dt><dd><a id="Xxie2024multimodal"></a> J. Xie et al. Large multimodal agents: A survey. <span class="ptmri8t-">arXiv:2402.15116</span>, 2024.
     </dd><dt>
-[45] </dt><dd><a id="Xyao2023react"></a> S. Yao et al. ReAct: Synergizing reasoning and acting in language models. <span class="ptmri8t-">ICLR</span>, 2023.
+[48] </dt><dd><a id="Xyao2023react"></a> S. Yao et al. ReAct: Synergizing reasoning and acting in language models. <span class="ptmri8t-">ICLR</span>, 2023.
     </dd><dt>
-[46] </dt><dd><a id="Xzheng2015trajectory"></a> Y. Zheng. Trajectory data mining: An overview. <span class="ptmri8t-">ACM TIST</span>, 6(3):1–41, 2015.
+[49] </dt><dd><a id="Xzheng2015trajectory"></a> Y. Zheng. Trajectory data mining: An overview. <span class="ptmri8t-">ACM TIST</span>, 6(3):1–41, 2015.
     </dd></dl></section>
  
 

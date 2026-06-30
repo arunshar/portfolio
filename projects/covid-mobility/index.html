@@ -7,35 +7,35 @@
 <meta name="description" content="A Grafana-style observability dashboard for the COVID-19 mobility decision-support project (Sharma et al., AGILE GIScience 2022): real weekly long-duration visits to bars and restaurants in Minnesota by dwell time, March 2020 to June 2021.">
 <link rel="canonical" href="https://arunshar.github.io/portfolio/projects/covid-mobility/">
 <style>
-  :root{color-scheme:dark}
+  :root{color-scheme:light}
   *{box-sizing:border-box}
-  body{margin:0;background:#0c0e12;color:#c7ccd4;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;line-height:1.6}
-  a{color:#5794f2;text-decoration:none}
-  a:hover{color:#ff9830}
+  body{margin:0;background:#fbfcfe;color:#16202c;font-family:'Noto Sans',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;line-height:1.6}
+  a{color:#1772d0;text-decoration:none}
+  a:hover{color:#b45309}
   .wrap{max-width:1040px;margin:0 auto;padding:18px 20px 48px}
-  .topnav{font-size:13px;color:#8a909a;margin-bottom:18px}
-  .topnav a{color:#9aa0aa}
-  h1{font-size:24px;font-weight:500;color:#e6e9ee;margin:0 0 4px}
-  .meta{font-size:13px;color:#8a909a;margin:0 0 14px}
+  .topnav{font-size:13px;color:#5b6776;margin-bottom:18px}
+  .topnav a{color:#1772d0}
+  h1{font-size:24px;font-weight:600;color:#0e1117;margin:0 0 4px}
+  .meta{font-size:13px;color:#5b6776;margin:0 0 14px}
   .btns{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px}
-  .btn{font-size:13px;color:#cdd2d9;border:0.5px solid #2a2e37;border-radius:8px;padding:6px 12px;background:#161922}
-  .btn:hover{border-color:#5794f2;color:#fff}
-  .pan{background:#181b20;border:0.5px solid #2a2e37;border-radius:8px;padding:12px;margin-bottom:12px}
-  .ttl{font-size:11px;color:#8a909a;letter-spacing:.04em;text-transform:uppercase;margin:0 0 6px}
-  .big{font-size:24px;font-weight:500;line-height:1}
-  .sub{font-size:11px;color:#8a909a;margin-top:3px}
+  .btn{font-size:13px;color:#16202c;border:1px solid #e6eaf0;border-radius:8px;padding:6px 12px;background:#f5f8fc}
+  .btn:hover{border-color:#1772d0;color:#1772d0}
+  .pan{background:#fff;border:1px solid #e6eaf0;border-radius:8px;padding:12px;margin-bottom:12px;box-shadow:0 1px 4px rgba(20,30,50,.05)}
+  .ttl{font-size:11px;color:#5b6776;letter-spacing:.04em;text-transform:uppercase;margin:0 0 6px}
+  .big{font-size:24px;font-weight:600;line-height:1}
+  .sub{font-size:11px;color:#5b6776;margin-top:3px}
   .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:12px}
-  .head{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;background:#11141a;border:0.5px solid #2a2e37;border-radius:8px;padding:10px 12px}
-  .pill{font-size:11px;color:#cdd2d9;border:0.5px solid #2a2e37;border-radius:6px;padding:4px 8px}
-  .pill.ok{color:#9fe3b0;border-color:#28503a;background:#10231a}
-  .legend{display:flex;flex-wrap:wrap;gap:14px;font-size:11px;color:#8a909a}
+  .head{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;background:#f5f8fc;border:1px solid #e6eaf0;border-radius:8px;padding:10px 12px}
+  .pill{font-size:11px;color:#16202c;border:1px solid #e6eaf0;border-radius:6px;padding:4px 8px}
+  .pill.ok{color:#0f766e;border-color:#0f766e;background:#e6f7ed}
+  .legend{display:flex;flex-wrap:wrap;gap:14px;font-size:11px;color:#5b6776}
   .legend span{display:flex;align-items:center;gap:5px}
   .swatch{width:14px;height:0;display:inline-block}
-  .totrow{display:flex;flex-wrap:wrap;gap:14px;font-size:11px;color:#9aa0aa;margin-top:6px}
-  .sec{font-size:13px;color:#cdd2d9;font-weight:500;margin:22px 0 8px}
-  .about{margin-top:24px;font-size:14px;color:#aeb4be;max-width:800px}
-  .about h2{font-size:17px;font-weight:500;color:#e6e9ee;margin:22px 0 8px}
-  .note{margin-top:14px;font-size:12.5px;color:#8a909a;border-left:2px solid #28503a;padding:8px 12px;background:#0f1814;border-radius:0}
+  .totrow{display:flex;flex-wrap:wrap;gap:14px;font-size:11px;color:#5b6776;margin-top:6px}
+  .sec{font-size:13px;color:#16202c;font-weight:600;margin:22px 0 8px}
+  .about{margin-top:24px;font-size:14px;color:#3a4250;max-width:800px}
+  .about h2{font-size:17px;font-weight:600;color:#0e1117;margin:22px 0 8px}
+  .note{margin-top:14px;font-size:12.5px;color:#5b6776;border-left:2px solid #0f766e;padding:8px 12px;background:#f5f8fc;border-radius:0}
   @media(max-width:760px){.grid4{grid-template-columns:repeat(2,1fr)}}
 </style>
 </head>
@@ -54,7 +54,7 @@
 
   <div class="head">
     <div style="flex:1">
-      <div style="font-size:15px;font-weight:500;color:#e6e9ee">SafeGraph long-duration visits</div>
+      <div style="font-size:15px;font-weight:600;color:#0e1117">SafeGraph long-duration visits</div>
       <div style="font-size:11px;color:#8a909a">weekly visit counts by dwell time, Minnesota</div>
     </div>
     <span class="pill">Mar 2020 to Jun 2021</span>
@@ -125,7 +125,7 @@
 <script>
 (function(){
   var C=window.COVID; if(!C){return;}
-  var grid='rgba(140,144,154,0.13)',tick='#8a909a';
+  var grid='rgba(20,30,50,0.10)',tick='#5b6776';
   var BC={"<5":"#5794f2","5-20":"#f2495c","21-60":"#73bf69","61-240":"#b877d9",">240":"#3aa6b9"};
   var BD={"<5":[5,4],"5-20":[5,4],"21-60":[],"61-240":[],">240":[]};
   var VC={"Full-service restaurants":"#5794f2","Bars":"#ff9830","Limited-service restaurants":"#73bf69"};

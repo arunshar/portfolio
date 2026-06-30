@@ -1,21 +1,15 @@
-<svg viewBox="0 0 920 300" width="100%" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="PhysFlow-Earth architecture"><style>
-.b{fill:#fff;stroke:#e6eaf0;stroke-width:1.5}
-.t{font-family:Montserrat,system-ui,sans-serif;font-size:13px;fill:#16202c}
-.s{font-family:'Noto Sans',system-ui,sans-serif;font-size:10.5px;fill:#5b6776}
-.real{stroke:#0e9f6e;stroke-width:2}
-.stub{stroke:#b45309;stroke-dasharray:5 4;stroke-width:2}
-.ar{stroke:#5b6776;stroke-width:1.6;fill:none;marker-end:url(#a)}
-.lg{font-family:'Noto Sans',system-ui,sans-serif;font-size:10.5px}
-</style>
-<defs><marker id="a" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#5b6776"/></marker></defs>
-<rect class="b" x="10" y="56" width="170" height="56" rx="10"/><text class="t" x="22" y="79">Low-res field</text><text class="s" x="22" y="97">imagery / climate (ERA5, S2)</text>
-<rect class="b real" x="240" y="56" width="200" height="56" rx="10"/><text class="t" x="252" y="79">DiT velocity</text><text class="s" x="252" y="97">rectified flow, forward verified</text>
-<rect class="b real" x="500" y="56" width="220" height="56" rx="10"/><text class="t" x="512" y="79">Physics residual penalty</text><text class="s" x="512" y="97">mass / divergence / band-ratio</text>
-<rect class="b" x="780" y="56" width="130" height="56" rx="10"/><text class="t" x="792" y="80">Sharp output</text>
-<path class="ar" d="M180,84 L238,84"/>
-<path class="ar" d="M440,84 L498,84"/>
-<path class="ar" d="M720,84 L778,84"/>
-<path class="ar" d="M610,112 C610,140 480,150 380,150 C300,150 250,120 340,114" style="stroke-dasharray:4 3"/>
-<text class="s" x="360" y="154">penalty keeps invented detail physically consistent (8/8 physics + flow tests)</text>
-<text class="s" x="240" y="184">trained checkpoints and PSNR 28.6 vs EDiffSR are scaffold / targets</text>
-<text class="lg" x="14" y="288" fill="#0e9f6e">green = real and tested</text><text class="lg" x="210" y="288" fill="#b45309">dashed amber = stub / target (off-the-shelf or roadmap)</text></svg>
+<svg viewBox="0 0 1120 322" width="100%" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="PhysFlow-Earth architecture"><defs>
+<marker id="ah" markerWidth="12" markerHeight="12" refX="9" refY="5" orient="auto"><path d="M0,0 L11,5 L0,10 z" fill="#202733"/></marker>
+</defs>
+<style>
+svg text{font-family:'Noto Sans',system-ui,-apple-system,sans-serif;}
+.box{fill:#fff;stroke:#aebbd0;stroke-width:1.5;}
+.acc{fill:#eaf3fd;stroke:#1772d0;stroke-width:1.5;}
+.grn{fill:#e6f7ed;stroke:#0f766e;stroke-width:1.5;}
+.amb{fill:#fff6e6;stroke:#e7b66a;stroke-width:1.5;stroke-dasharray:6 4;}
+.lane{fill:#f3f6fc;stroke:#aebbd0;stroke-width:1.5;}
+.ttl{font-size:16px;font-weight:700;fill:#0e1117;font-family:'Montserrat','Noto Sans',sans-serif;}
+.sub{font-size:12.5px;font-weight:500;fill:#1b2230;}
+.ar{stroke:#202733;stroke-width:2.2;fill:none;marker-end:url(#ah);}
+.lg{font-size:12px;}
+</style><rect class="box" x="28" y="52" width="177.6" height="92" rx="11"/><text class="ttl" x="117" y="94" text-anchor="middle">Coarse input</text><text class="sub" x="117" y="112" text-anchor="middle">Sentinel-2 / ERA5 / CHIRPS</text><rect class="box" x="249.6" y="52" width="177.6" height="92" rx="11"/><text class="ttl" x="338" y="94" text-anchor="middle">DiT backbone</text><text class="sub" x="338" y="112" text-anchor="middle">denoiser</text><rect class="grn" x="471.2" y="52" width="177.6" height="92" rx="11"/><text class="ttl" x="560" y="94" text-anchor="middle">Rectified flow + physics</text><text class="sub" x="560" y="112" text-anchor="middle">mass / divergence / band-ratio operators</text><rect class="box" x="692.8" y="52" width="177.6" height="92" rx="11"/><text class="ttl" x="782" y="94" text-anchor="middle">Super-resolved field</text><text class="sub" x="782" y="112" text-anchor="middle">fine-scale output</text><rect class="amb" x="914.4" y="52" width="177.6" height="92" rx="11"/><text class="ttl" x="1003" y="94" text-anchor="middle">PSNR / SSIM eval</text><text class="sub" x="1003" y="112" text-anchor="middle">held-out split</text><line class="ar" x1="205.6" y1="98.0" x2="249.6" y2="98.0"/><line class="ar" x1="427.2" y1="98.0" x2="471.2" y2="98.0"/><line class="ar" x1="648.8" y1="98.0" x2="692.8" y2="98.0"/><line class="ar" x1="870.4" y1="98.0" x2="914.4" y2="98.0"/><rect x="28" y="196" width="1064" height="84" rx="12" fill="#fff6e6" stroke="#e7b66a" stroke-width="1.5"/><text x="48" y="224" style="font-size:15px;font-weight:700;fill:#0e1117;font-family:Montserrat,sans-serif">Honest scope</text><text x="48" y="246" class="sub">Physics operators (mass, divergence, band-ratio) are exact and unit-tested (8 tests).</text><text x="48" y="266" class="sub">Trained PSNR / SSIM on a held-out split is the next step (target); leaderboard numbers not claimed.</text><text class="lg" x="28" y="304" fill="#0f766e">green = real and tested</text><text class="lg" x="228" y="304" fill="#b45309">dashed amber = off-the-shelf / target</text><text class="lg" x="498" y="304" fill="#1772d0">blue = learned / core method</text></svg>

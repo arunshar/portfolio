@@ -106,5 +106,12 @@
     "github": "https://github.com/arunshar/geotrace-agent",
     "demo": "https://huggingface.co/spaces/Arun0808/geotrace-agent",
     "markdown": "projects/geotrace-agent/paper.md"
+  },
+  {
+    "slug": "harbormaster",
+    "title": "Harbormaster: a production-shaped maritime anomaly platform under a $75/month cap",
+    "venue": "Personal engineering project, 2026",
+    "blurb": "A solo-built, production-shaped maritime anomaly-detection platform on AWS: change-data-capture, streaming, a SageMaker promotion pipeline, and a drift-to-HITL-to-RL flywheel, under a hard cost cap and three layers of adversarial review.",
+    "page": "projects/harbormaster/"
   }
 ]

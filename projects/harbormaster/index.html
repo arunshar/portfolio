@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Harbormaster: a production-shaped maritime anomaly platform under a $75/month cap</title>
+<meta name="description" content="Harbormaster: a personal, production-shaped maritime anomaly-detection platform on AWS, built under a $75/month hard cost cap, to honestly close named resume gaps in CDC, streaming, distributed systems, and MLOps. Guardrails-as-code, gated builds, and three layers of adversarial review.">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800&family=Noto+Sans:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#fbfcfe;--panel:#fff;--ink:#16202c;--mut:#5b6776;--line:#e6eaf0;--acc:#2257d6;--acc2:#0e9f6e;--warn:#b45309;--chip:#eef2f9;--code:#f3f5f9}
+@media(prefers-color-scheme:dark){:root{--bg:#0e1116;--panel:#161b22;--ink:#e7ecf3;--mut:#9aa6b4;--line:#252c37;--acc:#6ea8fe;--acc2:#54d6a0;--warn:#ffb454;--chip:#1b212b;--code:#11151b}}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Noto Sans",system-ui,-apple-system,Segoe UI,Roboto,sans-serif;line-height:1.65;font-size:16px}
+h1,h2,h3{font-family:Montserrat,system-ui,sans-serif}
+a{color:var(--acc);text-decoration:none}a:hover{text-decoration:underline}
+.wrap{max-width:980px;margin:0 auto;padding:0 22px}
+header.hero{padding:52px 0 24px;text-align:center;border-bottom:1px solid var(--line)}
+.kept{font-size:13px;letter-spacing:.16em;text-transform:uppercase;color:var(--mut);font-weight:700}
+h1.title{font-size:33px;line-height:1.16;margin:14px 0 8px;font-weight:800;max-width:880px;margin-left:auto;margin-right:auto}
+.subtitle{font-size:17px;color:var(--mut);max-width:800px;margin:0 auto 8px}
+.authors{margin:14px 0 4px;font-size:15.5px}.aff{color:var(--mut);font-size:13.5px}
+.links{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:20px 0 4px}
+.btn{display:inline-flex;align-items:center;gap:7px;background:var(--ink);color:var(--bg);padding:8px 15px;border-radius:999px;font-weight:600;font-size:14px}
+.btn.go{background:var(--acc);color:#fff}
+.btn.alt{background:transparent;color:var(--ink);border:1px solid var(--line)}
+.btn:hover{text-decoration:none;opacity:.92}
+.pills{display:flex;gap:7px;justify-content:center;flex-wrap:wrap;margin:16px 0 0}
+.pill{background:var(--chip);color:var(--mut);border:1px solid var(--line);border-radius:999px;padding:3px 11px;font-size:12.5px;font-weight:600}
+section{padding:28px 0;border-bottom:1px solid var(--line)}
+h2{font-size:23px;margin:0 0 12px}h3{font-size:17px;margin:20px 0 6px}
+p{margin:10px 0}.lead{font-size:17px}
+.fig{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;margin:16px 0}
+.figcap{color:var(--mut);font-size:13.5px;margin-top:10px;text-align:center}
+.callout{border-left:4px solid var(--acc2);background:var(--panel);border-radius:0 10px 10px 0;padding:14px 16px;margin:14px 0}
+.callout.warn{border-left-color:var(--warn)}.callout b{font-family:Montserrat}
+table{width:100%;border-collapse:collapse;margin:12px 0;font-size:14px}
+th,td{border:1px solid var(--line);padding:7px 10px;text-align:left;vertical-align:top}
+th{background:var(--chip);font-family:Montserrat;font-size:12.5px}
+.ok{color:var(--acc2);font-weight:700}.scaf{color:var(--warn);font-weight:700}
+code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;background:var(--code);padding:1px 6px;border-radius:5px}
+pre{background:var(--code);border:1px solid var(--line);border-radius:10px;padding:13px 15px;overflow:auto;font-size:12.6px;line-height:1.5}
+.defn{background:var(--chip);border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin:10px 0;font-size:14.5px}
+.defn b{font-family:Montserrat}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px}.card h3{margin-top:0}
+ul,ol{margin:8px 0;padding-left:22px}li{margin:5px 0}
+footer{padding:26px 0 50px;color:var(--mut);font-size:13.5px;text-align:center}
+@media(max-width:740px){.grid2,.grid3{grid-template-columns:1fr}h1.title{font-size:27px}}
+</style></head>
+<body>
+
+<header class="hero"><div class="wrap">
+  <div class="kept">Personal engineering project, 2026</div>
+  <h1 class="title">Harbormaster: a production-shaped maritime anomaly platform under a $75/month cap</h1>
+  <div class="subtitle">A solo build of a real-time maritime anomaly-detection platform on AWS, with a change-data-capture pipeline, a streaming feature plane, and a drift-to-HITL-to-RL promotion flywheel, all under a hard cost cap I built before I built anything else.</div>
+  <div class="authors">Arun Sharma</div>
+  <div class="aff">Personal project, built solo</div>
+  <div class="links">
+    <a class="btn go" href="https://arunshar.com/">arunshar.com</a>
+    <a class="btn alt" href="mailto:arun08sharma@gmail.com">Private repository; walkthrough available on request</a>
+  </div>
+  <div class="pills">
+    <span class="pill">Kinesis + Flink</span><span class="pill">Change-data-capture</span><span class="pill">SageMaker async endpoint</span><span class="pill">Model promotion</span><span class="pill">Drift + HITL + RL</span><span class="pill">Terraform</span><span class="pill">$75/mo cost cap</span>
+  </div>
+</div></header>
+
+<section><div class="wrap">
+  <h2>Abstract</h2>
+  <p class="lead">I built Harbormaster to honestly close resume gaps I named in a Supabase Multigres cover note: change-data-capture, streaming, production distributed systems, and MLOps observability. It is a real-time maritime anomaly-detection platform on AWS, live AIS vessel traffic through Kinesis and Managed Flink into a deterministic scoring front door, a Postgres change-data-capture pipeline keeping an online watchlist fresh, and a SageMaker-served model with a full promotion pipeline and a drift-to-HITL-to-RL flywheel behind it. Three layers of adversarial review sit on top of the code: two internal reviews that fixed 26 findings between them, an external audit against AWS's own canonical examples that caught a real, dollar-denominated bug before it ever ran, and live AWS runs that found what only reality could. All of it runs under a $75-a-month hard cost cap enforced by an IAM-deny policy, not a spreadsheet estimate.</p>
+  <div class="callout"><b>This page</b> covers what got built, phase by phase, the promotion pipeline and drift flywheel at the center of it, the adversarial-review discipline that differentiates it from a demo, and what it honestly does not prove.</div>
+</div></section>
+
+<section><div class="wrap">
+  <h2>1. Why this exists, honestly</h2>
+  <p>At ESRI, in the summer of 2023, I worked on a real maritime anomaly detector and the AWS MLOps around it, on a real team with real clients. That work is ESRI's. Harbormaster is my personal extension of the same problem, built entirely after that engagement, on public data, never merged with ESRI code or infrastructure.</p>
+  <p><b>Closes:</b> change-data-capture, streaming, production distributed systems, MLOps and infrastructure-as-code, observability.<br><b>Does not close:</b> a sharded query router, a consensus implementation. That is Vitess and Multigres territory, and Harbormaster deliberately consumes managed Postgres rather than re-implementing it.</p>
+</div></section>
+
+<section><div class="wrap">
+  <h2>2. Guardrails before anything</h2>
+  <p>Phase 0, the very first thing built, was the cost cap itself: a $75 hard budget whose breach action attaches an IAM-deny policy directly to the platform role, a soft budget alerting at $5, $15, and $25, cost-anomaly detection, and a nightly teardown Lambda that sweeps orphaned resources. This came before any pipeline, any model, any line of scoring logic. A deny policy stops new spend, it does not stop spend already in flight, so the cap needed the teardown Lambda alongside it, not the deny policy alone, a lesson the platform names as its own first anticipated war story.</p>
+</div></section>
+
+<section><div class="wrap">
+  <h2>3. Architecture: two planes, one code path</h2>
+  <p>Training happens on MSI, free H100s, entirely off the cloud. Serving happens on AWS. Local fakes and injected I/O prove the same code path the AWS demo windows exercise for real, so nothing has to be taken on faith. Kinesis carries the telemetry stream; Kafka, behind Debezium, carries the change-data-capture stream, two different reliability shapes, two different brokers. There is no standing load balancer and no Kubernetes control plane in the phases built so far: an EKS control plane alone runs about $73 a month flat, whether or not anything is running on it, and would eat the entire cap, so the serving front door runs on ECS Fargate instead, a decision a later, already-signed-off phase revisits on its own terms.</p>
+  <div class="fig">
+  <svg viewBox="0 0 940 320" xmlns="http://www.w3.org/2000/svg" width="100%" role="img" aria-label="Harbormaster two-plane architecture">
+    <style>
+      .bx{fill:#ffffff;stroke:#d8dee8;stroke-width:1.5}
+      .gr{fill:#eafaf2;stroke:#0e9f6e}.bl{fill:#eaf0fd;stroke:#2257d6}.am{fill:#fdf3e6;stroke:#b45309}
+      .t{font-family:Montserrat;font-size:13px;font-weight:700;fill:#16202c}
+      .s{font-family:'Noto Sans';font-size:10.5px;fill:#5b6776}
+      .ph{font-family:Montserrat;font-size:12px;font-weight:800;fill:#16202c;letter-spacing:.04em}
+      .ar{stroke:#8893a4;stroke-width:1.7;fill:none;marker-end:url(#a2)}
+    </style>
+    <defs><marker id="a2" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#8893a4"/></marker></defs>
+    <text class="ph" x="20" y="24">MSI (off-cloud, free H100s)</text>
+    <rect class="bx am" x="14" y="40" width="180" height="56" rx="10"/><text class="t" x="26" y="62">Pi-DPM training</text><text class="s" x="26" y="80">W&amp;B lineage</text>
+    <path class="ar" d="M194,68 L230,68" stroke-dasharray="4 3"/><text class="s" x="196" y="60">one-way manifest</text>
+
+    <text class="ph" x="20" y="130">AWS (serving plane)</text>
+    <rect class="bx bl" x="14" y="146" width="150" height="56" rx="10"/><text class="t" x="26" y="168">Kinesis</text><text class="s" x="26" y="186">live AIS telemetry</text>
+    <rect class="bx bl" x="188" y="146" width="150" height="56" rx="10"/><text class="t" x="200" y="168">Managed Flink</text><text class="s" x="200" y="186">features + P_phys gate</text>
+    <rect class="bx gr" x="362" y="146" width="176" height="56" rx="10"/><text class="t" x="374" y="166">ECS Fargate</text><text class="s" x="374" y="184">deterministic scoring</text>
+    <rect class="bx am" x="562" y="146" width="176" height="56" rx="10"/><text class="t" x="574" y="166">SageMaker async</text><text class="s" x="574" y="184">Pi-DPM, scale-to-zero</text>
+    <rect class="bx bl" x="762" y="146" width="164" height="56" rx="10"/><text class="t" x="774" y="168">HITL console</text><text class="s" x="774" y="186">reviewer verdicts</text>
+    <path class="ar" d="M164,174 L186,174"/><path class="ar" d="M338,174 L360,174"/><path class="ar" d="M538,174 L560,174" stroke-dasharray="4 3"/><path class="ar" d="M738,174 L760,174"/>
+
+    <rect class="bx bl" x="14" y="240" width="220" height="56" rx="10"/><text class="t" x="26" y="260">Postgres registry</text><text class="s" x="26" y="278">vessels, watchlist, sanctions</text>
+    <rect class="bx bl" x="270" y="240" width="150" height="56" rx="10"/><text class="t" x="282" y="262">Debezium</text><text class="s" x="282" y="280">Kafka CDC</text>
+    <rect class="bx gr" x="456" y="240" width="240" height="56" rx="10"/><text class="t" x="468" y="260">Idempotent consumer</text><text class="s" x="468" y="278">LSN-guarded, at-least-once</text>
+    <rect class="bx bl" x="732" y="240" width="194" height="56" rx="10"/><text class="t" x="744" y="260">Online store</text><text class="s" x="744" y="278">DynamoDB + Redis</text>
+    <path class="ar" d="M234,268 L268,268"/><path class="ar" d="M420,268 L454,268"/><path class="ar" d="M696,268 L730,268"/>
+    <path class="ar" d="M844,240 L844,210" stroke-dasharray="4 3"/><text class="s" x="850" y="228">watchlist read-through</text>
+  </svg>
+  <div class="figcap">Two planes: MSI trains, AWS serves. Solid arrows are the live telemetry path (Kinesis to Flink to the scoring service to HITL); the lower row is the change-data-capture path keeping the online watchlist fresh; the dashed arrows are the one-way checkpoint manifest and the read-through watchlist lookup the scorer uses on every request.</div>
+  </div>
+</div></section>
+
+<section><div class="wrap">
+  <h2>4. The build in five phases</h2>
+  <p><b>Phase 0, deployed, live since 2026-07-03.</b> VPC, state stores, the FinOps guardrails above. The only always-on plane; everything else is a bounded demo window, toggled on for a session and torn down before the window closes, never left running between sessions.</p>
+  <p><b>Phase 1, AWS showcase run live 2026-07-04.</b> A replay ingestor into Kinesis, Managed Flink computing per-vessel features and a cheap physics gate, a deterministic ECS Fargate scoring front door with the LLM planner stripped out entirely, a Streamlit human-in-the-loop console. The platform's first-ever live run against real infrastructure found and fixed five real bugs, ranging from a Python worker subprocess that does not inherit its driver's environment to a replay fixture's historical timestamps expiring a database record the instant it landed. Once fixed, a planted anomaly reached the review queue end to end, confirmed live.</p>
+  <p><b>Phase 2, local-stack accepted 2026-07-03; AWS showcase not yet run.</b> The resume-critical piece: Postgres logical decoding through Debezium into an idempotent, LSN-guarded consumer, keeping a DynamoDB and Redis online store fresh, with an append-only audit trail and replication-slot lag alerting. All five acceptance criteria pass in one 33.5-second run against the local stack, and a same-day adversarial review found and fixed seventeen findings, including a real, silent Phase 1 defect it caught by accident. I say plainly that the AWS demonstration of this specific pipeline has not run yet, and no claim on this page should read otherwise.</p>
+  <p><b>Phase 3, AWS showcase run live 2026-07-04, then torn down clean.</b> A transient EMR Spark job backfills historical AIS into an Iceberg lake; a SageMaker async endpoint serves a model behind a real scale-to-zero mechanism, verified live in both directions, a genuinely zero-instance endpoint waking to serving in about 30 seconds; a full promotion pipeline, holdout gate through weighted canary with burn-rate auto-rollback, ran end to end against the live endpoint and promoted a candidate successfully, matching a pinned expected transition sequence exactly. Afterward, every resource, thirteen of them, was torn down in one clean pass and verified gone.</p>
+  <p><b>Phase 4, code-complete on its integration branch, mergeable.</b> The drift-to-HITL-to-RL flywheel: three drift detectors answering three different questions (population shift, calibration, and a proxied concept-drift signal cross-validated against real human disagreement), a preference-triple pipeline for reinforcement-learning fine-tuning candidates, and a reward-hacking probe I red-teamed myself and found a real gap in the same day it was built, then fixed with the smallest possible change before the day was over.</p>
+  <p><b>Phase 5, authored and signed off; the build is a later sprint.</b> A multi-tenant EKS front door with KEDA-based scale-to-zero, per-tenant row-level-security isolation and SLOs, a Bedrock explanation layer that narrates already-computed reasons and never touches the score itself, and a labeled PPO route-optimization stretch service, never counted toward this platform's core resume-gap claims. Signing off on the plan surfaced three real gaps in the platform's own prior assumptions before any of this phase's code exists, the kind of finding a plan review is supposed to produce.</p>
+</div></section>
+
+<section><div class="wrap">
+  <h2>5. The CDC pipeline: the gap that mattered</h2>
+  <p>The whole reason Harbormaster exists is a line I wrote in a Supabase Multigres cover note admitting I had not built change-data-capture in production. This pipeline closes it. Postgres emits a durable, ordered log through logical replication; Debezium captures it; a consumer applies every change through a monotonic LSN guard enforced by a DynamoDB conditional write, so replaying the entire topic from the beginning produces zero duplicate state even though every redelivery is still recorded, on purpose, in an append-only audit table. Insert-to-online latency measures at 0.57 seconds against a 5-second target. Two live drills grounded the design: a stalled consumer's replication-slot lag climbing from zero to 74 million bytes before the alert fires and the slot drains, and a consumer restart under a hostile schedule proving the guarded path converges to byte-identical state where an unguarded path visibly regresses.</p>
+</div></section>
+
+<section><div class="wrap">
+  <h2>6. The promotion pipeline and the flywheel</h2>
+  <p>Every model candidate walks through one door: a holdout gate reusing ported, cross-checked evaluation code, then a shadow comparison against real online traffic, then a canary ramp at 5, 25, 50, and 100 percent, with a burn-rate breach at any weight triggering a full, immediate revert. This is modeled as a saga, not an ad hoc script: each promotion step has an explicit compensating action, so a bad canary weight has a tested, automatic undo rather than an incident-time scramble. Two drills prove the layers actually catch what they claim: a candidate that passed the holdout gate cleanly (AUC 1.0) failed shadow with a real divergence the offline check structurally could not see, because the offline export and the online path had drifted onto different feature encodings; and a candidate that passed both holdout and shadow regressed only once real canary traffic reached it, reverting cleanly at weight 25 and never advancing further. On top of the promotion pipeline sits the drift flywheel: input drift, calibration drift, and a proxied concept-drift signal each answer a different question, cross-validated against each other so a rising population-shape signal alone never triggers retraining on its own, only a rising rate of real operator disagreement does. A reward-hacking probe guards the one path where a fine-tuned candidate could game its own reward function, and I red-teamed that probe myself and found a real gap, a candidate that could win on reward while making its physics violations more severe without ever tripping the original rate-only check. Fixed the same day, with the smallest possible change, and the predicted blast radius held exactly: one existing test's expected outcome flipped, correctly, and nothing else moved.</p>
+</div></section>
+
+<section><div class="wrap">
+  <h2>7. Red-teaming my own platform</h2>
+  <p>Four layers of review, not one. Internally, a Phase 1 review confirmed nine findings and a Phase 2 review confirmed seventeen, including a real, live, silent defect: the serving task definition on AWS had never actually injected the database credential, so the human-review queue had been quietly falling back to an in-memory stub the entire time, caught by accident while reviewing something else. A separate Phase 4 review confirmed the reward-hacking probe's own gap. Externally, an independent audit ran the Phase 3 SageMaker Terraform line by line against AWS's own canonical examples and found nineteen distinct findings, two of them fix-before-demo severity, seven hardening, six decision-record-only, and four that were checked and held without change, including a scale-to-zero design fuller than AWS's own walkthrough notebook. The headline: a target-tracking metric specification was missing one required dimension, meaning the platform's scale-to-zero mechanism would never have fired and an idle GPU instance would have run twenty-four hours a day at roughly 530 dollars a month, silently, against a 75-dollar cap. Both fix-before-demo findings are fixed now, at real commits, verified live, not just planned. Verifying that fix live then surfaced a second, sibling bug on a different alarm the audit itself never checked, an extraneous dimension on the opposite alarm that quietly kept the wake-from-zero path from ever firing, the platform's clearest argument that a review which catches a bug class does not certify every other instance of it is safe. Live AWS runs found what only reality could: a Python UDF worker subprocess that does not inherit its driver's environment, a runtime that turned out to be Python 3.9 rather than the development machine's 3.12, a TTL sweeper deleting historical replay data within seconds of it landing, a Docker build producing a manifest format the deployment target flatly rejects. None of these showed up until the pipeline actually ran against real infrastructure, which is the whole argument for running it rather than trusting a clean plan and a passing test suite.</p>
+</div></section>
+
+<section><div class="wrap">
+  <h2>8. What this does not prove</h2>
+  <ul>
+    <li>No sharded query router and no consensus implementation. That is Vitess and Multigres territory, and I say so before anyone asks.</li>
+    <li>The SageMaker endpoint serves a labeled demo stand-in; there is no MSI-trained checkpoint behind it yet.</li>
+    <li>The canary weight ramp is currently traffic-inert, a single-variant endpoint, and the shadow comparison self-paired against the same batch. A challenger variant is the honest next step before that story is fully load-bearing.</li>
+    <li>Phase 2's AWS demonstration of the CDC pipeline has never run; the pipeline is proven end to end on a local stack only.</li>
+    <li>The real reinforcement-learning fine-tune has not run; the flywheel as built ends at a validated preference-data pipeline.</li>
+    <li>Phase 5 is a signed-off plan, not a build. Nothing beyond the doc exists yet.</li>
+    <li>Restricted figures from my ESRI internship never appear here as a corroborated Harbormaster result; where they matter, I describe them at architecture granularity only.</li>
+    <li>Full-scale historical data, roughly 600 gigabytes of AIS history, is costed and designed but has only run at fixture scale so far.</li>
+  </ul>
+</div></section>
+
+<section><div class="wrap">
+  <h2>9. Numbers at a glance</h2>
+  <table>
+    <thead><tr><th>Metric</th><th>Value</th></tr></thead>
+    <tbody>
+      <tr><td>Hard cost cap</td><td>$75/month, IAM-deny on breach</td></tr>
+      <tr><td>Historical data scope</td><td>~150K ships, ~600 GB AIS, 2009-2017</td></tr>
+      <tr><td>CDC insert-to-online</td><td>0.57s (target 5s)</td></tr>
+      <tr><td>CDC end-to-end</td><td>5/5 acceptance criteria, one 33.5s run</td></tr>
+      <tr><td>Test suite</td><td>376 passed, 9 skipped, growing from 72 across four phases</td></tr>
+      <tr><td>Internal review findings</td><td>9 + 17, fixed same-day both times</td></tr>
+      <tr><td>External audit</td><td>19 findings; both fix-before-demo findings now fixed and verified live</td></tr>
+      <tr><td>Audit catch, dollar value</td><td>~$530/month idle-GPU risk, caught before it ever ran</td></tr>
+      <tr><td>Scale-out-from-zero wake</td><td>real invocation to InService in ~30 seconds</td></tr>
+      <tr><td>War stories</td><td>28 platform stories, 26 grounded in a live drill or a live AWS run</td></tr>
+    </tbody>
+  </table>
+</div></section>
+
+<section><div class="wrap">
+  <h2>References and provenance</h2>
+  <ul>
+    <li>Provenance and honesty framing: locked in this project's own <code>docs/HONESTY.md</code>; every claim above matches it.</li>
+    <li>Data credits: MarineCadastre historical AIS, AISStream.io live AIS traffic, NOAA Electronic Navigational Charts.</li>
+    <li>External audit reference material: <a href="https://github.com/aws-samples/amazon-sagemaker-examples">AWS's SageMaker examples repository</a> and live AWS documentation, audited line by line against this platform's own Terraform.</li>
+    <li>This is a private repository; a walkthrough is available on request.</li>
+  </ul>
+</div></section>
+
+<footer><div class="wrap">
+  Personal project, built solo, 2026 &middot; Private repository; walkthrough available on request.
+  <br><a href="https://arunshar.com/">arunshar.com</a>
+</div></footer>
+
+</body></html>

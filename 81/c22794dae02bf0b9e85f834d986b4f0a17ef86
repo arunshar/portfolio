@@ -1,0 +1,23 @@
+projects/harbormaster/index.html
+  s_a2e22b769416de::t_01e81d3f685a55 1-121,128-136,138-141,143-193
+  s_a2e22b769416de::t_d675f12a76aa11 122-127
+  s_a2e22b769416de::t_018e0015398d77 137,142
+projects/manifest.json
+  s_a2e22b769416de::t_41f8422b6c814a 109-115
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "81c22794dae02bf0b9e85f834d986b4f0a17ef86",
+  "prompts": {},
+  "sessions": {
+    "s_a2e22b769416de": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e974be01-bf66-4a71-962a-97fd96d587a3",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Arun Sharma <sharm485@umn.edu>"
+    }
+  }
+}

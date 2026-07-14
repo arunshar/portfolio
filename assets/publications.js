@@ -62,7 +62,11 @@ window.LEGACY_PUBLICATIONS = [
     "venue": "The 1st ACM SIGSPATIAL International Workshop on Generative and Agentic AI for Multi-Modality Space-Time Intelligence (GeoGenAgent '25), Minneapolis, MN, USA, 5 pages, 2025",
     "links": [
       {
-        "label": "paper",
+        "label": "PDF",
+        "href": "assets/papers/pgfm.pdf"
+      },
+      {
+        "label": "DOI",
         "href": "https://dl.acm.org/doi/pdf/10.1145/3764915.3770717"
       },
       {
@@ -142,7 +146,11 @@ window.LEGACY_PUBLICATIONS = [
     "venue": "Proceedings of the 17th ACM SIGSPATIAL International Workshop on Computational Transportation Science GenAI and Smart Mobility Session (IWCTS'24), pp. 36-45, 2025",
     "links": [
       {
-        "label": "paper",
+        "label": "PDF",
+        "href": "assets/papers/mbor.pdf"
+      },
+      {
+        "label": "DOI",
         "href": "https://dl.acm.org/doi/10.1145/3681772.3698215"
       }
     ],

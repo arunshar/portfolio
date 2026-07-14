@@ -1,0 +1,25 @@
+index.html
+  s_77205060ac6e89::t_9ba0b6f6c7e78d 329
+assets/publications.js
+  s_77205060ac6e89::t_174b61130f5aad 295-299
+  s_77205060ac6e89::t_a0dc096cf45c16 325-329
+  s_77205060ac6e89::t_86b38e936875e8 163-167
+  s_77205060ac6e89::t_2f17177d6608f3 43-47
+  s_77205060ac6e89::t_8a07fe23d1e08c 13-17
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.13",
+  "base_commit_sha": "15d7211889f71847dff8ac39d2c2dd9a2921ed66",
+  "prompts": {},
+  "sessions": {
+    "s_77205060ac6e89": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d0bc849a-1db0-4c1e-829e-1636f9bd1af9",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Arun Sharma <sharm485@umn.edu>"
+    }
+  }
+}

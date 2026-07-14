@@ -190,7 +190,11 @@ window.LEGACY_PUBLICATIONS = [
     "venue": "ACM Transactions on Intelligent Systems and Technology 15 (5), 1-31",
     "links": [
       {
-        "label": "paper",
+        "label": "PDF",
+        "href": "assets/papers/stagd.pdf"
+      },
+      {
+        "label": "DOI",
         "href": "https://dl.acm.org/doi/pdf/10.1145/3673235"
       },
       {

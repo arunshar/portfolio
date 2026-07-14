@@ -10,7 +10,11 @@ window.LEGACY_PUBLICATIONS = [
     "venue": "Proceedings of the 2nd ACM SIGSPATIAL International Workshop on Geospatial Anomaly Detection (GeoAnomalies '25), pp. 11-24, 2025",
     "links": [
       {
-        "label": "paper",
+        "label": "PDF",
+        "href": "assets/papers/pidpm.pdf"
+      },
+      {
+        "label": "DOI",
         "href": "https://dl.acm.org/doi/10.1145/3764914.3770595"
       },
       {
@@ -36,7 +40,11 @@ window.LEGACY_PUBLICATIONS = [
     "venue": "Proceedings of the 33rd ACM International Conference on Advances in Geographic Information Systems (SIGSPATIAL '25), pp. 382-395, 2025",
     "links": [
       {
-        "label": "paper",
+        "label": "PDF",
+        "href": "assets/papers/gcdm.pdf"
+      },
+      {
+        "label": "DOI",
         "href": "https://dl.acm.org/doi/10.1145/3748636.3762749"
       }
     ],
@@ -152,7 +160,11 @@ window.LEGACY_PUBLICATIONS = [
     "venue": "Proceedings of the 32nd ACM International Conference on Advances in Geographic Information Systems (SIGSPATIAL '24), pp. 372-383, 2024",
     "links": [
       {
-        "label": "paper",
+        "label": "PDF",
+        "href": "assets/papers/kicdpm.pdf"
+      },
+      {
+        "label": "DOI",
         "href": "https://dl.acm.org/doi/pdf/10.1145/3678717.3691304"
       },
       {
@@ -280,7 +292,11 @@ window.LEGACY_PUBLICATIONS = [
     "venue": "International Conference on Advances in Geographic Information Systems (ACM SIGSPATIAL 2022) (Oral)",
     "links": [
       {
-        "label": "paper",
+        "label": "PDF",
+        "href": "assets/papers/tgard.pdf"
+      },
+      {
+        "label": "DOI",
         "href": "https://dl.acm.org/doi/pdf/10.1145/3557915.3561033"
       },
       {
@@ -306,7 +322,11 @@ window.LEGACY_PUBLICATIONS = [
     "venue": "ACM TIST 2023",
     "links": [
       {
-        "label": "paper",
+        "label": "PDF",
+        "href": "assets/papers/rendezvous-tss.pdf"
+      },
+      {
+        "label": "DOI",
         "href": "https://dl.acm.org/doi/pdf/10.1145/3467977"
       },
       {

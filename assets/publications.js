@@ -92,7 +92,11 @@ window.LEGACY_PUBLICATIONS = [
     "venue": "Proceedings of the 8th ACM SIGSPATIAL International Workshop on Geospatial Simulation (GeoSIM '25), pp. 57-69, 2025",
     "links": [
       {
-        "label": "paper",
+        "label": "PDF",
+        "href": "assets/papers/SM-Hybrid.pdf"
+      },
+      {
+        "label": "DOI",
         "href": "https://dl.acm.org/doi/pdf/10.1145/3764921.3770153"
       }
     ],
@@ -250,7 +254,11 @@ window.LEGACY_PUBLICATIONS = [
     "venue": "ACM Transactions on Spatial Algorithms and Systems 10, no. 3 (2024): 1-36.",
     "links": [
       {
-        "label": "paper",
+        "label": "PDF",
+        "href": "assets/papers/Atlas-EHR.pdf"
+      },
+      {
+        "label": "DOI",
         "href": "https://dl.acm.org/doi/pdf/10.1145/3679201"
       }
     ],
@@ -268,7 +276,11 @@ window.LEGACY_PUBLICATIONS = [
     "venue": "COSIT 2024",
     "links": [
       {
-        "label": "paper",
+        "label": "PDF",
+        "href": "assets/papers/SSTCM.pdf"
+      },
+      {
+        "label": "Dagstuhl",
         "href": "https://drops.dagstuhl.de/storage/00lipics/lipics-vol315-cosit2024/LIPIcs.COSIT.2024.25/LIPIcs.COSIT.2024.25.pdf"
       }
     ],
@@ -286,7 +298,11 @@ window.LEGACY_PUBLICATIONS = [
     "venue": "GIScience 2023",
     "links": [
       {
-        "label": "paper",
+        "label": "PDF",
+        "href": "assets/papers/MultComp-RCM.pdf"
+      },
+      {
+        "label": "Dagstuhl",
         "href": "https://drops.dagstuhl.de/storage/00lipics/lipics-vol277-giscience2023/LIPIcs.GIScience.2023.3/LIPIcs.GIScience.2023.3.pdf"
       }
     ],
@@ -364,7 +380,11 @@ window.LEGACY_PUBLICATIONS = [
     "venue": "ACM SIGSPATIAL 2022",
     "links": [
       {
-        "label": "paper",
+        "label": "PDF",
+        "href": "assets/papers/TCM.pdf"
+      },
+      {
+        "label": "DOI",
         "href": "https://dl.acm.org/doi/pdf/10.1145/3557915.3561034"
       }
     ],
@@ -382,7 +402,11 @@ window.LEGACY_PUBLICATIONS = [
     "venue": "COSIT 2022 (Oral)",
     "links": [
       {
-        "label": "paper",
+        "label": "PDF",
+        "href": "assets/papers/AGD.pdf"
+      },
+      {
+        "label": "Dagstuhl",
         "href": "https://drops.dagstuhl.de/storage/00lipics/lipics-vol240-cosit2022/LIPIcs.COSIT.2022.26/LIPIcs.COSIT.2022.26.pdf"
       },
       {
@@ -404,7 +428,11 @@ window.LEGACY_PUBLICATIONS = [
     "venue": "ACM GeoSim 2022",
     "links": [
       {
-        "label": "paper",
+        "label": "PDF",
+        "href": "assets/papers/geo-robust-regional-colocation.pdf"
+      },
+      {
+        "label": "DOI",
         "href": "https://dl.acm.org/doi/pdf/10.1145/3557989.3566158"
       }
     ],
@@ -492,7 +520,11 @@ window.LEGACY_PUBLICATIONS = [
     "venue": "ACM BIGSPATIAL 2018",
     "links": [
       {
-        "label": "paper",
+        "label": "PDF",
+        "href": "assets/papers/webGlobe.pdf"
+      },
+      {
+        "label": "DOI",
         "href": "https://dl.acm.org/doi/pdf/10.1145/3282834.3282835"
       },
       {

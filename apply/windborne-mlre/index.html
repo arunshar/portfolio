@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Arun Sharma — WindBorne ML Research Engineer Submission</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body {
+      max-width: 760px; margin: 3rem auto; padding: 0 1.25rem;
+      font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: #1a1a1a; background: #fff;
+    }
+    @media (prefers-color-scheme: dark) { body { color: #e6e6e6; background: #111; } }
+    h1 { font-size: 1.5rem; margin-bottom: 0.15rem; }
+    .role { color: #666; margin-top: 0; }
+    @media (prefers-color-scheme: dark) { .role { color: #aaa; } }
+    h2 { font-size: 1.02rem; margin: 2rem 0 0.35rem; }
+    p.answer { margin-top: 0; }
+    hr { border: none; border-top: 1px solid #e2e2e2; margin: 2rem 0 0.5rem; }
+    @media (prefers-color-scheme: dark) { hr { border-top-color: #333; } }
+    .meta { color: #888; font-size: 0.85rem; }
+  </style>
+</head>
+<body>
+  <h1>Arun Sharma</h1>
+  <p class="role">Written submission, Machine Learning Research Engineer, WindBorne Systems</p>
+
+  <h2>1. Which of your open ML Research Engineer roles are you interested in, in order?</h2>
+  <p class="answer">Model Evaluation first, then Applied Research, then General. My PhD is on when metric-correct models are still trust-wrong, and I review for SDM/CIKM/ACL, so building honest, meteorologically valid comparisons of WeatherMesh against AI and physics baselines is what I most want to do. Applied Research is a close second: physics-informed spatiotemporal ML is my core.</p>
+
+  <h2>2. Describe an ML idea you were initially excited about but later decided was wrong or unimportant. What changed your mind?</h2>
+  <p class="answer">I thought scaling a purely data-driven model would beat physics-guided methods for trajectory anomaly detection. It didn't: the anomalies lived in missing, denied observations, which a bigger model just smoothed over. Treating the gaps as signal and adding physics and knowledge constraints beat scale. It reset how I weight inductive bias against raw data.</p>
+
+  <h2>3. Describe a time you took initiative outside your core job responsibilities. What value did you add? What drove you to action?</h2>
+  <p class="answer">Outside my thesis, training kept hitting a silent failure in DeepSpeed. Rather than work around it, I traced the root cause in the library, wrote a fix and a regression test, and upstreamed it; the PR was merged. It spared other users the same quiet breakage. I trust infrastructure I can read and repair, and leaving a landmine for the next person felt wrong.</p>
+
+  <h2>4. How could better accuracy fail to translate into more useful forecasts for a weather model?</h2>
+  <p class="answer">Aggregate accuracy and decision value can diverge. Models tuned to minimize RMSE hedge toward blurry, low-amplitude fields: strong average scores, but they wash out the sharp gradients and extremes that decisions turn on, the double-penalty trap. Global RMSE can fall while the key region, threshold, or tail regresses, and calibration, not point skill, drives actionable risk.</p>
+
+  <h2>5. Describe a time you changed how you use LLMs in your work, switching models, tools, or workflows. What did you observe that prompted the change?</h2>
+  <p class="answer">I stopped using LLMs as authors and made them adversarial reviewers behind hard verification gates. The trigger: a model reported a clean result no run had actually produced. Now every generated number must trace to an executed artifact, and a second model red-teams the first. My output quality and my trust in it both rose.</p>
+
+  <hr>
+  <p class="meta">Resume: <a href="https://arunshar.com/portfolio/data/Arun_Sharma_Resume.pdf">arunshar.com/portfolio/data/Arun_Sharma_Resume.pdf</a> &middot; Portfolio: <a href="https://arunshar.com/portfolio/">arunshar.com/portfolio</a></p>
+</body>
+</html>
